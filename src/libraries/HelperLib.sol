@@ -5,6 +5,9 @@ library HelperLib {
     uint256 constant E4 = 1e4;
     error TransferFromFailed();
     error TransferFailed();
+    error UniswapV2_InsufficientInputAmount();
+    error UniswapV2_InsufficientOutputAmount();
+    error UniswapV2_InsufficientLiquidity();
 
     // given an input amount of an asset and pair reserves, returns the maximum output amount of the other asset
     function getAmountOut(
@@ -13,11 +16,14 @@ library HelperLib {
         uint256 reserveOut,
         uint256 feeE4
     ) internal pure returns (uint256 amountOut) {
-        require(amountIn > 0, "UniswapV2Library: INSUFFICIENT_INPUT_AMOUNT");
-        require(
-            reserveIn > 0 && reserveOut > 0,
-            "UniswapV2Library: INSUFFICIENT_LIQUIDITY"
-        );
+        if (amountIn == 0) {
+            revert UniswapV2_InsufficientInputAmount();
+        }
+
+        if (reserveIn == 0 || reserveOut == 0) {
+            revert UniswapV2_InsufficientLiquidity();
+        }
+
         unchecked {
             uint256 amountInWithFee = amountIn * (feeE4);
             uint256 numerator = amountInWithFee * (reserveOut);
@@ -33,68 +39,18 @@ library HelperLib {
         uint256 reserveOut,
         uint256 feeE4
     ) internal pure returns (uint256 amountIn) {
-        require(amountOut > 0, "UniswapV2Library: INSUFFICIENT_OUTPUT_AMOUNT");
-        require(
-            reserveIn > 0 && reserveOut > 0,
-            "UniswapV2Library: INSUFFICIENT_LIQUIDITY"
-        );
+        if (amountIn == 0) {
+            revert UniswapV2_InsufficientOutputAmount();
+        }
+        if (reserveIn == 0 || reserveOut == 0) {
+            revert UniswapV2_InsufficientLiquidity();
+        }
 
         unchecked {
             uint256 numerator = reserveIn * amountOut * E4;
             uint256 denominator = reserveOut - amountOut * feeE4;
             amountIn = (numerator / denominator) + 1;
         }
-    }
-
-    /// @notice Cast a uint256 to a int256, revert on overflow
-    /// @param y The uint256 to be casted
-    /// @return z The casted integer, now type int256
-    // https://github.com/Uniswap/v3-core/blob/main/contracts/libraries/SafeCast.sol#L24
-    function toInt256(uint256 y) internal pure returns (int256 z) {
-        require(y < 2 ** 255);
-        z = int256(y);
-    }
-
-    function toUint24(
-        bytes memory _bytes,
-        uint256 _start
-    ) internal pure returns (uint24) {
-        require(_start + 3 >= _start, "toUint24_overflow");
-        require(_bytes.length >= _start + 3, "toUint24_outOfBounds");
-        uint24 tempUint;
-
-        assembly {
-            tempUint := mload(add(add(_bytes, 0x3), _start))
-        }
-
-        return tempUint;
-    }
-
-    function decodePool(
-        bytes memory path
-    ) internal pure returns (address tokenA, address tokenB, uint24 fee) {
-        tokenA = toAddress(path, 0);
-        fee = toUint24(path, 20);
-        tokenB = toAddress(path, 23);
-    }
-
-    // TODO
-    function toAddress(
-        bytes memory _bytes,
-        uint256 _start
-    ) internal pure returns (address) {
-        require(_start + 20 >= _start, "toAddress_overflow");
-        require(_bytes.length >= _start + 20, "toAddress_outOfBounds");
-        address tempAddress;
-
-        assembly {
-            tempAddress := div(
-                mload(add(add(_bytes, 0x20), _start)),
-                0x1000000000000000000000000
-            )
-        }
-
-        return tempAddress;
     }
 
     // https://github.com/transmissions11/solmate/blob/main/src/utils/SafeTransferLib.sol#L65
