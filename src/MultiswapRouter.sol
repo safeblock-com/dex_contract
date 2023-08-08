@@ -39,6 +39,8 @@ contract MultiswapRouter {
         ADDRESS_THIS_BYTES32 = addressThisBytes32;
     }
 
+    error MultiswapRouter_InvalidOutAmount();
+
     error MultiswapRouter_FailedV2Swap();
 
     error MultiswapRouter_InvalidPairsArray();
@@ -49,6 +51,8 @@ contract MultiswapRouter {
     struct Calldata {
         // initial exact value in
         uint256 amountIn;
+        // minimal amountOut
+        uint256 minAmountOut;
         // first token in swap
         address tokenIn;
         // array of bytes32 values (pairs) involved in the swap
@@ -63,8 +67,12 @@ contract MultiswapRouter {
     function multiswap(Calldata calldata data) external {
         // cache length of pairs to stack for gas savings
         uint256 length = data.pairs.length;
+        uint256 lastIndex;
+        unchecked {
+            lastIndex = length - 1;
+        }
 
-        // if length of array is zero - revert
+        // if length of array is zero -> revert
         if (length == 0) {
             revert MultiswapRouter_InvalidPairsArray();
         }
@@ -93,14 +101,13 @@ contract MultiswapRouter {
             amountIn
         );
 
+        uint256 balanceOutBeforeLastSwap;
         bool uni3Next;
         bytes32 destination;
         for (uint256 i; i < length; i = _unsafeAddOne(i)) {
-            if (i == length - 1) {
-                // if the pair is the last in the array - the next token recipient after the swap is msg.sender
-                assembly {
-                    destination := caller()
-                }
+            if (i == lastIndex) {
+                // if the pair is the last in the array - the next token recipient after the swap is address(this)
+                destination = ADDRESS_THIS_BYTES32;
             } else {
                 // otherwise take the next pair
                 destination = data.pairs[_unsafeAddOne(i)];
@@ -114,14 +121,16 @@ contract MultiswapRouter {
             }
 
             if (uni3) {
-                (amountIn, tokenIn) = _swapUniV3(
+                (amountIn, tokenIn, balanceOutBeforeLastSwap) = _swapUniV3(
+                    i == lastIndex,
                     pair,
                     amountIn,
                     tokenIn,
                     uni3Next ? ADDRESS_THIS_BYTES32 : destination
                 );
             } else {
-                (amountIn, tokenIn) = _swapUniV2(
+                (amountIn, tokenIn, balanceOutBeforeLastSwap) = _swapUniV2(
+                    i == lastIndex,
                     pair,
                     tokenIn,
                     uni3Next ? ADDRESS_THIS_BYTES32 : destination
@@ -130,6 +139,25 @@ contract MultiswapRouter {
             // upgrade the pair for the next swap
             pair = destination;
         }
+
+        uint256 balanceOutAfterLastSwap = IERC20(tokenIn).balanceOf(
+            address(this)
+        );
+
+        if (balanceOutAfterLastSwap < balanceOutBeforeLastSwap) {
+            revert MultiswapRouter_InvalidOutAmount();
+        }
+
+        uint256 exactAmountOut;
+        unchecked {
+            exactAmountOut = balanceOutAfterLastSwap - balanceOutBeforeLastSwap;
+        }
+
+        if (exactAmountOut < data.minAmountOut) {
+            revert MultiswapRouter_InvalidOutAmount();
+        }
+
+        HelperLib.safeTransfer(tokenIn, msg.sender, exactAmountOut);
     }
 
     struct CalldataPartswap {
@@ -168,14 +196,20 @@ contract MultiswapRouter {
             }
 
             if (uni3) {
-                _swapUniV3(pair, data.amountsIn[i], tokenIn, msgSenderBytes32);
+                _swapUniV3(
+                    false,
+                    pair,
+                    data.amountsIn[i],
+                    tokenIn,
+                    msgSenderBytes32
+                );
             } else {
                 address _pair;
                 assembly {
                     _pair := and(pair, ADDRESS_MASK)
                 }
                 HelperLib.safeTransfer(tokenIn, _pair, data.amountsIn[i]);
-                _swapUniV2(pair, tokenIn, msgSenderBytes32);
+                _swapUniV2(false, pair, tokenIn, msgSenderBytes32);
             }
         }
     }
@@ -214,17 +248,23 @@ contract MultiswapRouter {
 
     /// @dev uniswapV3 swap exact tokens
     function _swapUniV3(
+        bool lastSwap,
         bytes32 _pool,
         uint256 amountIn,
         address tokenIn,
         bytes32 _destination
-    ) private returns (uint256 amountOut, address tokenOut) {
+    )
+        private
+        returns (
+            uint256 amountOut,
+            address tokenOut,
+            uint256 balanceOutBeforeLastSwap
+        )
+    {
         IRouter pool;
-        uint24 fee;
         address destination;
         assembly {
             pool := and(_pool, ADDRESS_MASK)
-            fee := and(FEE_MASK, shr(160, _pool))
             destination := and(_destination, ADDRESS_MASK)
         }
 
@@ -232,6 +272,11 @@ contract MultiswapRouter {
         tokenOut = pool.token0();
         if (tokenOut == tokenIn) {
             tokenOut = pool.token1();
+        }
+        if (lastSwap) {
+            balanceOutBeforeLastSwap = IERC20(tokenOut).balanceOf(
+                address(this)
+            );
         }
 
         bool zeroForOne = tokenIn < tokenOut;
@@ -258,10 +303,18 @@ contract MultiswapRouter {
 
     /// @dev uniswapV2 swap exact tokens
     function _swapUniV2(
+        bool lastSwap,
         bytes32 _pair,
         address tokenIn,
         bytes32 _destination
-    ) private returns (uint256 amountOutput, address tokenOut) {
+    )
+        private
+        returns (
+            uint256 amountOutput,
+            address tokenOut,
+            uint256 balanceOutBeforeLastSwap
+        )
+    {
         IRouter pair;
         uint256 fee;
         address destination;
@@ -272,29 +325,39 @@ contract MultiswapRouter {
         }
 
         address token0 = pair.token0();
-        uint256 amountInput;
-        // scope to avoid stack too deep errors
-        (uint256 reserve0, uint256 reserve1, ) = pair.getReserves();
-        (uint256 reserveInput, uint256 reserveOutput) = tokenIn == token0
-            ? (reserve0, reserve1)
-            : (reserve1, reserve0);
+        tokenOut = tokenIn == token0 ? pair.token1() : token0;
 
-        // get the exact number of tokens that were sent to the pair
-        // underflow is impossible cause after token transfer via token contract
-        // reserves in the pair not updated yet
-        unchecked {
-            amountInput =
-                IERC20(tokenIn).balanceOf(address(pair)) -
-                reserveInput;
+        if (lastSwap) {
+            balanceOutBeforeLastSwap = IERC20(tokenOut).balanceOf(
+                address(this)
+            );
         }
 
-        // get the output number of tokens after swap
-        amountOutput = HelperLib.getAmountOut(
-            amountInput,
-            reserveInput,
-            reserveOutput,
-            fee
-        );
+        uint256 amountInput;
+        // scope to avoid stack too deep errors
+        {
+            (uint256 reserve0, uint256 reserve1, ) = pair.getReserves();
+            (uint256 reserveInput, uint256 reserveOutput) = tokenIn == token0
+                ? (reserve0, reserve1)
+                : (reserve1, reserve0);
+
+            // get the exact number of tokens that were sent to the pair
+            // underflow is impossible cause after token transfer via token contract
+            // reserves in the pair not updated yet
+            unchecked {
+                amountInput =
+                    IERC20(tokenIn).balanceOf(address(pair)) -
+                    reserveInput;
+            }
+
+            // get the output number of tokens after swap
+            amountOutput = HelperLib.getAmountOut(
+                amountInput,
+                reserveInput,
+                reserveOutput,
+                fee
+            );
+        }
 
         (uint256 amount0Out, uint256 amount1Out) = tokenIn == token0
             ? (uint256(0), amountOutput)
@@ -330,8 +393,6 @@ contract MultiswapRouter {
                 revert MultiswapRouter_FailedV2Swap();
             }
         }
-
-        tokenOut = tokenIn == token0 ? pair.token1() : token0;
     }
 
     /// @dev check for overflow has been removed for optimization
