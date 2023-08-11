@@ -6,13 +6,16 @@ import {IRouter} from "./interfaces/IRouter.sol";
 import {HelperLib} from "./libraries/HelperLib.sol";
 
 contract MultiswapRouter {
+    // =========================
+    // Storage
+    // =========================
+
     // mask for UniswapV3 pair designation
     // if `mask & pair == true`, the swap is performed using the UniswapV3 logic
     bytes32 private constant UNISWAP_V3_MASK =
         0x8000000000000000000000000000000000000000000000000000000000000000;
     // address mask: `mask & pair == address(pair)`
-    address private constant ADDRESS_MASK =
-        0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;
+    address private constant ADDRESS_MASK = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;
     // fee mask: `mask & (pair >> 160) == fee in pair`
     uint24 private constant FEE_MASK = 0xffffff;
 
@@ -31,14 +34,68 @@ contract MultiswapRouter {
     // cache for swapV3Callback
     address private _poolAddressCache;
 
-    constructor() {
+    // ownership control
+    address private _owner;
+
+    // fee logic
+    uint256 private constant FEE_MAX = 10000;
+    uint256 private _protocolFee;
+
+    struct RefferalFee {
+        uint256 protocolPart;
+        uint256 refferalPart;
+    }
+    RefferalFee private _refferalFee;
+    mapping(address owner => mapping(address token => uint256 balance)) public profit;
+
+    // =========================
+    // Constructor
+    // =========================
+
+    constructor(uint256 protocolFee_, RefferalFee memory refferalFee_) {
+        if (
+            protocolFee_ > FEE_MAX ||
+            refferalFee_.refferalPart + refferalFee_.protocolPart > protocolFee_
+        ) {
+            revert MultiswapRouter_InvalidFeeValue();
+        }
+        _protocolFee = protocolFee_;
+        _refferalFee = refferalFee_;
+
         bytes32 addressThisBytes32;
         assembly {
             addressThisBytes32 := address()
         }
         ADDRESS_THIS_BYTES32 = addressThisBytes32;
+
+        _owner = msg.sender;
+        emit OwnershipTransferred(address(0), msg.sender);
     }
 
+    // =========================
+    // Modifiers
+    // =========================
+
+    modifier onlyOwner() {
+        if (msg.sender != _owner) {
+            revert MultiswapRouter_SenderIsNotOwner();
+        }
+
+        _;
+    }
+
+    // =========================
+    // Events
+    // =========================
+
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
+    // =========================
+    // Errors
+    // =========================
+
+    error MultiswapRouter_InvalidFeeValue();
+    error MultiswapRouter_SenderIsNotOwner();
     error MultiswapRouter_InvalidOutAmount();
 
     error MultiswapRouter_FailedV2Swap();
@@ -47,8 +104,95 @@ contract MultiswapRouter {
     error MultiswapRouter_FailedV3Swap();
     error MultiswapRouter_SenderMustBeUniswapV3Pool();
     error MultiswapRouter_InvalidIntCast();
+    error MultiswapRouter_NewOwnerIsZeroAddress();
 
-    struct Calldata {
+    // =========================
+    // Ownership logic
+    // =========================
+
+    function owner() external view returns (address) {
+        return _owner;
+    }
+
+    function transferOwnership(address newOwner) external onlyOwner {
+        if (newOwner == address(0)) {
+            revert MultiswapRouter_NewOwnerIsZeroAddress();
+        }
+        _owner = newOwner;
+        emit OwnershipTransferred(msg.sender, newOwner);
+    }
+
+    // =========================
+    // Fees logic
+    // =========================
+
+    function fees() external view returns (uint256, RefferalFee memory) {
+        return (_protocolFee, _refferalFee);
+    }
+
+    function changeProtocolFee(uint256 newProtocolFee) external onlyOwner {
+        if (newProtocolFee > FEE_MAX) {
+            revert MultiswapRouter_InvalidFeeValue();
+        }
+
+        _protocolFee = newProtocolFee;
+    }
+
+    function changeRefferalFee(RefferalFee memory newRefferalFee) external onlyOwner {
+        if ((newRefferalFee.refferalPart + newRefferalFee.protocolPart) > _protocolFee) {
+            revert MultiswapRouter_InvalidFeeValue();
+        }
+
+        _refferalFee = newRefferalFee;
+    }
+
+    // =========================
+    // Main logic
+    // =========================
+
+    function collectProtocolFees(address token, address recipient, uint256 amount) external onlyOwner {
+        uint256 balanceOf = profit[address(this)][token];
+        if (balanceOf >= amount) {
+            unchecked {
+                profit[address(this)][token] -= amount;
+            }
+            HelperLib.safeTransfer(token, recipient, amount);
+        }
+    }
+
+    function collectRefferalFees(address token, address recipient, uint256 amount) external {
+        uint256 balanceOf = profit[msg.sender][token];
+
+        if (balanceOf >= amount) {
+            unchecked {
+                profit[msg.sender][token] -= amount;
+            }
+            HelperLib.safeTransfer(token, recipient, amount);
+        }
+    }
+
+    function collectProtocolFees(address token, address recipient) external onlyOwner {
+        uint256 balanceOf = profit[address(this)][token];
+        if (balanceOf >= 0) {
+            unchecked {
+                profit[address(this)][token] -= balanceOf;
+            }
+            HelperLib.safeTransfer(token, recipient, balanceOf);
+        }
+    }
+
+    function collectRefferalFees(address token, address recipient) external {
+        uint256 balanceOf = profit[msg.sender][token];
+
+        if (balanceOf >= 0) {
+            unchecked {
+                profit[msg.sender][token] -= balanceOf;
+            }
+            HelperLib.safeTransfer(token, recipient, balanceOf);
+        }
+    }
+
+    struct MultiswapCalldata {
         // initial exact value in
         uint256 amountIn;
         // minimal amountOut
@@ -58,13 +202,16 @@ contract MultiswapRouter {
         // array of bytes32 values (pairs) involved in the swap
         // from left to right:
         //     address of the pair - 20 bytes
-        //     fee in pair - 3 bytes
+        //     fee in pair - 3 bytes (for V2 pairs)
         //     the highest bit shows which version the pair belongs to
         bytes32[] pairs;
+        // an optional address that slightly relaxes the protocol's fees in favor of that address 
+        // and the user who called the multiswap
+        address refferalAddress;
     }
 
     /// @notice Swaps through the data.pairs array
-    function multiswap(Calldata calldata data) external {
+    function multiswap(MultiswapCalldata calldata data) external {
         // cache length of pairs to stack for gas savings
         uint256 length = data.pairs.length;
         uint256 lastIndex;
@@ -95,10 +242,7 @@ contract MultiswapRouter {
         //     if the pair belongs to version 2 of the protocol - to the pair
         //     if version 3 - to the router contract
         HelperLib.safeTransferFrom(
-            tokenIn,
-            msg.sender,
-            uni3 ? address(this) : firstPair,
-            amountIn
+            tokenIn, msg.sender, uni3 ? address(this) : firstPair, amountIn
         );
 
         uint256 balanceOutBeforeLastSwap;
@@ -122,17 +266,12 @@ contract MultiswapRouter {
 
             if (uni3) {
                 (amountIn, tokenIn, balanceOutBeforeLastSwap) = _swapUniV3(
-                    i == lastIndex,
-                    pair,
-                    amountIn,
-                    tokenIn,
+                    i == lastIndex, pair, amountIn, tokenIn,
                     uni3Next ? ADDRESS_THIS_BYTES32 : destination
                 );
             } else {
                 (amountIn, tokenIn, balanceOutBeforeLastSwap) = _swapUniV2(
-                    i == lastIndex,
-                    pair,
-                    tokenIn,
+                    i == lastIndex, pair, tokenIn,
                     uni3Next ? ADDRESS_THIS_BYTES32 : destination
                 );
             }
@@ -140,9 +279,7 @@ contract MultiswapRouter {
             pair = destination;
         }
 
-        uint256 balanceOutAfterLastSwap = IERC20(tokenIn).balanceOf(
-            address(this)
-        );
+        uint256 balanceOutAfterLastSwap = IERC20(tokenIn).balanceOf(address(this));
 
         if (balanceOutAfterLastSwap < balanceOutBeforeLastSwap) {
             revert MultiswapRouter_InvalidOutAmount();
@@ -157,17 +294,21 @@ contract MultiswapRouter {
             revert MultiswapRouter_InvalidOutAmount();
         }
 
+        exactAmountOut = _writeFees( exactAmountOut, data.refferalAddress, tokenIn);
+
         HelperLib.safeTransfer(tokenIn, msg.sender, exactAmountOut);
     }
 
-    struct CalldataPartswap {
+    // TODO
+    struct PartswapCalldata {
         uint256 fullAmount;
         address tokenIn;
         uint256[] amountsIn;
         bytes32[] pairs;
     }
 
-    function partSwap(CalldataPartswap calldata data) external {
+    // TODO
+    function partSwap(PartswapCalldata calldata data) external {
         uint256 length = data.pairs.length;
         if (length == 0) {
             revert MultiswapRouter_InvalidPairsArray();
@@ -246,6 +387,30 @@ contract MultiswapRouter {
         HelperLib.safeTransfer(tokenIn, msg.sender, amountToPay);
     }
 
+    // =========================
+    // Private methods
+    // =========================
+
+    function _writeFees(uint256 exactAmount, address refferalAddress, address token) private returns (uint256) {
+        if (refferalAddress == address(0)) {
+            unchecked {
+                uint256 fee = (exactAmount * _protocolFee) / FEE_MAX;
+                profit[address(this)][token] += fee;
+
+                return exactAmount - fee;
+            }
+        } else {
+            unchecked {
+                uint256 refferalFeePart = (exactAmount * _refferalFee.refferalPart) / FEE_MAX;
+                uint256 protocolFeePart = (exactAmount * _refferalFee.protocolPart) / FEE_MAX;
+                profit[refferalAddress][token] += refferalFeePart;
+                profit[address(this)][token] += protocolFeePart;
+
+                return exactAmount - refferalFeePart - protocolFeePart;
+            }
+        }
+    }
+
     /// @dev uniswapV3 swap exact tokens
     function _swapUniV3(
         bool lastSwap,
@@ -255,11 +420,7 @@ contract MultiswapRouter {
         bytes32 _destination
     )
         private
-        returns (
-            uint256 amountOut,
-            address tokenOut,
-            uint256 balanceOutBeforeLastSwap
-        )
+        returns (uint256 amountOut, address tokenOut, uint256 balanceOutBeforeLastSwap)
     {
         IRouter pool;
         address destination;
@@ -274,9 +435,7 @@ contract MultiswapRouter {
             tokenOut = pool.token1();
         }
         if (lastSwap) {
-            balanceOutBeforeLastSwap = IERC20(tokenOut).balanceOf(
-                address(this)
-            );
+            balanceOutBeforeLastSwap = IERC20(tokenOut).balanceOf(address(this));
         }
 
         bool zeroForOne = tokenIn < tokenOut;
@@ -309,11 +468,7 @@ contract MultiswapRouter {
         bytes32 _destination
     )
         private
-        returns (
-            uint256 amountOutput,
-            address tokenOut,
-            uint256 balanceOutBeforeLastSwap
-        )
+        returns (uint256 amountOutput, address tokenOut, uint256 balanceOutBeforeLastSwap)
     {
         IRouter pair;
         uint256 fee;
@@ -328,9 +483,7 @@ contract MultiswapRouter {
         tokenOut = tokenIn == token0 ? pair.token1() : token0;
 
         if (lastSwap) {
-            balanceOutBeforeLastSwap = IERC20(tokenOut).balanceOf(
-                address(this)
-            );
+            balanceOutBeforeLastSwap = IERC20(tokenOut).balanceOf(address(this));
         }
 
         uint256 amountInput;
@@ -345,17 +498,12 @@ contract MultiswapRouter {
             // underflow is impossible cause after token transfer via token contract
             // reserves in the pair not updated yet
             unchecked {
-                amountInput =
-                    IERC20(tokenIn).balanceOf(address(pair)) -
-                    reserveInput;
+                amountInput = IERC20(tokenIn).balanceOf(address(pair)) - reserveInput;
             }
 
             // get the output number of tokens after swap
             amountOutput = HelperLib.getAmountOut(
-                amountInput,
-                reserveInput,
-                reserveOutput,
-                fee
+                amountInput, reserveInput, reserveOutput, fee
             );
         }
 
@@ -369,11 +517,7 @@ contract MultiswapRouter {
                 address(pair),
                 abi.encodeWithSelector(
                     // swap(uint256,uint256,address,bytes) selector
-                    0x022c0d9f,
-                    amount0Out,
-                    amount1Out,
-                    destination,
-                    bytes("")
+                    0x022c0d9f, amount0Out, amount1Out, destination, bytes("")
                 )
             )
         ) {
@@ -383,10 +527,7 @@ contract MultiswapRouter {
                     address(pair),
                     abi.encodeWithSelector(
                         // swap(uint256,uint256,address) selector
-                        0x6d9a640a,
-                        amount0Out,
-                        amount1Out,
-                        destination
+                        0x6d9a640a, amount0Out, amount1Out, destination
                     )
                 )
             ) {
