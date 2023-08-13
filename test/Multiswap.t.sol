@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Test, console2} from "forge-std/Test.sol";
+import "forge-std/Test.sol";
 import {IERC20} from "src/interfaces/IERC20.sol";
 
 import {MultiswapRouter} from "src/MultiswapRouter.sol";
@@ -273,7 +273,7 @@ contract MultiswapTest is Test {
         vm.prank(address(1));
         multiswapRouter.collectRefferalFees(BUSD, address(1), fees / 2);
 
-        vm.prank(user);
+        vm.prank(address(1212));
         multiswapRouter.collectRefferalFees(BUSD, user, fees / 2);
 
         assertEq(multiswapRouter.profit(address(1212), BUSD), fees / 2);
@@ -303,7 +303,7 @@ contract MultiswapTest is Test {
         vm.prank(address(1));
         multiswapRouter.collectRefferalFees(BUSD, address(1));
 
-        vm.prank(user);
+        vm.prank(address(1212));
         multiswapRouter.collectRefferalFees(BUSD, user);
 
         assertEq(multiswapRouter.profit(address(1212), BUSD), 0);
