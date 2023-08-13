@@ -364,6 +364,7 @@ contract MultiswapRouter {
             }
         }
 
+        // sum of amounts array must be lte to fullAmount
         if (fullAmountCheck > data.fullAmount) {
             revert MultiswapRouter_InvalidPartswapCalldata();
         }
@@ -372,7 +373,6 @@ contract MultiswapRouter {
         address tokenOut = data.tokenOut;
 
         // Transfer full amount in for all swaps
-        // sum of amounts array must be equal to fullAmount (do offchain check)
         HelperLib.safeTransferFrom(tokenIn, msg.sender, address(this), data.fullAmount);
 
         bytes32 pair;

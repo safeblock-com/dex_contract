@@ -78,7 +78,6 @@ struct PartswapCalldata {
 ``` 
 
 Note: sum of all amounts in `amounts` array should be equal to `fullAmount`
-(do offchain check)
 
 Protocol and refferal fees are calculated from sum of swap amountsOut
 
