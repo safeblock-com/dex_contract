@@ -6,17 +6,6 @@ interface IERC20 {
 
     function balanceOf(address holder) external view returns (uint256);
 
-    function allowance(
-        address spender,
-        address recipient
-    ) external view returns (uint256);
-
-    function transferFrom(
-        address spender,
-        address recipient,
-        uint256 amount
-    ) external returns (bool);
-
     function transfer(
         address recipient,
         uint256 amount

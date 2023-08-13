@@ -45,7 +45,12 @@ contract MultiswapRouter {
         uint256 protocolPart;
         uint256 refferalPart;
     }
-    RefferalFee private _refferalFee;
+
+    // protocolPart of refferalFee: _refferalFee & PROTOCOL_PART_MASK
+    // refferalPart of refferalFee: _refferalFee >> 128
+    uint256 private constant PROTOCOL_PART_MASK = 0xffffffffffffffffffffffffffffffff;
+    uint256 private _refferalFee;
+
     mapping(address owner => mapping(address token => uint256 balance)) public profit;
 
     // =========================
@@ -53,14 +58,18 @@ contract MultiswapRouter {
     // =========================
 
     constructor(uint256 protocolFee_, RefferalFee memory refferalFee_) {
-        if (
-            protocolFee_ > FEE_MAX ||
-            refferalFee_.refferalPart + refferalFee_.protocolPart > protocolFee_
-        ) {
+        if (protocolFee_ > FEE_MAX || refferalFee_.refferalPart + refferalFee_.protocolPart > protocolFee_) {
             revert MultiswapRouter_InvalidFeeValue();
         }
         _protocolFee = protocolFee_;
-        _refferalFee = refferalFee_;
+
+        uint256 protocolPart = refferalFee_.protocolPart;
+        uint256 refferalPart = refferalFee_.refferalPart;
+        uint256 refferalFee;
+        assembly {
+            refferalFee := or(shl(128, refferalPart), protocolPart)
+        }
+        _refferalFee = refferalFee;
 
         bytes32 addressThisBytes32;
         assembly {
@@ -126,8 +135,19 @@ contract MultiswapRouter {
     // Fees logic
     // =========================
 
-    function fees() external view returns (uint256, RefferalFee memory) {
-        return (_protocolFee, _refferalFee);
+    function fees() external view returns (uint256 protocolFee, RefferalFee memory refferalFee) {
+        protocolFee = _protocolFee;
+        uint256 refferalFee_ = _refferalFee;
+        uint256 protocolPart;
+        uint256 refferalPart;
+
+        assembly {
+            protocolPart := and(PROTOCOL_PART_MASK, refferalFee_)
+            refferalPart := shr(128, refferalFee_)
+        }
+
+        refferalFee.protocolPart = protocolPart;
+        refferalFee.refferalPart = refferalPart;
     }
 
     function changeProtocolFee(uint256 newProtocolFee) external onlyOwner {
@@ -143,7 +163,13 @@ contract MultiswapRouter {
             revert MultiswapRouter_InvalidFeeValue();
         }
 
-        _refferalFee = newRefferalFee;
+        uint256 protocolPart = newRefferalFee.protocolPart;
+        uint256 refferalPart = newRefferalFee.refferalPart;
+        uint256 refferalFee;
+        assembly {
+            refferalFee := or(shl(128, refferalPart), protocolPart)
+        }
+        _refferalFee = refferalFee;
     }
 
     // =========================
@@ -162,7 +188,6 @@ contract MultiswapRouter {
 
     function collectRefferalFees(address token, address recipient, uint256 amount) external {
         uint256 balanceOf = profit[msg.sender][token];
-
         if (balanceOf >= amount) {
             unchecked {
                 profit[msg.sender][token] -= amount;
@@ -183,7 +208,6 @@ contract MultiswapRouter {
 
     function collectRefferalFees(address token, address recipient) external {
         uint256 balanceOf = profit[msg.sender][token];
-
         if (balanceOf >= 0) {
             unchecked {
                 profit[msg.sender][token] -= balanceOf;
@@ -205,7 +229,7 @@ contract MultiswapRouter {
         //     fee in pair - 3 bytes (for V2 pairs)
         //     the highest bit shows which version the pair belongs to
         bytes32[] pairs;
-        // an optional address that slightly relaxes the protocol's fees in favor of that address 
+        // an optional address that slightly relaxes the protocol's fees in favor of that address
         // and the user who called the multiswap
         address refferalAddress;
     }
@@ -294,41 +318,50 @@ contract MultiswapRouter {
             revert MultiswapRouter_InvalidOutAmount();
         }
 
-        exactAmountOut = _writeFees( exactAmountOut, data.refferalAddress, tokenIn);
+        exactAmountOut = _writeFees(exactAmountOut, data.refferalAddress, tokenIn);
 
         HelperLib.safeTransfer(tokenIn, msg.sender, exactAmountOut);
     }
 
-    // TODO
     struct PartswapCalldata {
+        // exact value in for part swap
         uint256 fullAmount;
+        // minimal amountOut
+        uint256 minAmountOut;
+        // token in
         address tokenIn;
+        // token out
+        address tokenOut;
+        // array of amounts for each swap, corresponding to the address for the swap from the pairs array
         uint256[] amountsIn;
+        // array of bytes32 values (pairs) involved in the swap
+        // from left to right:
+        //     address of the pair - 20 bytes
+        //     fee in pair - 3 bytes (for V2 pairs)
+        //     the highest bit shows which version the pair belongs to
         bytes32[] pairs;
+        // an optional address that slightly relaxes the protocol's fees in favor of that address
+        // and the user who called the multiswap
+        address refferalAddress;
     }
 
-    // TODO
-    function partSwap(PartswapCalldata calldata data) external {
+    /// @notice Swaps through each pair separately
+    /// @dev each pair in the pairs array must have tokenIn and have the same tokenOut,
+    /// the result of swap is the sum after each swap
+    function partswap(PartswapCalldata calldata data) external {
+        // cache length of pairs to stack for gas savings
         uint256 length = data.pairs.length;
-        if (length == 0) {
-            revert MultiswapRouter_InvalidPairsArray();
-        }
 
         address tokenIn = data.tokenIn;
+        address tokenOut = data.tokenOut;
 
-        HelperLib.safeTransferFrom(
-            tokenIn,
-            msg.sender,
-            address(this),
-            data.fullAmount
-        );
+        // Transfer full amount in for all swaps
+        // sum of amounts array must be equal to fullAmount (do offchain check)
+        HelperLib.safeTransferFrom(tokenIn, msg.sender, address(this), data.fullAmount);
 
         bytes32 pair;
         bool uni3;
-        bytes32 msgSenderBytes32;
-        assembly {
-            msgSenderBytes32 := caller()
-        }
+        uint256 amountBefore = IERC20(tokenOut).balanceOf(address(this));
 
         for (uint256 i; i < length; i = _unsafeAddOne(i)) {
             pair = data.pairs[i];
@@ -337,22 +370,35 @@ contract MultiswapRouter {
             }
 
             if (uni3) {
-                _swapUniV3(
-                    false,
-                    pair,
-                    data.amountsIn[i],
-                    tokenIn,
-                    msgSenderBytes32
-                );
+                _swapUniV3(false, pair, data.amountsIn[i], tokenIn, ADDRESS_THIS_BYTES32);
             } else {
                 address _pair;
                 assembly {
                     _pair := and(pair, ADDRESS_MASK)
                 }
                 HelperLib.safeTransfer(tokenIn, _pair, data.amountsIn[i]);
-                _swapUniV2(false, pair, tokenIn, msgSenderBytes32);
+                _swapUniV2(false, pair, tokenIn, ADDRESS_THIS_BYTES32);
             }
         }
+
+        uint256 amountAfter = IERC20(tokenOut).balanceOf(address(this));
+
+        if (amountAfter < amountBefore) {
+            revert MultiswapRouter_InvalidOutAmount();
+        }
+
+        uint256 exactAmountOut;
+        unchecked {
+            exactAmountOut = amountAfter - amountBefore;
+        }
+
+        if (exactAmountOut < data.minAmountOut) {
+            revert MultiswapRouter_InvalidOutAmount();
+        }
+
+        exactAmountOut = _writeFees(exactAmountOut, data.refferalAddress, tokenOut);
+
+        HelperLib.safeTransfer(tokenOut, msg.sender, exactAmountOut);
     }
 
     // for V3Callback
@@ -400,9 +446,17 @@ contract MultiswapRouter {
                 return exactAmount - fee;
             }
         } else {
+            uint256 refferalFee_ = _refferalFee;
+            uint256 protocolPart;
+            uint256 refferalPart;
+            assembly {
+                protocolPart := and(PROTOCOL_PART_MASK, refferalFee_)
+                refferalPart := shr(128, refferalFee_)
+            }
+
             unchecked {
-                uint256 refferalFeePart = (exactAmount * _refferalFee.refferalPart) / FEE_MAX;
-                uint256 protocolFeePart = (exactAmount * _refferalFee.protocolPart) / FEE_MAX;
+                uint256 refferalFeePart = (exactAmount * refferalPart) / FEE_MAX;
+                uint256 protocolFeePart = (exactAmount * protocolPart) / FEE_MAX;
                 profit[refferalAddress][token] += refferalFeePart;
                 profit[address(this)][token] += protocolFeePart;
 
@@ -412,13 +466,7 @@ contract MultiswapRouter {
     }
 
     /// @dev uniswapV3 swap exact tokens
-    function _swapUniV3(
-        bool lastSwap,
-        bytes32 _pool,
-        uint256 amountIn,
-        address tokenIn,
-        bytes32 _destination
-    )
+    function _swapUniV3(bool lastSwap, bytes32 _pool, uint256 amountIn, address tokenIn, bytes32 _destination)
         private
         returns (uint256 amountOut, address tokenOut, uint256 balanceOutBeforeLastSwap)
     {
@@ -449,9 +497,7 @@ contract MultiswapRouter {
         // caching pool address in storage
         _poolAddressCache = address(pool);
         (int256 amount0, int256 amount1) = pool.swap(
-            destination,
-            zeroForOne,
-            int256(amountIn),
+            destination, zeroForOne, int256(amountIn),
             (zeroForOne ? MIN_SQRT_RATIO_PLUS_ONE : MAX_SQRT_RATIO_MINUS_ONE),
             abi.encode(tokenIn)
         );
@@ -461,12 +507,7 @@ contract MultiswapRouter {
     }
 
     /// @dev uniswapV2 swap exact tokens
-    function _swapUniV2(
-        bool lastSwap,
-        bytes32 _pair,
-        address tokenIn,
-        bytes32 _destination
-    )
+    function _swapUniV2(bool lastSwap, bytes32 _pair, address tokenIn, bytes32 _destination)
         private
         returns (uint256 amountOutput, address tokenOut, uint256 balanceOutBeforeLastSwap)
     {
@@ -544,10 +585,7 @@ contract MultiswapRouter {
     }
 
     /// @dev low-level call, returns true if successful
-    function _makeCall(
-        address addr,
-        bytes memory data
-    ) private returns (bool success) {
+    function _makeCall(address addr, bytes memory data) private returns (bool success) {
         (success, ) = addr.call(data);
     }
 }

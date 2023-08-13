@@ -86,10 +86,11 @@ library HelperLib {
                 // surrounding and() call or else returndatasize() will be zero during the computation.
                 call(gas(), token, 0, freeMemoryPointer, 68, 0, 32)
             )
-        }
 
-        if (!success) {
-            revert TransferFailed();
+            if iszero(success) {
+                returndatacopy(0, 0, returndatasize())
+                revert (0, returndatasize())
+            }
         }
     }
 
@@ -135,10 +136,11 @@ library HelperLib {
                 // surrounding and() call or else returndatasize() will be zero during the computation.
                 call(gas(), token, 0, freeMemoryPointer, 100, 0, 32)
             )
-        }
 
-        if (!success) {
-            revert TransferFromFailed();
+            if iszero(success) {
+                returndatacopy(0, 0, returndatasize())
+                revert (0, returndatasize())
+            }
         }
     }
 }
