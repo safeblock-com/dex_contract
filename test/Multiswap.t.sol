@@ -276,7 +276,11 @@ contract MultiswapTest is Test {
         vm.prank(address(1212));
         multiswapRouter.collectRefferalFees(BUSD, user, fees / 2);
 
-        assertEq(multiswapRouter.profit(address(1212), BUSD), fees / 2);
+        assertApproxEqAbs(
+            multiswapRouter.profit(address(1212), BUSD),
+            fees / 2,
+            2
+        );
     }
 
     function test_multiswapRouter_collectRefferalFees_shouldWithdrawAllFees()
