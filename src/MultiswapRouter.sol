@@ -341,7 +341,7 @@ contract MultiswapRouter {
         //     the highest bit shows which version the pair belongs to
         bytes32[] pairs;
         // an optional address that slightly relaxes the protocol's fees in favor of that address
-        // and the user who called the multiswap
+        // and the user who called the partswap
         address refferalAddress;
     }
 
