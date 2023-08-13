@@ -218,4 +218,44 @@ contract MultiswapTest is Test {
         assertGt(multiswapRouter.profit(address(multiswapRouter), BUSD), 0);
         vm.stopPrank();
     }
+
+    function test_multiswapRouter_partswap_shouldRevertWithInvalidCalldata() external {
+        MultiswapRouter.PartswapCalldata memory data;
+        data.fullAmount = 2000000000;
+        data.tokenIn = WBNB;
+        data.tokenOut = BUSD;
+        data.amountsIn = new uint256[](4);
+        data.amountsIn[0] = 600000000;
+        data.amountsIn[1] = 500000000;
+        data.amountsIn[2] = 500000000;
+        data.amountsIn[3] = 500000000;
+        data.pairs = new bytes32[](4);
+        data.pairs[0] = WBNB_BUSD_Cake;
+        data.pairs[1] = WBNB_BUSD_Biswap;
+        data.pairs[2] = WBNB_BUSD_CakeV3_500;
+        data.pairs[3] = WBNB_BUSD_Bakery;
+
+        vm.startPrank(user);
+        vm.expectRevert(MultiswapRouter.MultiswapRouter_InvalidPartswapCalldata.selector);
+        multiswapRouter.partswap(data);
+
+        data.fullAmount = 2000000000;
+        data.tokenIn = WBNB;
+        data.tokenOut = BUSD;
+        data.amountsIn = new uint256[](3);
+        data.amountsIn[0] = 500000000;
+        data.amountsIn[1] = 500000000;
+        data.amountsIn[2] = 500000000;
+        data.pairs = new bytes32[](4);
+        data.pairs[0] = WBNB_BUSD_Cake;
+        data.pairs[1] = WBNB_BUSD_Biswap;
+        data.pairs[2] = WBNB_BUSD_CakeV3_500;
+        data.pairs[3] = WBNB_BUSD_Bakery;
+
+        vm.startPrank(user);
+        vm.expectRevert(MultiswapRouter.MultiswapRouter_InvalidPartswapCalldata.selector);
+        multiswapRouter.partswap(data);
+
+        vm.stopPrank();
+    }
 }

@@ -110,6 +110,7 @@ contract MultiswapRouter {
     error MultiswapRouter_FailedV2Swap();
 
     error MultiswapRouter_InvalidPairsArray();
+    error MultiswapRouter_InvalidPartswapCalldata();
     error MultiswapRouter_FailedV3Swap();
     error MultiswapRouter_SenderMustBeUniswapV3Pool();
     error MultiswapRouter_InvalidIntCast();
@@ -351,6 +352,21 @@ contract MultiswapRouter {
     function partswap(PartswapCalldata calldata data) external {
         // cache length of pairs to stack for gas savings
         uint256 length = data.pairs.length;
+
+        if (length != data.amountsIn.length) {
+            revert MultiswapRouter_InvalidPartswapCalldata();
+        }
+
+        uint256 fullAmountCheck;
+        for (uint256 i; i < length; i = _unsafeAddOne(i)) {
+            unchecked {
+                fullAmountCheck += data.amountsIn[i];
+            }
+        }
+
+        if (fullAmountCheck > data.fullAmount) {
+            revert MultiswapRouter_InvalidPartswapCalldata();
+        }
 
         address tokenIn = data.tokenIn;
         address tokenOut = data.tokenOut;
