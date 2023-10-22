@@ -1,0 +1,1 @@
+[{"inputs":[],"name":"TransferFailed","type":"error"},{"inputs":[],"name":"TransferFromFailed","type":"error"},{"inputs":[],"name":"UniswapV2_InsufficientInputAmount","type":"error"},{"inputs":[],"name":"UniswapV2_InsufficientLiquidity","type":"error"},{"inputs":[],"name":"UniswapV2_InsufficientOutputAmount","type":"error"}]

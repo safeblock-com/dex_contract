@@ -145,5 +145,5 @@ put private key and rpc url to `.env` file
 and run `source .env`
 
 ```bash
-forge script script/MultiswapRouter.s:MultiswapRouterDeploy -vvvv --rpc-url $BSC_URL --broadcast     
+forge script script/MultiswapRouter.s.sol:MultiswapRouterDeploy -vvvv --rpc-url $BSC_URL --broadcast     
 ```

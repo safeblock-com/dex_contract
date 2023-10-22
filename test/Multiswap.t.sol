@@ -21,7 +21,7 @@ contract MultiswapTest is Test {
         vm.prank(user);
         multiswapRouter = new MultiswapRouter(
             300,
-            MultiswapRouter.RefferalFee({protocolPart: 200, refferalPart: 50})
+            MultiswapRouter.ReferralFee({protocolPart: 200, ReferralPart: 50})
         );
     }
 
@@ -57,7 +57,7 @@ contract MultiswapTest is Test {
         assertGt(multiswapRouter.profit(address(multiswapRouter), BUSD), 0);
     }
 
-    function test_multiswapRouter_multiswap_swapViaOnePairV3_refferal()
+    function test_multiswapRouter_multiswap_swapViaOnePairV3_Referral()
         external
     {
         MultiswapRouter.MultiswapCalldata memory data;
@@ -65,7 +65,7 @@ contract MultiswapTest is Test {
         data.tokenIn = WBNB;
         data.pairs = new bytes32[](1);
         data.pairs[0] = WBNB_BUSD_UniV3_3000;
-        data.refferalAddress = address(123);
+        data.ReferralAddress = address(123);
 
         vm.prank(user);
         IERC20(WBNB).approve(address(multiswapRouter), type(uint256).max);
@@ -77,7 +77,7 @@ contract MultiswapTest is Test {
         assertGt(multiswapRouter.profit(address(123), BUSD), 0);
     }
 
-    function test_multiswapRouter_multiswap_swapViaOnePairV2_refferal()
+    function test_multiswapRouter_multiswap_swapViaOnePairV2_Referral()
         external
     {
         MultiswapRouter.MultiswapCalldata memory data;
@@ -85,7 +85,7 @@ contract MultiswapTest is Test {
         data.tokenIn = WBNB;
         data.pairs = new bytes32[](1);
         data.pairs[0] = WBNB_BUSD_Cake;
-        data.refferalAddress = address(123);
+        data.ReferralAddress = address(123);
 
         vm.prank(user);
         IERC20(WBNB).approve(address(multiswapRouter), type(uint256).max);
@@ -129,7 +129,7 @@ contract MultiswapTest is Test {
         vm.stopPrank();
     }
 
-    function test_multiswapRouter_multiswap_swapViaTwoPairsV2AndV3_refferal()
+    function test_multiswapRouter_multiswap_swapViaTwoPairsV2AndV3_Referral()
         external
     {
         MultiswapRouter.MultiswapCalldata memory data;
@@ -138,7 +138,7 @@ contract MultiswapTest is Test {
         data.pairs = new bytes32[](2);
         data.pairs[0] = WBNB_BUSD_Cake;
         data.pairs[1] = BUSD_CAKE_CakeV3_100;
-        data.refferalAddress = address(123);
+        data.ReferralAddress = address(123);
 
         vm.startPrank(user);
         IERC20(WBNB).approve(address(multiswapRouter), type(uint256).max);
@@ -249,7 +249,7 @@ contract MultiswapTest is Test {
         assertEq(multiswapRouter.profit(address(multiswapRouter), BUSD), 0);
     }
 
-    function test_multiswapRouter_collectRefferalFees_shouldWithdrawPartOfFees()
+    function test_multiswapRouter_collectReferralFees_shouldWithdrawPartOfFees()
         external
     {
         MultiswapRouter.MultiswapCalldata memory data;
@@ -257,7 +257,7 @@ contract MultiswapTest is Test {
         data.tokenIn = WBNB;
         data.pairs = new bytes32[](1);
         data.pairs[0] = WBNB_BUSD_UniV3_3000;
-        data.refferalAddress = address(1212);
+        data.ReferralAddress = address(1212);
 
         vm.prank(user);
         IERC20(WBNB).approve(address(multiswapRouter), type(uint256).max);
@@ -271,10 +271,10 @@ contract MultiswapTest is Test {
 
         // did nothing
         vm.prank(address(1));
-        multiswapRouter.collectRefferalFees(BUSD, address(1), fees / 2);
+        multiswapRouter.collectReferralFees(BUSD, address(1), fees / 2);
 
         vm.prank(address(1212));
-        multiswapRouter.collectRefferalFees(BUSD, user, fees / 2);
+        multiswapRouter.collectReferralFees(BUSD, user, fees / 2);
 
         assertApproxEqAbs(
             multiswapRouter.profit(address(1212), BUSD),
@@ -283,7 +283,7 @@ contract MultiswapTest is Test {
         );
     }
 
-    function test_multiswapRouter_collectRefferalFees_shouldWithdrawAllFees()
+    function test_multiswapRouter_collectReferralFees_shouldWithdrawAllFees()
         external
     {
         MultiswapRouter.MultiswapCalldata memory data;
@@ -291,7 +291,7 @@ contract MultiswapTest is Test {
         data.tokenIn = WBNB;
         data.pairs = new bytes32[](1);
         data.pairs[0] = WBNB_BUSD_UniV3_3000;
-        data.refferalAddress = address(1212);
+        data.ReferralAddress = address(1212);
 
         vm.prank(user);
         IERC20(WBNB).approve(address(multiswapRouter), type(uint256).max);
@@ -305,11 +305,30 @@ contract MultiswapTest is Test {
 
         // did nothing
         vm.prank(address(1));
-        multiswapRouter.collectRefferalFees(BUSD, address(1));
+        multiswapRouter.collectReferralFees(BUSD, address(1));
 
         vm.prank(address(1212));
-        multiswapRouter.collectRefferalFees(BUSD, user);
+        multiswapRouter.collectReferralFees(BUSD, user);
 
         assertEq(multiswapRouter.profit(address(1212), BUSD), 0);
+    }
+
+    function test_amountOut() external {
+        MultiswapRouter.MultiswapCalldata memory data;
+        data.amountIn = 1e18;
+        data.tokenIn = WBNB;
+        data.pairs = new bytes32[](1);
+        data.pairs[0] = WBNB_USDT_Cake;
+
+        vm.prank(user);
+        IERC20(WBNB).approve(address(multiswapRouter), type(uint256).max);
+
+        vm.prank(user);
+        multiswapRouter.multiswap(data);
+        assertGt(multiswapRouter.profit(address(multiswapRouter), USDT), 0);
+
+
+        console.log("WBNB", 500e18-IERC20(WBNB).balanceOf(user));
+        console.log("USDT", IERC20(USDT).balanceOf(user));
     }
 }
