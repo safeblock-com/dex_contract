@@ -19,36 +19,36 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
     // storage
     // =========================
 
-    // mask for UniswapV3 pair designation
-    // if `mask & pair == true`, the swap is performed using the UniswapV3 logic
-    bytes32 internal constant UNISWAP_V3_MASK = 0x8000000000000000000000000000000000000000000000000000000000000000;
-    // address mask: `mask & pair == address(pair)`
-    address internal constant ADDRESS_MASK = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;
-    // fee mask: `mask & (pair >> 160) == fee in pair`
-    uint24 internal constant FEE_MASK = 0xffffff;
+    /// @dev mask for UniswapV3 pair designation
+    /// if `mask & pair == true`, the swap is performed using the UniswapV3 logic
+    bytes32 private constant UNISWAP_V3_MASK = 0x8000000000000000000000000000000000000000000000000000000000000000;
+    /// address mask: `mask & pair == address(pair)`
+    address private constant ADDRESS_MASK = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;
+    /// fee mask: `mask & (pair >> 160) == fee in pair`
+    uint24 private constant FEE_MASK = 0xffffff;
 
-    // minimum and maximum possible values of SQRT_RATIO in UniswapV3
-    uint160 internal constant MIN_SQRT_RATIO_PLUS_ONE = 4_295_128_740;
-    uint160 internal constant MAX_SQRT_RATIO_MINUS_ONE =
+    /// @dev minimum and maximum possible values of SQRT_RATIO in UniswapV3
+    uint160 private constant MIN_SQRT_RATIO_PLUS_ONE = 4_295_128_740;
+    uint160 private constant MAX_SQRT_RATIO_MINUS_ONE =
         1_461_446_703_485_210_103_287_273_052_203_988_822_378_723_970_341;
 
-    // 2**255
-    uint256 internal constant CAST_INT_CONSTANT =
-        57_896_044_618_658_097_711_785_492_504_343_953_926_634_992_332_820_282_019_728_792_003_956_564_819_968;
+    /// @dev 2**255 - 1
+    uint256 private constant CAST_INT_CONSTANT =
+        57_896_044_618_658_097_711_785_492_504_343_953_926_634_992_332_820_282_019_728_792_003_956_564_819_967;
 
-    // cache for swapV3Callback
-    address internal _poolAddressCache;
+    /// @dev cache for swapV3Callback
+    address private _poolAddressCache;
 
-    // fee logic
-    uint256 internal constant FEE_MAX = 10_000;
-    uint256 internal _protocolFee;
+    /// @dev fee logic
+    uint256 private constant FEE_MAX = 10_000;
+    uint256 private _protocolFee;
 
-    // protocolPart of referralFee: _referralFee & PROTOCOL_PART_MASK
-    // referralPart of referralFee: _referralFee >> 128
-    uint256 internal constant PROTOCOL_PART_MASK = 0xffffffffffffffffffffffffffffffff;
-    uint256 internal _referralFee;
+    /// @dev protocolPart of referralFee: _referralFee & PROTOCOL_PART_MASK
+    /// referralPart of referralFee: _referralFee >> 128
+    uint256 private constant PROTOCOL_PART_MASK = 0xffffffffffffffffffffffffffffffff;
+    uint256 private _referralFee;
 
-    mapping(address owner => mapping(address token => uint256 balance)) public profit;
+    mapping(address owner => mapping(address token => uint256 balance)) private _profit;
 
     // =========================
     // constructor
@@ -82,6 +82,11 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
     }
 
     /// @inheritdoc IMultiswapRouter
+    function profit(address owner, address token) external view returns (uint256 balance) {
+        return _profit[owner][token];
+    }
+
+    /// @inheritdoc IMultiswapRouter
     function fees() external view returns (uint256 protocolFee, ReferralFee memory referralFee) {
         assembly ("memory-safe") {
             protocolFee := sload(_protocolFee.slot)
@@ -112,10 +117,10 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
 
     /// @inheritdoc IMultiswapRouter
     function collectProtocolFees(address token, address recipient, uint256 amount) external onlyOwner {
-        uint256 balanceOf = profit[address(this)][token];
+        uint256 balanceOf = _profit[address(this)][token];
         if (balanceOf >= amount) {
             unchecked {
-                profit[address(this)][token] -= amount;
+                _profit[address(this)][token] -= amount;
             }
             TransferHelper.safeTransfer(token, recipient, amount);
         }
@@ -123,10 +128,10 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
 
     /// @inheritdoc IMultiswapRouter
     function collectReferralFees(address token, address recipient, uint256 amount) external {
-        uint256 balanceOf = profit[msg.sender][token];
+        uint256 balanceOf = _profit[msg.sender][token];
         if (balanceOf >= amount) {
             unchecked {
-                profit[msg.sender][token] -= amount;
+                _profit[msg.sender][token] -= amount;
             }
             TransferHelper.safeTransfer(token, recipient, amount);
         }
@@ -134,10 +139,10 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
 
     /// @inheritdoc IMultiswapRouter
     function collectProtocolFees(address token, address recipient) external onlyOwner {
-        uint256 balanceOf = profit[address(this)][token];
+        uint256 balanceOf = _profit[address(this)][token];
         if (balanceOf > 0) {
             unchecked {
-                profit[address(this)][token] -= balanceOf;
+                _profit[address(this)][token] -= balanceOf;
             }
             TransferHelper.safeTransfer(token, recipient, balanceOf);
         }
@@ -145,10 +150,10 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
 
     /// @inheritdoc IMultiswapRouter
     function collectReferralFees(address token, address recipient) external {
-        uint256 balanceOf = profit[msg.sender][token];
+        uint256 balanceOf = _profit[msg.sender][token];
         if (balanceOf > 0) {
             unchecked {
-                profit[msg.sender][token] -= balanceOf;
+                _profit[msg.sender][token] -= balanceOf;
             }
             TransferHelper.safeTransfer(token, recipient, balanceOf);
         }
@@ -162,14 +167,14 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
     function multiswap(MultiswapCalldata calldata data) external {
         // cache length of pairs to stack for gas savings
         uint256 length = data.pairs.length;
+        // if length of array is zero -> revert
+        if (length == 0) {
+            revert MultiswapRouter_InvalidArray();
+        }
+
         uint256 lastIndex;
         unchecked {
             lastIndex = length - 1;
-        }
-
-        // if length of array is zero -> revert
-        if (length == 0) {
-            revert MultiswapRouter_InvalidPairsArray();
         }
 
         bytes32 pair = data.pairs[0];
@@ -187,14 +192,11 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
         address tokenIn = data.tokenIn;
 
         // execute transferFrom:
-        //     if the pair belongs to version 2 of the protocol - to the pair
-        //     if version 3 - to the router contract
+        //     if the pair belongs to version 2 of the protocol -> transfer tokens to the pair
+        //     if version 3 - to this contract
         TransferHelper.safeTransferFrom(tokenIn, msg.sender, uni3 ? address(this) : firstPair, amountIn);
 
-        bytes32 addressThisBytes32;
-        assembly ("memory-safe") {
-            addressThisBytes32 := address()
-        }
+        bytes32 addressThisBytes32 = _addressThisBytes32();
 
         uint256 balanceOutBeforeLastSwap;
         bool uni3Next;
@@ -209,7 +211,7 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
             }
 
             assembly ("memory-safe") {
-                uni3 := and(pair, UNISWAP_V3_MASK)
+                // uni3 := and(pair, UNISWAP_V3_MASK) // TODO check
                 // if the next pair belongs to version 3 of the protocol - the address
                 // of the router is set as the recipient, otherwise - the next pair
                 uni3Next := and(destination, UNISWAP_V3_MASK)
@@ -224,6 +226,7 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
             }
             // upgrade the pair for the next swap
             pair = destination;
+            uni3 = uni3Next; // TODO check
         }
 
         uint256 balanceOutAfterLastSwap = IERC20(tokenIn).balanceOf(address(this));
@@ -250,33 +253,38 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
     function partswap(PartswapCalldata calldata data) external {
         // cache length of pairs to stack for gas savings
         uint256 length = data.pairs.length;
-
+        // if length of array is zero -> revert
+        if (length == 0) {
+            revert MultiswapRouter_InvalidArray();
+        }
         if (length != data.amountsIn.length) {
             revert MultiswapRouter_InvalidPartswapCalldata();
         }
 
-        uint256 fullAmountCheck;
-        for (uint256 i; i < length; i = _unsafeAddOne(i)) {
-            unchecked {
-                fullAmountCheck += data.amountsIn[i];
+        address tokenIn;
+        address tokenOut;
+        {
+            uint256 fullAmountCheck;
+            for (uint256 i; i < length; i = _unsafeAddOne(i)) {
+                unchecked {
+                    fullAmountCheck += data.amountsIn[i];
+                }
             }
+
+            uint256 fullAmount = data.fullAmount;
+            // sum of amounts array must be lte to fullAmount
+            if (fullAmountCheck > fullAmount) {
+                revert MultiswapRouter_InvalidPartswapCalldata();
+            }
+
+            tokenIn = data.tokenIn;
+            tokenOut = data.tokenOut;
+
+            // Transfer full amount in for all swaps
+            TransferHelper.safeTransferFrom(tokenIn, msg.sender, address(this), fullAmount);
         }
 
-        // sum of amounts array must be lte to fullAmount
-        if (fullAmountCheck > data.fullAmount) {
-            revert MultiswapRouter_InvalidPartswapCalldata();
-        }
-
-        address tokenIn = data.tokenIn;
-        address tokenOut = data.tokenOut;
-
-        // Transfer full amount in for all swaps
-        TransferHelper.safeTransferFrom(tokenIn, msg.sender, address(this), data.fullAmount);
-
-        bytes32 addressThisBytes32;
-        assembly ("memory-safe") {
-            addressThisBytes32 := address()
-        }
+        bytes32 addressThisBytes32 = _addressThisBytes32();
 
         bytes32 pair;
         bool uni3;
@@ -390,15 +398,15 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
         if (referralAddress == address(0)) {
             unchecked {
                 uint256 fee = (exactAmount * _protocolFee) / FEE_MAX;
-                profit[address(this)][token] += fee;
+                _profit[address(this)][token] += fee;
 
                 return exactAmount - fee;
             }
         } else {
-            uint256 referralFee_ = _referralFee;
             uint256 protocolPart;
             uint256 referralPart;
             assembly ("memory-safe") {
+                let referralFee_ := sload(_referralFee.slot)
                 protocolPart := and(PROTOCOL_PART_MASK, referralFee_)
                 referralPart := shr(128, referralFee_)
             }
@@ -406,8 +414,8 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
             unchecked {
                 uint256 referralFeePart = (exactAmount * referralPart) / FEE_MAX;
                 uint256 protocolFeePart = (exactAmount * protocolPart) / FEE_MAX;
-                profit[referralAddress][token] += referralFeePart;
-                profit[address(this)][token] += protocolFeePart;
+                _profit[referralAddress][token] += referralFeePart;
+                _profit[address(this)][token] += protocolFeePart;
 
                 return exactAmount - referralFeePart - protocolFeePart;
             }
@@ -437,6 +445,7 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
         if (tokenOut == tokenIn) {
             tokenOut = pool.token1();
         }
+
         if (lastSwap) {
             balanceOutBeforeLastSwap = IERC20(tokenOut).balanceOf(address(this));
         }
@@ -445,7 +454,7 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
 
         // cast a uint256 to a int256, revert on overflow
         // https://github.com/Uniswap/v3-core/blob/main/contracts/libraries/SafeCast.sol#L24
-        if (!(amountIn < CAST_INT_CONSTANT)) {
+        if (amountIn > CAST_INT_CONSTANT) {
             revert MultiswapRouter_InvalidIntCast();
         }
 
@@ -482,6 +491,7 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
             destination := and(_destination, ADDRESS_MASK)
         }
 
+        // if token0 in the pool is tokenIn - tokenOut == token1, otherwise tokenOut == token0
         address token0 = pair.token0();
         tokenOut = tokenIn == token0 ? pair.token1() : token0;
 
@@ -529,6 +539,12 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
     function _unsafeAddOne(uint256 i) internal pure returns (uint256) {
         unchecked {
             return i + 1;
+        }
+    }
+
+    function _addressThisBytes32() internal view returns (bytes32 addressThisBytes32) {
+        assembly ("memory-safe") {
+            addressThisBytes32 := address()
         }
     }
 

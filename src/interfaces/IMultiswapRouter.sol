@@ -12,7 +12,7 @@ interface IMultiswapRouter {
 
     error MultiswapRouter_FailedV2Swap();
 
-    error MultiswapRouter_InvalidPairsArray();
+    error MultiswapRouter_InvalidArray();
     error MultiswapRouter_InvalidPartswapCalldata();
     error MultiswapRouter_FailedV3Swap();
     error MultiswapRouter_SenderMustBeUniswapV3Pool();
@@ -26,25 +26,30 @@ interface IMultiswapRouter {
     function initialize(uint256 protocolFee, ReferralFee calldata newReferralFee, address newOwner) external;
 
     // =========================
-    // fees logic
+    // getters
     // =========================
+
+    function getVersion() external view returns (uint8);
+
+    function profit(address owner, address token) external view returns (uint256 balance);
 
     struct ReferralFee {
         uint256 protocolPart;
         uint256 referralPart;
     }
 
-    /// @notice Returns the current proxy version
-    function getVersion() external view returns (uint8);
-
     function fees() external view returns (uint256 protocolFee, ReferralFee memory referralFee);
+
+    // =========================
+    // admin logic
+    // =========================
 
     function changeProtocolFee(uint256 newProtocolFee) external;
 
     function changeReferralFee(ReferralFee memory newReferralFee) external;
 
     // =========================
-    // main logic
+    // fees logic
     // =========================
 
     function collectProtocolFees(address token, address recipient, uint256 amount) external;
@@ -54,6 +59,10 @@ interface IMultiswapRouter {
     function collectProtocolFees(address token, address recipient) external;
 
     function collectReferralFees(address token, address recipient) external;
+
+    // =========================
+    // main logic
+    // =========================
 
     struct MultiswapCalldata {
         // initial exact value in

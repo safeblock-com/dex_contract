@@ -137,6 +137,12 @@ contract FactoryTest is Test {
         vm.expectRevert(abi.encodeWithSelector(IOwnable.Ownable_SenderIsNotOwner.selector, notOwner));
         router.transferOwnership(notOwner);
 
+        vm.expectRevert(abi.encodeWithSelector(IOwnable.Ownable_SenderIsNotOwner.selector, notOwner));
+        router.changeProtocolFee(123);
+
+        vm.expectRevert(abi.encodeWithSelector(IOwnable.Ownable_SenderIsNotOwner.selector, notOwner));
+        router.changeReferralFee(IMultiswapRouter.ReferralFee({ protocolPart: 50, referralPart: 50 }));
+
         vm.stopPrank();
     }
 
@@ -251,5 +257,40 @@ contract FactoryTest is Test {
         address impl_ = address(uint160(uint256(vm.load(address(router), ERC1967Utils.IMPLEMENTATION_SLOT))));
 
         assertEq(impl_, impl);
+    }
+
+    // =========================
+    // changeFees
+    // =========================
+
+    function test_multiswapRouter_changeFees_shouldRevertIfDataInvalid() external {
+        vm.prank(owner);
+        vm.expectRevert(IMultiswapRouter.MultiswapRouter_InvalidFeeValue.selector);
+        router.changeProtocolFee(10_001);
+
+        vm.prank(owner);
+        vm.expectRevert(IMultiswapRouter.MultiswapRouter_InvalidFeeValue.selector);
+        router.changeReferralFee(IMultiswapRouter.ReferralFee({ protocolPart: 300, referralPart: 1 }));
+    }
+
+    function test_multiswapRouter_changeFees_shouldSuccessfulChangeFees(
+        uint256 newPotocolFee,
+        IMultiswapRouter.ReferralFee memory newReferralFee
+    )
+        external
+    {
+        newPotocolFee = bound(newPotocolFee, 300, 10_000);
+        newReferralFee.protocolPart = bound(newReferralFee.protocolPart, 10, 200);
+        newReferralFee.referralPart = bound(newReferralFee.referralPart, 10, 50);
+
+        vm.startPrank(owner);
+        router.changeProtocolFee(newPotocolFee);
+        router.changeReferralFee(newReferralFee);
+
+        (uint256 protocolFee, IMultiswapRouter.ReferralFee memory referralFee) = router.fees();
+
+        assertEq(protocolFee, newPotocolFee);
+        assertEq(referralFee.protocolPart, newReferralFee.protocolPart);
+        assertEq(referralFee.referralPart, newReferralFee.referralPart);
     }
 }
