@@ -1,241 +1,164 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity 0.8.19;
 
-import {IERC20} from "./interfaces/IERC20.sol";
-import {IRouter} from "./interfaces/IRouter.sol";
-import {HelperLib} from "./libraries/HelperLib.sol";
+import { IERC20 } from "forge-std/interfaces/IERC20.sol";
 
-contract MultiswapRouter {
+import { IRouter } from "./interfaces/IRouter.sol";
+import { HelperLib } from "./libraries/HelperLib.sol";
+
+import { Initializable } from "./proxy/Initializable.sol";
+import { UUPSUpgradeable } from "./proxy/UUPSUpgradeable.sol";
+
+import { TransferHelper } from "./libraries/TransferHelper.sol";
+import { Ownable2Step } from "./external/Ownable2Step.sol";
+
+import { IMultiswapRouter } from "./interfaces/IMultiswapRouter.sol";
+
+contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMultiswapRouter {
     // =========================
-    // Storage
+    // storage
     // =========================
 
     // mask for UniswapV3 pair designation
     // if `mask & pair == true`, the swap is performed using the UniswapV3 logic
-    bytes32 private constant UNISWAP_V3_MASK =
-        0x8000000000000000000000000000000000000000000000000000000000000000;
+    bytes32 internal constant UNISWAP_V3_MASK = 0x8000000000000000000000000000000000000000000000000000000000000000;
     // address mask: `mask & pair == address(pair)`
-    address private constant ADDRESS_MASK = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;
+    address internal constant ADDRESS_MASK = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;
     // fee mask: `mask & (pair >> 160) == fee in pair`
-    uint24 private constant FEE_MASK = 0xffffff;
+    uint24 internal constant FEE_MASK = 0xffffff;
 
     // minimum and maximum possible values of SQRT_RATIO in UniswapV3
-    uint160 private constant MIN_SQRT_RATIO_PLUS_ONE = 4295128740;
-    uint160 private constant MAX_SQRT_RATIO_MINUS_ONE =
-        1461446703485210103287273052203988822378723970341;
+    uint160 internal constant MIN_SQRT_RATIO_PLUS_ONE = 4_295_128_740;
+    uint160 internal constant MAX_SQRT_RATIO_MINUS_ONE =
+        1_461_446_703_485_210_103_287_273_052_203_988_822_378_723_970_341;
 
     // 2**255
-    uint256 private constant CAST_INT_CONSTANT =
-        57896044618658097711785492504343953926634992332820282019728792003956564819968;
-
-    // address(this) in bytes32 representation
-    bytes32 private immutable ADDRESS_THIS_BYTES32;
+    uint256 internal constant CAST_INT_CONSTANT =
+        57_896_044_618_658_097_711_785_492_504_343_953_926_634_992_332_820_282_019_728_792_003_956_564_819_968;
 
     // cache for swapV3Callback
-    address private _poolAddressCache;
-
-    // ownership control
-    address private _owner;
+    address internal _poolAddressCache;
 
     // fee logic
-    uint256 private constant FEE_MAX = 10000;
-    uint256 private _protocolFee;
+    uint256 internal constant FEE_MAX = 10_000;
+    uint256 internal _protocolFee;
 
-    struct RefferalFee {
-        uint256 protocolPart;
-        uint256 refferalPart;
-    }
-
-    // protocolPart of refferalFee: _refferalFee & PROTOCOL_PART_MASK
-    // refferalPart of refferalFee: _refferalFee >> 128
-    uint256 private constant PROTOCOL_PART_MASK = 0xffffffffffffffffffffffffffffffff;
-    uint256 private _refferalFee;
+    // protocolPart of referralFee: _referralFee & PROTOCOL_PART_MASK
+    // referralPart of referralFee: _referralFee >> 128
+    uint256 internal constant PROTOCOL_PART_MASK = 0xffffffffffffffffffffffffffffffff;
+    uint256 internal _referralFee;
 
     mapping(address owner => mapping(address token => uint256 balance)) public profit;
 
     // =========================
-    // Constructor
+    // constructor
     // =========================
 
-    constructor(uint256 protocolFee_, RefferalFee memory refferalFee_) {
-        if (protocolFee_ > FEE_MAX || refferalFee_.refferalPart + refferalFee_.protocolPart > protocolFee_) {
-            revert MultiswapRouter_InvalidFeeValue();
-        }
-        _protocolFee = protocolFee_;
+    constructor() {
+        _disableInitializers();
+    }
 
-        uint256 protocolPart = refferalFee_.protocolPart;
-        uint256 refferalPart = refferalFee_.refferalPart;
-        uint256 refferalFee;
-        assembly {
-            refferalFee := or(shl(128, refferalPart), protocolPart)
-        }
-        _refferalFee = refferalFee;
+    function initialize(
+        uint256 protocolFee,
+        ReferralFee calldata newReferralFee,
+        address newOwner
+    )
+        external
+        initializer
+    {
+        _setProtocolFee(protocolFee);
+        _setReferralFee(newReferralFee, protocolFee);
 
-        bytes32 addressThisBytes32;
-        assembly {
-            addressThisBytes32 := address()
-        }
-        ADDRESS_THIS_BYTES32 = addressThisBytes32;
-
-        _owner = msg.sender;
-        emit OwnershipTransferred(address(0), msg.sender);
+        _transferOwnership(newOwner);
     }
 
     // =========================
-    // Modifiers
+    // getters
     // =========================
 
-    modifier onlyOwner() {
-        if (msg.sender != _owner) {
-            revert MultiswapRouter_SenderIsNotOwner();
+    /// @inheritdoc IMultiswapRouter
+    function getVersion() external view returns (uint8) {
+        return _getInitializedVersion();
+    }
+
+    /// @inheritdoc IMultiswapRouter
+    function fees() external view returns (uint256 protocolFee, ReferralFee memory referralFee) {
+        assembly ("memory-safe") {
+            protocolFee := sload(_protocolFee.slot)
+
+            let referralFee_ := sload(_referralFee.slot)
+            mstore(referralFee, and(PROTOCOL_PART_MASK, referralFee_))
+            mstore(add(referralFee, 32), shr(128, referralFee_))
         }
-
-        _;
     }
 
     // =========================
-    // Events
+    // admin logic
     // =========================
 
-    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
-
-    // =========================
-    // Errors
-    // =========================
-
-    error MultiswapRouter_InvalidFeeValue();
-    error MultiswapRouter_SenderIsNotOwner();
-    error MultiswapRouter_InvalidOutAmount();
-
-    error MultiswapRouter_FailedV2Swap();
-
-    error MultiswapRouter_InvalidPairsArray();
-    error MultiswapRouter_InvalidPartswapCalldata();
-    error MultiswapRouter_FailedV3Swap();
-    error MultiswapRouter_SenderMustBeUniswapV3Pool();
-    error MultiswapRouter_InvalidIntCast();
-    error MultiswapRouter_NewOwnerIsZeroAddress();
-
-    // =========================
-    // Ownership logic
-    // =========================
-
-    function owner() external view returns (address) {
-        return _owner;
-    }
-
-    function transferOwnership(address newOwner) external onlyOwner {
-        if (newOwner == address(0)) {
-            revert MultiswapRouter_NewOwnerIsZeroAddress();
-        }
-        _owner = newOwner;
-        emit OwnershipTransferred(msg.sender, newOwner);
-    }
-
-    // =========================
-    // Fees logic
-    // =========================
-
-    function fees() external view returns (uint256 protocolFee, RefferalFee memory refferalFee) {
-        protocolFee = _protocolFee;
-        uint256 refferalFee_ = _refferalFee;
-        uint256 protocolPart;
-        uint256 refferalPart;
-
-        assembly {
-            protocolPart := and(PROTOCOL_PART_MASK, refferalFee_)
-            refferalPart := shr(128, refferalFee_)
-        }
-
-        refferalFee.protocolPart = protocolPart;
-        refferalFee.refferalPart = refferalPart;
-    }
-
+    /// @inheritdoc IMultiswapRouter
     function changeProtocolFee(uint256 newProtocolFee) external onlyOwner {
-        if (newProtocolFee > FEE_MAX) {
-            revert MultiswapRouter_InvalidFeeValue();
-        }
-
-        _protocolFee = newProtocolFee;
+        _setProtocolFee(newProtocolFee);
     }
 
-    function changeRefferalFee(RefferalFee memory newRefferalFee) external onlyOwner {
-        if ((newRefferalFee.refferalPart + newRefferalFee.protocolPart) > _protocolFee) {
-            revert MultiswapRouter_InvalidFeeValue();
-        }
-
-        uint256 protocolPart = newRefferalFee.protocolPart;
-        uint256 refferalPart = newRefferalFee.refferalPart;
-        uint256 refferalFee;
-        assembly {
-            refferalFee := or(shl(128, refferalPart), protocolPart)
-        }
-        _refferalFee = refferalFee;
+    /// @inheritdoc IMultiswapRouter
+    function changeReferralFee(ReferralFee calldata newReferralFee) external onlyOwner {
+        _setReferralFee(newReferralFee, _protocolFee);
     }
 
     // =========================
-    // Main logic
+    // fees logic
     // =========================
 
+    /// @inheritdoc IMultiswapRouter
     function collectProtocolFees(address token, address recipient, uint256 amount) external onlyOwner {
         uint256 balanceOf = profit[address(this)][token];
         if (balanceOf >= amount) {
             unchecked {
                 profit[address(this)][token] -= amount;
             }
-            HelperLib.safeTransfer(token, recipient, amount);
+            TransferHelper.safeTransfer(token, recipient, amount);
         }
     }
 
-    function collectRefferalFees(address token, address recipient, uint256 amount) external {
+    /// @inheritdoc IMultiswapRouter
+    function collectReferralFees(address token, address recipient, uint256 amount) external {
         uint256 balanceOf = profit[msg.sender][token];
         if (balanceOf >= amount) {
             unchecked {
                 profit[msg.sender][token] -= amount;
             }
-            HelperLib.safeTransfer(token, recipient, amount);
+            TransferHelper.safeTransfer(token, recipient, amount);
         }
     }
 
+    /// @inheritdoc IMultiswapRouter
     function collectProtocolFees(address token, address recipient) external onlyOwner {
         uint256 balanceOf = profit[address(this)][token];
-        if (balanceOf >= 0) {
+        if (balanceOf > 0) {
             unchecked {
                 profit[address(this)][token] -= balanceOf;
             }
-            HelperLib.safeTransfer(token, recipient, balanceOf);
+            TransferHelper.safeTransfer(token, recipient, balanceOf);
         }
     }
 
-    function collectRefferalFees(address token, address recipient) external {
+    /// @inheritdoc IMultiswapRouter
+    function collectReferralFees(address token, address recipient) external {
         uint256 balanceOf = profit[msg.sender][token];
-        if (balanceOf >= 0) {
+        if (balanceOf > 0) {
             unchecked {
                 profit[msg.sender][token] -= balanceOf;
             }
-            HelperLib.safeTransfer(token, recipient, balanceOf);
+            TransferHelper.safeTransfer(token, recipient, balanceOf);
         }
     }
 
-    struct MultiswapCalldata {
-        // initial exact value in
-        uint256 amountIn;
-        // minimal amountOut
-        uint256 minAmountOut;
-        // first token in swap
-        address tokenIn;
-        // array of bytes32 values (pairs) involved in the swap
-        // from left to right:
-        //     address of the pair - 20 bytes
-        //     fee in pair - 3 bytes (for V2 pairs)
-        //     the highest bit shows which version the pair belongs to
-        bytes32[] pairs;
-        // an optional address that slightly relaxes the protocol's fees in favor of that address
-        // and the user who called the multiswap
-        address refferalAddress;
-    }
+    // =========================
+    // main logic
+    // =========================
 
-    /// @notice Swaps through the data.pairs array
+    //// @inheritdoc IMultiswapRouter
     function multiswap(MultiswapCalldata calldata data) external {
         // cache length of pairs to stack for gas savings
         uint256 length = data.pairs.length;
@@ -253,7 +176,7 @@ contract MultiswapRouter {
         address firstPair;
         bool uni3;
 
-        assembly {
+        assembly ("memory-safe") {
             // take the first pair in the array
             firstPair := and(pair, ADDRESS_MASK)
             // find out which version of the protocol it belongs to
@@ -266,9 +189,12 @@ contract MultiswapRouter {
         // execute transferFrom:
         //     if the pair belongs to version 2 of the protocol - to the pair
         //     if version 3 - to the router contract
-        HelperLib.safeTransferFrom(
-            tokenIn, msg.sender, uni3 ? address(this) : firstPair, amountIn
-        );
+        TransferHelper.safeTransferFrom(tokenIn, msg.sender, uni3 ? address(this) : firstPair, amountIn);
+
+        bytes32 addressThisBytes32;
+        assembly ("memory-safe") {
+            addressThisBytes32 := address()
+        }
 
         uint256 balanceOutBeforeLastSwap;
         bool uni3Next;
@@ -276,13 +202,13 @@ contract MultiswapRouter {
         for (uint256 i; i < length; i = _unsafeAddOne(i)) {
             if (i == lastIndex) {
                 // if the pair is the last in the array - the next token recipient after the swap is address(this)
-                destination = ADDRESS_THIS_BYTES32;
+                destination = addressThisBytes32;
             } else {
                 // otherwise take the next pair
                 destination = data.pairs[_unsafeAddOne(i)];
             }
 
-            assembly {
+            assembly ("memory-safe") {
                 uni3 := and(pair, UNISWAP_V3_MASK)
                 // if the next pair belongs to version 3 of the protocol - the address
                 // of the router is set as the recipient, otherwise - the next pair
@@ -290,15 +216,11 @@ contract MultiswapRouter {
             }
 
             if (uni3) {
-                (amountIn, tokenIn, balanceOutBeforeLastSwap) = _swapUniV3(
-                    i == lastIndex, pair, amountIn, tokenIn,
-                    uni3Next ? ADDRESS_THIS_BYTES32 : destination
-                );
+                (amountIn, tokenIn, balanceOutBeforeLastSwap) =
+                    _swapUniV3(i == lastIndex, pair, amountIn, tokenIn, uni3Next ? addressThisBytes32 : destination);
             } else {
-                (amountIn, tokenIn, balanceOutBeforeLastSwap) = _swapUniV2(
-                    i == lastIndex, pair, tokenIn,
-                    uni3Next ? ADDRESS_THIS_BYTES32 : destination
-                );
+                (amountIn, tokenIn, balanceOutBeforeLastSwap) =
+                    _swapUniV2(i == lastIndex, pair, tokenIn, uni3Next ? addressThisBytes32 : destination);
             }
             // upgrade the pair for the next swap
             pair = destination;
@@ -319,36 +241,12 @@ contract MultiswapRouter {
             revert MultiswapRouter_InvalidOutAmount();
         }
 
-        exactAmountOut = _writeFees(exactAmountOut, data.refferalAddress, tokenIn);
+        exactAmountOut = _writeFees(exactAmountOut, data.referralAddress, tokenIn);
 
-        HelperLib.safeTransfer(tokenIn, msg.sender, exactAmountOut);
+        TransferHelper.safeTransfer(tokenIn, msg.sender, exactAmountOut);
     }
 
-    struct PartswapCalldata {
-        // exact value in for part swap
-        uint256 fullAmount;
-        // minimal amountOut
-        uint256 minAmountOut;
-        // token in
-        address tokenIn;
-        // token out
-        address tokenOut;
-        // array of amounts for each swap, corresponding to the address for the swap from the pairs array
-        uint256[] amountsIn;
-        // array of bytes32 values (pairs) involved in the swap
-        // from left to right:
-        //     address of the pair - 20 bytes
-        //     fee in pair - 3 bytes (for V2 pairs)
-        //     the highest bit shows which version the pair belongs to
-        bytes32[] pairs;
-        // an optional address that slightly relaxes the protocol's fees in favor of that address
-        // and the user who called the partswap
-        address refferalAddress;
-    }
-
-    /// @notice Swaps through each pair separately
-    /// @dev each pair in the pairs array must have tokenIn and have the same tokenOut,
-    /// the result of swap is the sum after each swap
+    /// @inheritdoc IMultiswapRouter
     function partswap(PartswapCalldata calldata data) external {
         // cache length of pairs to stack for gas savings
         uint256 length = data.pairs.length;
@@ -373,7 +271,12 @@ contract MultiswapRouter {
         address tokenOut = data.tokenOut;
 
         // Transfer full amount in for all swaps
-        HelperLib.safeTransferFrom(tokenIn, msg.sender, address(this), data.fullAmount);
+        TransferHelper.safeTransferFrom(tokenIn, msg.sender, address(this), data.fullAmount);
+
+        bytes32 addressThisBytes32;
+        assembly ("memory-safe") {
+            addressThisBytes32 := address()
+        }
 
         bytes32 pair;
         bool uni3;
@@ -381,19 +284,19 @@ contract MultiswapRouter {
 
         for (uint256 i; i < length; i = _unsafeAddOne(i)) {
             pair = data.pairs[i];
-            assembly {
+            assembly ("memory-safe") {
                 uni3 := and(pair, UNISWAP_V3_MASK)
             }
 
             if (uni3) {
-                _swapUniV3(false, pair, data.amountsIn[i], tokenIn, ADDRESS_THIS_BYTES32);
+                _swapUniV3(false, pair, data.amountsIn[i], tokenIn, addressThisBytes32);
             } else {
                 address _pair;
-                assembly {
+                assembly ("memory-safe") {
                     _pair := and(pair, ADDRESS_MASK)
                 }
-                HelperLib.safeTransfer(tokenIn, _pair, data.amountsIn[i]);
-                _swapUniV2(false, pair, tokenIn, ADDRESS_THIS_BYTES32);
+                TransferHelper.safeTransfer(tokenIn, _pair, data.amountsIn[i]);
+                _swapUniV2(false, pair, tokenIn, addressThisBytes32);
             }
         }
 
@@ -412,9 +315,9 @@ contract MultiswapRouter {
             revert MultiswapRouter_InvalidOutAmount();
         }
 
-        exactAmountOut = _writeFees(exactAmountOut, data.refferalAddress, tokenOut);
+        exactAmountOut = _writeFees(exactAmountOut, data.referralAddress, tokenOut);
 
-        HelperLib.safeTransfer(tokenOut, msg.sender, exactAmountOut);
+        TransferHelper.safeTransfer(tokenOut, msg.sender, exactAmountOut);
     }
 
     // for V3Callback
@@ -430,7 +333,7 @@ contract MultiswapRouter {
         int256 amount1Delta;
         address tokenIn;
 
-        assembly {
+        assembly ("memory-safe") {
             amount0Delta := calldataload(4)
             amount1Delta := calldataload(36)
             tokenIn := calldataload(132)
@@ -441,20 +344,50 @@ contract MultiswapRouter {
             revert MultiswapRouter_FailedV3Swap();
         }
 
-        uint256 amountToPay = amount0Delta > 0
-            ? uint256(amount0Delta)
-            : uint256(amount1Delta);
+        uint256 amountToPay = amount0Delta > 0 ? uint256(amount0Delta) : uint256(amount1Delta);
 
         // transfer tokens to the pool address
-        HelperLib.safeTransfer(tokenIn, msg.sender, amountToPay);
+        TransferHelper.safeTransfer(tokenIn, msg.sender, amountToPay);
     }
 
     // =========================
-    // Private methods
+    // internal methods
     // =========================
 
-    function _writeFees(uint256 exactAmount, address refferalAddress, address token) private returns (uint256) {
-        if (refferalAddress == address(0)) {
+    /// @dev Function that should revert when `msg.sender` is not authorized to upgrade the contract. Called by
+    /// {upgradeTo} and {upgradeToAndCall}.
+    ///
+    /// Normally, this function will use an xref:access.adoc[access control] modifier such as {Ownable-onlyOwner}.
+    ///
+    /// ```solidity
+    /// function _authorizeUpgrade(address) internal override onlyOwner {}
+    /// ```
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner { }
+
+    function _setProtocolFee(uint256 protocolFee) internal {
+        if (protocolFee > FEE_MAX) {
+            revert MultiswapRouter_InvalidFeeValue();
+        }
+        _protocolFee = protocolFee;
+    }
+
+    function _setReferralFee(ReferralFee calldata newReferralFee, uint256 protocolFee) internal {
+        unchecked {
+            uint256 protocolPart = newReferralFee.protocolPart;
+            uint256 referralPart = newReferralFee.referralPart;
+
+            if ((referralPart + protocolPart) > protocolFee) {
+                revert MultiswapRouter_InvalidFeeValue();
+            }
+
+            assembly ("memory-safe") {
+                sstore(_referralFee.slot, or(shl(128, referralPart), protocolPart))
+            }
+        }
+    }
+
+    function _writeFees(uint256 exactAmount, address referralAddress, address token) internal returns (uint256) {
+        if (referralAddress == address(0)) {
             unchecked {
                 uint256 fee = (exactAmount * _protocolFee) / FEE_MAX;
                 profit[address(this)][token] += fee;
@@ -462,33 +395,39 @@ contract MultiswapRouter {
                 return exactAmount - fee;
             }
         } else {
-            uint256 refferalFee_ = _refferalFee;
+            uint256 referralFee_ = _referralFee;
             uint256 protocolPart;
-            uint256 refferalPart;
-            assembly {
-                protocolPart := and(PROTOCOL_PART_MASK, refferalFee_)
-                refferalPart := shr(128, refferalFee_)
+            uint256 referralPart;
+            assembly ("memory-safe") {
+                protocolPart := and(PROTOCOL_PART_MASK, referralFee_)
+                referralPart := shr(128, referralFee_)
             }
 
             unchecked {
-                uint256 refferalFeePart = (exactAmount * refferalPart) / FEE_MAX;
+                uint256 referralFeePart = (exactAmount * referralPart) / FEE_MAX;
                 uint256 protocolFeePart = (exactAmount * protocolPart) / FEE_MAX;
-                profit[refferalAddress][token] += refferalFeePart;
+                profit[referralAddress][token] += referralFeePart;
                 profit[address(this)][token] += protocolFeePart;
 
-                return exactAmount - refferalFeePart - protocolFeePart;
+                return exactAmount - referralFeePart - protocolFeePart;
             }
         }
     }
 
     /// @dev uniswapV3 swap exact tokens
-    function _swapUniV3(bool lastSwap, bytes32 _pool, uint256 amountIn, address tokenIn, bytes32 _destination)
-        private
+    function _swapUniV3(
+        bool lastSwap,
+        bytes32 _pool,
+        uint256 amountIn,
+        address tokenIn,
+        bytes32 _destination
+    )
+        internal
         returns (uint256 amountOut, address tokenOut, uint256 balanceOutBeforeLastSwap)
     {
         IRouter pool;
         address destination;
-        assembly {
+        assembly ("memory-safe") {
             pool := and(_pool, ADDRESS_MASK)
             destination := and(_destination, ADDRESS_MASK)
         }
@@ -513,7 +452,9 @@ contract MultiswapRouter {
         // caching pool address in storage
         _poolAddressCache = address(pool);
         (int256 amount0, int256 amount1) = pool.swap(
-            destination, zeroForOne, int256(amountIn),
+            destination,
+            zeroForOne,
+            int256(amountIn),
             (zeroForOne ? MIN_SQRT_RATIO_PLUS_ONE : MAX_SQRT_RATIO_MINUS_ONE),
             abi.encode(tokenIn)
         );
@@ -523,14 +464,19 @@ contract MultiswapRouter {
     }
 
     /// @dev uniswapV2 swap exact tokens
-    function _swapUniV2(bool lastSwap, bytes32 _pair, address tokenIn, bytes32 _destination)
-        private
+    function _swapUniV2(
+        bool lastSwap,
+        bytes32 _pair,
+        address tokenIn,
+        bytes32 _destination
+    )
+        internal
         returns (uint256 amountOutput, address tokenOut, uint256 balanceOutBeforeLastSwap)
     {
         IRouter pair;
         uint256 fee;
         address destination;
-        assembly {
+        assembly ("memory-safe") {
             pair := and(_pair, ADDRESS_MASK)
             fee := and(FEE_MASK, shr(160, _pair))
             destination := and(_destination, ADDRESS_MASK)
@@ -546,10 +492,9 @@ contract MultiswapRouter {
         uint256 amountInput;
         // scope to avoid stack too deep errors
         {
-            (uint256 reserve0, uint256 reserve1, ) = pair.getReserves();
-            (uint256 reserveInput, uint256 reserveOutput) = tokenIn == token0
-                ? (reserve0, reserve1)
-                : (reserve1, reserve0);
+            (uint256 reserve0, uint256 reserve1,) = pair.getReserves();
+            (uint256 reserveInput, uint256 reserveOutput) =
+                tokenIn == token0 ? (reserve0, reserve1) : (reserve1, reserve0);
 
             // get the exact number of tokens that were sent to the pair
             // underflow is impossible cause after token transfer via token contract
@@ -559,34 +504,21 @@ contract MultiswapRouter {
             }
 
             // get the output number of tokens after swap
-            amountOutput = HelperLib.getAmountOut(
-                amountInput, reserveInput, reserveOutput, fee
-            );
+            amountOutput = HelperLib.getAmountOut(amountInput, reserveInput, reserveOutput, fee);
         }
 
-        (uint256 amount0Out, uint256 amount1Out) = tokenIn == token0
-            ? (uint256(0), amountOutput)
-            : (amountOutput, uint256(0));
+        (uint256 amount0Out, uint256 amount1Out) =
+            tokenIn == token0 ? (uint256(0), amountOutput) : (amountOutput, uint256(0));
 
         if (
             // first do the swap via the most common swap function selector
-            !_makeCall(
-                address(pair),
-                abi.encodeWithSelector(
-                    // swap(uint256,uint256,address,bytes) selector
-                    0x022c0d9f, amount0Out, amount1Out, destination, bytes("")
-                )
-            )
+            // swap(uint256,uint256,address,bytes) selector
+            !_makeCall(address(pair), abi.encodeWithSelector(0x022c0d9f, amount0Out, amount1Out, destination, bytes("")))
         ) {
             if (
                 // if revert - try to swap through another selector
-                !_makeCall(
-                    address(pair),
-                    abi.encodeWithSelector(
-                        // swap(uint256,uint256,address) selector
-                        0x6d9a640a, amount0Out, amount1Out, destination
-                    )
-                )
+                // swap(uint256,uint256,address) selector
+                !_makeCall(address(pair), abi.encodeWithSelector(0x6d9a640a, amount0Out, amount1Out, destination))
             ) {
                 revert MultiswapRouter_FailedV2Swap();
             }
@@ -594,14 +526,14 @@ contract MultiswapRouter {
     }
 
     /// @dev check for overflow has been removed for optimization
-    function _unsafeAddOne(uint256 i) private pure returns (uint256) {
+    function _unsafeAddOne(uint256 i) internal pure returns (uint256) {
         unchecked {
             return i + 1;
         }
     }
 
     /// @dev low-level call, returns true if successful
-    function _makeCall(address addr, bytes memory data) private returns (bool success) {
-        (success, ) = addr.call(data);
+    function _makeCall(address addr, bytes memory data) internal returns (bool success) {
+        (success,) = addr.call(data);
     }
 }

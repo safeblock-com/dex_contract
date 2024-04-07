@@ -24,7 +24,7 @@ struct MultiswapCalldata {
     bytes32[] pairs;
     // an optional address that slightly relaxes the protocol's fees in favor of that address 
     // and the user who called the multiswap
-    address refferalAddress;
+    address referralAddress;
 }
 ``` 
 
@@ -41,7 +41,7 @@ data.pairs = new bytes32[](3);
 data.pairs[0] = WBNB_BUSD_Cake;
 data.pairs[1] = BUSD_USDT_CakeV3_500;
 data.pairs[2] = USDT_USDC_CakeV3_500;
-data.refferalAddress = address(0);
+data.referralAddress = address(0);
 data.minAmountOut = 200e18; // 200 Cakes
 
 multiswapRouter.multiswap(data);
@@ -73,13 +73,13 @@ struct PartswapCalldata {
     bytes32[] pairs;
     // an optional address that slightly relaxes the protocol's fees in favor of that address
     // and the user who called the partswap
-    address refferalAddress;
+    address referralAddress;
 }
 ``` 
 
 Note: sum of all amounts in `amounts` array should be equal to `fullAmount`
 
-Protocol and refferal fees are calculated from sum of swap amountsOut
+Protocol and referral fees are calculated from sum of swap amountsOut
 
 Example call:
 
@@ -109,27 +109,27 @@ There are 2 types of commission charges in the protocol:
 Regular protocol fee:
     `exactOutputAmount = amountOut * protocolFee / 10000`
 
-Commission using a referral address (if `refferalAddress` in calldata != address(0)):
+Commission using a referral address (if `referralAddress` in calldata != address(0)):
 ```solidity
 example:
     protocolPart = 200 bps
-    refferalPart = 50 bps
-    refferalFee = amountOut * refferalPart / 10000
+    referralPart = 50 bps
+    referralFee = amountOut * referralPart / 10000
     protocolFee = amountOut * protocolPart / 10000
-    exactOutputAmount = amountOut - refferalFee - protocolFee
+    exactOutputAmount = amountOut - referralFee - protocolFee
 ```
 
 Protocol fees are saved in mapping:
     `profit(address(this), tokenAddress)`
 
 Fees for referral addresses are also saved in the mapping:
-    `profit(refferalAddress, tokenAddress)`
+    `profit(referralAddress, tokenAddress)`
 
 The referral address can at any time withdraw assets that are registered to its address:
 ```solidity
-    multiswapRouter.collectRefferalFees(tokenAddress, recipient, amountForWithdraw)
+    multiswapRouter.collectReferralFees(tokenAddress, recipient, amountForWithdraw)
 or withdraw all:
-    multiswapRouter.collectRefferalFees(tokenAddress, recipient)
+    multiswapRouter.collectReferralFees(tokenAddress, recipient)
 ```
 
 The protocol commission can be withdrawn only by the MultiswapRouter contract owner:

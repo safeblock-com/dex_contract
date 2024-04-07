@@ -9,15 +9,12 @@ interface IRouter {
         int256 amountSpecified,
         uint160 sqrtPriceLimitX96,
         bytes calldata data
-    ) external returns (int256 amount0, int256 amount1);
+    )
+        external
+        returns (int256 amount0, int256 amount1);
 
     // V2
-    function swap(
-        uint256 amount0Out,
-        uint256 amount1Out,
-        address to,
-        bytes calldata data
-    ) external;
+    function swap(uint256 amount0Out, uint256 amount1Out, address to, bytes calldata data) external;
 
     // V2 without data
     function swap(uint256 amount0Out, uint256 amount1Out, address to) external;
