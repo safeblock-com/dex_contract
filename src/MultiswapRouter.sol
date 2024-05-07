@@ -211,7 +211,6 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
             }
 
             assembly ("memory-safe") {
-                // uni3 := and(pair, UNISWAP_V3_MASK) // TODO check
                 // if the next pair belongs to version 3 of the protocol - the address
                 // of the router is set as the recipient, otherwise - the next pair
                 uni3Next := and(destination, UNISWAP_V3_MASK)
@@ -226,7 +225,7 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
             }
             // upgrade the pair for the next swap
             pair = destination;
-            uni3 = uni3Next; // TODO check
+            uni3 = uni3Next;
         }
 
         uint256 balanceOutAfterLastSwap = IERC20(tokenIn).balanceOf(address(this));

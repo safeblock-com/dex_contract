@@ -28,8 +28,8 @@ library HelperLib {
         }
 
         unchecked {
-            uint256 amountInWithFee = amountIn * (feeE4);
-            uint256 numerator = amountInWithFee * (reserveOut);
+            uint256 amountInWithFee = amountIn * (E4 - feeE4);
+            uint256 numerator = amountInWithFee * reserveOut;
             uint256 denominator = reserveIn * E4 + amountInWithFee;
             amountOut = numerator / denominator;
         }
@@ -55,7 +55,7 @@ library HelperLib {
 
         unchecked {
             uint256 numerator = reserveIn * amountOut * E4;
-            uint256 denominator = reserveOut - amountOut * feeE4;
+            uint256 denominator = reserveOut - amountOut * (E4 - feeE4);
             amountIn = (numerator / denominator) + 1;
         }
     }
