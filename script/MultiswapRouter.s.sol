@@ -5,6 +5,7 @@ import "forge-std/Script.sol";
 
 import { MultiswapRouter, IMultiswapRouter } from "../src/MultiswapRouter.sol";
 import { Proxy } from "../src/proxy/Proxy.sol";
+import { WBNB } from "../test/Helpers.t.sol";
 
 contract MultiswapRouterDeploy is Script {
     function run() external {
@@ -13,7 +14,7 @@ contract MultiswapRouterDeploy is Script {
         vm.startBroadcast(deployer);
 
         new Proxy(
-            address(new MultiswapRouter()),
+            address(new MultiswapRouter(WBNB)),
             abi.encodeCall(
                 IMultiswapRouter.initialize,
                 (

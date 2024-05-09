@@ -21,7 +21,7 @@ contract MultiswapTest is Test {
 
         deal(WBNB, user, 500e18);
 
-        address routerImplementation = address(new MultiswapRouter());
+        address routerImplementation = address(new MultiswapRouter(WBNB));
         router = MultiswapRouter(
             payable(
                 address(
@@ -312,5 +312,122 @@ contract MultiswapTest is Test {
         router.collectReferralFees(BUSD, user);
 
         assertEq(router.profit(referral, BUSD), 0);
+    }
+
+    // native swaps
+
+    function test_multiswapRouter_multiswapNative_swapViaOnePairV3() external {
+        MultiswapRouter.MultiswapCalldata memory data;
+        data.pairs = new bytes32[](1);
+        data.pairs[0] = WBNB_BUSD_UniV3_3000;
+
+        hoax(user);
+        router.multiswapNative{ value: 500_000_000 }(data);
+
+        assertGt(router.profit(address(router), BUSD), 0);
+    }
+
+    function test_multiswapRouter_multiswapNative_swapViaOnePairV3_referral() external {
+        MultiswapRouter.MultiswapCalldata memory data;
+        data.pairs = new bytes32[](1);
+        data.pairs[0] = WBNB_BUSD_UniV3_3000;
+        data.referralAddress = referral;
+
+        hoax(user);
+        router.multiswapNative{ value: 500_000_000 }(data);
+
+        assertGt(router.profit(address(router), BUSD), 0);
+        assertGt(router.profit(referral, BUSD), 0);
+    }
+
+    function test_multiswapRouter_multiswapNative_swapViaOnePairV2() external {
+        MultiswapRouter.MultiswapCalldata memory data;
+        data.pairs = new bytes32[](1);
+        data.pairs[0] = WBNB_BUSD_Cake;
+
+        hoax(user);
+        router.multiswapNative{ value: 500_000_000 }(data);
+
+        assertGt(router.profit(address(router), BUSD), 0);
+    }
+
+    function test_multiswapRouter_multiswapNative_swapViaOnePairV2_referral() external {
+        MultiswapRouter.MultiswapCalldata memory data;
+        data.pairs = new bytes32[](1);
+        data.pairs[0] = WBNB_BUSD_Cake;
+        data.referralAddress = referral;
+
+        hoax(user);
+        router.multiswapNative{ value: 500_000_000 }(data);
+
+        assertGt(router.profit(address(router), BUSD), 0);
+        assertGt(router.profit(referral, BUSD), 0);
+    }
+
+    function test_multiswapRouter_multiswapNative_swapViaTwoPairsV3() external {
+        MultiswapRouter.MultiswapCalldata memory data;
+        data.pairs = new bytes32[](2);
+        data.pairs[0] = WBNB_BUSD_CakeV3_100;
+        data.pairs[1] = BUSD_CAKE_CakeV3_100;
+
+        hoax(user);
+        router.multiswapNative{ value: 500_000_000 }(data);
+
+        assertGt(router.profit(address(router), CAKE), 0);
+    }
+
+    function test_multiswapRouter_multiswapNative_swapViaTwoPairsV2() external {
+        MultiswapRouter.MultiswapCalldata memory data;
+        data.amountIn = 500_000_000;
+        data.tokenIn = WBNB;
+        data.pairs = new bytes32[](2);
+        data.pairs[0] = WBNB_BUSD_Cake;
+        data.pairs[1] = BUSD_CAKE_Cake;
+
+        hoax(user);
+        router.multiswapNative{ value: 500_000_000 }(data);
+
+        assertGt(router.profit(address(router), CAKE), 0);
+    }
+
+    function test_multiswapRouter_multiswapNative_swapViaTwoPairsV2AndV3_referral() external {
+        MultiswapRouter.MultiswapCalldata memory data;
+        data.pairs = new bytes32[](2);
+        data.pairs[0] = WBNB_BUSD_Cake;
+        data.pairs[1] = BUSD_CAKE_CakeV3_100;
+        data.referralAddress = referral;
+
+        hoax(user);
+        router.multiswapNative{ value: 500_000_000 }(data);
+
+        assertGt(router.profit(address(router), CAKE), 0);
+        assertGt(router.profit(referral, CAKE), 0);
+    }
+
+    function test_multiswapRouter_multiswapNative_swapViaThreePairs() external {
+        MultiswapRouter.MultiswapCalldata memory data;
+        data.pairs = new bytes32[](3);
+        data.pairs[0] = WBNB_BUSD_Cake;
+        data.pairs[1] = BUSD_USDT_CakeV3_500;
+        data.pairs[2] = USDT_USDC_CakeV3_500;
+
+        hoax(user);
+        router.multiswapNative{ value: 500_000_000 }(data);
+
+        assertGt(router.profit(address(router), USDC), 0);
+    }
+
+    function test_multiswapRouter_multiswapNative_swapViaFourPairs() external {
+        MultiswapRouter.MultiswapCalldata memory data;
+        data.pairs = new bytes32[](4);
+        data.pairs[0] = WBNB_BUSD_Cake;
+        data.pairs[1] = BUSD_USDT_CakeV3_500;
+        data.pairs[2] = USDT_USDC_CakeV3_500;
+        data.pairs[3] = USDC_CAKE_Cake;
+
+        hoax(user);
+        router.multiswapNative{ value: 500_000_000 }(data);
+
+        assertGt(router.profit(address(router), CAKE), 0);
     }
 }

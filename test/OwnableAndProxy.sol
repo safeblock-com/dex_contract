@@ -20,6 +20,8 @@ contract NewImplementation is UUPSUpgradeable {
 contract FactoryTest is Test {
     address owner = makeAddr("owner");
 
+    address wrappedNative = makeAddr("wrappedNative");
+
     MultiswapRouter router;
 
     bytes32 beaconProxyInitCodeHash;
@@ -29,7 +31,7 @@ contract FactoryTest is Test {
     IERC20 mockERC20 = IERC20(address(deployMockERC20("mockERC20", "MockERC20", 18)));
 
     function setUp() external {
-        address routerImplementation = address(new MultiswapRouter());
+        address routerImplementation = address(new MultiswapRouter(wrappedNative));
 
         router = MultiswapRouter(
             payable(
@@ -61,9 +63,7 @@ contract FactoryTest is Test {
         referralFee.protocolPart = bound(referralFee.protocolPart, 10, 200);
         referralFee.referralPart = bound(referralFee.referralPart, 10, 50);
 
-        MultiswapRouter _router = new MultiswapRouter();
-
-        assertEq(_router.getVersion(), 255);
+        MultiswapRouter _router = new MultiswapRouter(wrappedNative);
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
         _router.initialize(protocolFee, referralFee, newOwner);
@@ -79,8 +79,6 @@ contract FactoryTest is Test {
         protocolFee = bound(protocolFee, 300, 10_000);
         referralFee.protocolPart = bound(referralFee.protocolPart, 10, 200);
         referralFee.referralPart = bound(referralFee.referralPart, 10, 50);
-
-        assertEq(router.getVersion(), 1);
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
         router.initialize(protocolFee, referralFee, newOwner);
@@ -103,7 +101,7 @@ contract FactoryTest is Test {
             payable(
                 address(
                     new Proxy(
-                        address(new MultiswapRouter()),
+                        address(new MultiswapRouter(wrappedNative)),
                         abi.encodeCall(IMultiswapRouter.initialize, (protocolFee, referralFee, newOwner))
                     )
                 )
