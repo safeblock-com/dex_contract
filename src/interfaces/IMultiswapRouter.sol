@@ -38,6 +38,9 @@ interface IMultiswapRouter {
     /// @notice Throws if `newOwner` is the zero address
     error MultiswapRouter_NewOwnerIsZeroAddress();
 
+    /// @notice Throws if `sender` is not the wrapped native token for receive function
+    error MultiswapRouter_InvalidNativeSender();
+
     // =========================
     // constructor
     // =========================

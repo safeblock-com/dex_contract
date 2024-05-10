@@ -195,6 +195,13 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
         _sendTokens(isNative, data.tokenOut, amount, data.unwrap);
     }
 
+    // for unwrap native currency
+    receive() external payable {
+        if(msg.sender != address(_wrappedNative)) {
+            revert MultiswapRouter_InvalidNativeSender();
+        }
+    }
+
     // for V3Callback
     fallback() external {
         // Checking that msg.sender is equal to the value from the cache
