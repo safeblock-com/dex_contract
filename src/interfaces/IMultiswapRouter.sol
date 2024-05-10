@@ -101,8 +101,10 @@ interface IMultiswapRouter {
         uint256 minAmountOut;
         // first token in swap
         address tokenIn;
+        // unwrap native tokenOut
+        bool unwrap;
         // array of bytes32 values (pairs) involved in the swap
-        // from left to right:
+        // from right to left:
         //     address of the pair - 20 bytes
         //     fee in pair - 3 bytes (for V2 pairs)
         //     the highest bit shows which version the pair belongs to
@@ -112,12 +114,8 @@ interface IMultiswapRouter {
         address referralAddress;
     }
 
-    /// @notice Wraps native amount to wrappedNative token and
-    /// swaps through the data.pairs array
-    function multiswapNative(MultiswapCalldata calldata data) external payable;
-
     /// @notice Swaps through the data.pairs array
-    function multiswap(MultiswapCalldata calldata data) external;
+    function multiswap(MultiswapCalldata calldata data) external payable;
 
     struct PartswapCalldata {
         // exact value in for part swap
@@ -128,6 +126,8 @@ interface IMultiswapRouter {
         address tokenIn;
         // token out
         address tokenOut;
+        // unwrap native tokenOut
+        bool unwrap;
         // array of amounts for each swap, corresponding to the address for the swap from the pairs array
         uint256[] amountsIn;
         // array of bytes32 values (pairs) involved in the swap
@@ -141,12 +141,8 @@ interface IMultiswapRouter {
         address referralAddress;
     }
 
-    /// @notice Wraps native amount to wrappedNative token and
-    /// swaps wrappedNative token through each pair separately
-    function partswapNative(PartswapCalldata calldata data) external payable;
-
     /// @notice Swaps tokenIn through each pair separately
     /// @dev each pair in the pairs array must have tokenIn and have the same tokenOut,
     /// the result of swap is the sum after each swap
-    function partswap(PartswapCalldata calldata data) external;
+    function partswap(PartswapCalldata calldata data) external payable;
 }

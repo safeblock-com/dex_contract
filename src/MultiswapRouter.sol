@@ -171,30 +171,28 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
     // main logic
     // =========================
 
-    /// @inheritdoc IMultiswapRouter
-    function multiswapNative(MultiswapCalldata calldata data) external payable {
-        // deposit native currency to wrapped native contract
-        _wrappedNative.deposit{ value: msg.value }();
+    //// @inheritdoc IMultiswapRouter
+    function multiswap(MultiswapCalldata calldata data) external payable {
+        bool isNative = _wrapNative();
 
-        _multiswap(true, address(_wrappedNative), msg.value, data);
+        address tokenOut;
+        uint256 amount;
+        (tokenOut, amount, isNative) = _multiswap(isNative, data);
+
+        _sendTokens(isNative, tokenOut, amount, data.unwrap);
     }
 
     //// @inheritdoc IMultiswapRouter
-    function multiswap(MultiswapCalldata calldata data) external {
-        _multiswap(false, data.tokenIn, data.amountIn, data);
-    }
+    function partswap(PartswapCalldata calldata data) external payable {
+        bool isNative = _wrapNative();
 
-    /// @inheritdoc IMultiswapRouter
-    function partswapNative(PartswapCalldata calldata data) external payable {
-        // deposit native currency to wrapped native contract
-        _wrappedNative.deposit{ value: msg.value }();
+        uint256 amount;
 
-        _partswap(true, msg.value, address(_wrappedNative), data);
-    }
+        (amount, isNative) = _partswap(
+            isNative, isNative ? msg.value : data.fullAmount, isNative ? address(_wrappedNative) : data.tokenIn, data
+        );
 
-    /// @inheritdoc IMultiswapRouter
-    function partswap(PartswapCalldata calldata data) external {
-        _partswap(false, data.fullAmount, data.tokenIn, data);
+        _sendTokens(isNative, data.tokenOut, amount, data.unwrap);
     }
 
     // for V3Callback
@@ -232,7 +230,7 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
     // =========================
 
     /// @dev Swaps through the data.pairs array
-    function _multiswap(bool native, address tokenIn, uint256 amountIn, MultiswapCalldata calldata data) internal {
+    function _multiswap(bool isNative, MultiswapCalldata calldata data) internal returns (address, uint256, bool) {
         // cache length of pairs to stack for gas savings
         uint256 length = data.pairs.length;
         // if length of array is zero -> revert
@@ -248,6 +246,10 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
         bytes32 pair = data.pairs[0];
         bool uni3;
 
+        address tokenIn;
+        uint256 amountIn;
+
+        // scope for transfer, avoids stack too deep errors
         {
             address firstPair;
 
@@ -258,13 +260,19 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
                 uni3 := and(pair, UNISWAP_V3_MASK)
             }
 
-            if (native) {
+            if (isNative) {
+                tokenIn = address(_wrappedNative);
+                amountIn = msg.value;
+
                 // execute transfer:
                 //     if the pair belongs to version 2 of the protocol -> transfer tokens to the pair
                 if (!uni3) {
                     TransferHelper.safeTransfer(tokenIn, firstPair, amountIn);
                 }
             } else {
+                tokenIn = data.tokenIn;
+                amountIn = data.amountIn;
+
                 // execute transferFrom:
                 //     if the pair belongs to version 2 of the protocol -> transfer tokens to the pair
                 //     if version 3 - to this contract
@@ -272,36 +280,39 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
             }
         }
 
-        bytes32 addressThisBytes32 = _addressThisBytes32();
-
         uint256 balanceOutBeforeLastSwap;
-        bool uni3Next;
-        bytes32 destination;
-        for (uint256 i; i < length; i = _unsafeAddOne(i)) {
-            if (i == lastIndex) {
-                // if the pair is the last in the array - the next token recipient after the swap is address(this)
-                destination = addressThisBytes32;
-            } else {
-                // otherwise take the next pair
-                destination = data.pairs[_unsafeAddOne(i)];
-            }
 
-            assembly ("memory-safe") {
-                // if the next pair belongs to version 3 of the protocol - the address
-                // of the router is set as the recipient, otherwise - the next pair
-                uni3Next := and(destination, UNISWAP_V3_MASK)
-            }
+        // scope for swaps, avoids stack too deep errors
+        {
+            bytes32 addressThisBytes32 = _addressThisBytes32();
+            bool uni3Next;
+            bytes32 destination;
+            for (uint256 i; i < length; i = _unsafeAddOne(i)) {
+                if (i == lastIndex) {
+                    // if the pair is the last in the array - the next token recipient after the swap is address(this)
+                    destination = addressThisBytes32;
+                } else {
+                    // otherwise take the next pair
+                    destination = data.pairs[_unsafeAddOne(i)];
+                }
 
-            if (uni3) {
-                (amountIn, tokenIn, balanceOutBeforeLastSwap) =
-                    _swapUniV3(i == lastIndex, pair, amountIn, tokenIn, uni3Next ? addressThisBytes32 : destination);
-            } else {
-                (amountIn, tokenIn, balanceOutBeforeLastSwap) =
-                    _swapUniV2(i == lastIndex, pair, tokenIn, uni3Next ? addressThisBytes32 : destination);
+                assembly ("memory-safe") {
+                    // if the next pair belongs to version 3 of the protocol - the address
+                    // of the router is set as the recipient, otherwise - the next pair
+                    uni3Next := and(destination, UNISWAP_V3_MASK)
+                }
+
+                if (uni3) {
+                    (amountIn, tokenIn, balanceOutBeforeLastSwap) =
+                        _swapUniV3(i == lastIndex, pair, amountIn, tokenIn, uni3Next ? addressThisBytes32 : destination);
+                } else {
+                    (amountIn, tokenIn, balanceOutBeforeLastSwap) =
+                        _swapUniV2(i == lastIndex, pair, tokenIn, uni3Next ? addressThisBytes32 : destination);
+                }
+                // upgrade the pair for the next swap
+                pair = destination;
+                uni3 = uni3Next;
             }
-            // upgrade the pair for the next swap
-            pair = destination;
-            uni3 = uni3Next;
         }
 
         uint256 balanceOutAfterLastSwap = IERC20(tokenIn).balanceOf(address(this));
@@ -321,11 +332,19 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
 
         exactAmountOut = _writeFees(exactAmountOut, data.referralAddress, tokenIn);
 
-        TransferHelper.safeTransfer(tokenIn, msg.sender, exactAmountOut);
+        return (tokenIn, exactAmountOut, tokenIn == address(_wrappedNative));
     }
 
     /// @dev Swaps tokenIn through each pair separately
-    function _partswap(bool native, uint256 fullAmount, address tokenIn, PartswapCalldata calldata data) internal {
+    function _partswap(
+        bool isNative,
+        uint256 fullAmount,
+        address tokenIn,
+        PartswapCalldata calldata data
+    )
+        internal
+        returns (uint256, bool)
+    {
         // cache length of pairs to stack for gas savings
         uint256 length = data.pairs.length;
         // if length of array is zero -> revert
@@ -349,7 +368,7 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
                 revert MultiswapRouter_InvalidPartswapCalldata();
             }
 
-            if (!native) {
+            if (!isNative) {
                 // Transfer full amount in for all swaps
                 TransferHelper.safeTransferFrom(tokenIn, msg.sender, address(this), fullAmount);
             }
@@ -397,7 +416,7 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
 
         exactAmountOut = _writeFees(exactAmountOut, data.referralAddress, tokenOut);
 
-        TransferHelper.safeTransfer(tokenOut, msg.sender, exactAmountOut);
+        return (exactAmountOut, tokenOut == address(_wrappedNative));
     }
 
     /// @dev Function that should revert when `msg.sender` is not authorized to upgrade the contract. Called by
@@ -595,5 +614,24 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
     /// @dev low-level call, returns true if successful
     function _makeCall(address addr, bytes memory data) internal returns (bool success) {
         (success,) = addr.call(data);
+    }
+
+    /// @dev wraps native token if needed
+    function _wrapNative() internal returns (bool isNative) {
+        isNative = msg.value > 0;
+
+        if (isNative) {
+            _wrappedNative.deposit{ value: msg.value }();
+        }
+    }
+
+    /// @dev sends tokens or unwrap and send native
+    function _sendTokens(bool isNative, address token, uint256 amount, bool unwrap) internal {
+        if (isNative && unwrap) {
+            _wrappedNative.withdraw(amount);
+            TransferHelper.safeTransferNative(msg.sender, amount);
+        } else {
+            TransferHelper.safeTransfer(token, msg.sender, amount);
+        }
     }
 }

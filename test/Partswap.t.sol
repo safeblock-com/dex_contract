@@ -281,7 +281,7 @@ contract Partswap is Test {
 
     // native swaps
 
-    function test_multiswapRouter_partswapNative_swapViaOnePairV3() external {
+    function test_multiswapRouter_partswapWithNative_swapViaOnePairV3() external {
         MultiswapRouter.PartswapCalldata memory data;
         data.tokenOut = BUSD;
         data.amountsIn = new uint256[](1);
@@ -290,12 +290,12 @@ contract Partswap is Test {
         data.pairs[0] = WBNB_BUSD_UniV3_3000;
 
         hoax(user);
-        router.partswapNative{ value: 500_000_000 }(data);
+        router.partswap{ value: 500_000_000 }(data);
 
         assertGt(router.profit(address(router), BUSD), 0);
     }
 
-    function test_multiswapRouter_partswapNative_swapViaOnePairV2() external {
+    function test_multiswapRouter_partswapWithNative_swapViaOnePairV2() external {
         MultiswapRouter.PartswapCalldata memory data;
         data.tokenOut = BUSD;
         data.amountsIn = new uint256[](1);
@@ -304,12 +304,12 @@ contract Partswap is Test {
         data.pairs[0] = WBNB_BUSD_Cake;
 
         hoax(user);
-        router.partswapNative{ value: 500_000_000 }(data);
+        router.partswap{ value: 500_000_000 }(data);
 
         assertGt(router.profit(address(router), BUSD), 0);
     }
 
-    function test_multiswapRouter_partswapNative_swapViaOnePairV3_referral() external {
+    function test_multiswapRouter_partswapWithNative_swapViaOnePairV3_referral() external {
         MultiswapRouter.PartswapCalldata memory data;
         data.tokenOut = BUSD;
         data.amountsIn = new uint256[](1);
@@ -319,13 +319,13 @@ contract Partswap is Test {
         data.referralAddress = referral;
 
         hoax(user);
-        router.partswapNative{ value: 500_000_000 }(data);
+        router.partswap{ value: 500_000_000 }(data);
 
         assertGt(router.profit(address(router), BUSD), 0);
         assertGt(router.profit(referral, BUSD), 0);
     }
 
-    function test_multiswapRouter_partswapNative_swapViaOnePairV2_referral() external {
+    function test_multiswapRouter_partswapWithNative_swapViaOnePairV2_referral() external {
         MultiswapRouter.PartswapCalldata memory data;
         data.tokenOut = BUSD;
         data.amountsIn = new uint256[](1);
@@ -335,13 +335,13 @@ contract Partswap is Test {
         data.referralAddress = referral;
 
         hoax(user);
-        router.partswapNative{ value: 500_000_000 }(data);
+        router.partswap{ value: 500_000_000 }(data);
 
         assertGt(router.profit(address(router), BUSD), 0);
         assertGt(router.profit(referral, BUSD), 0);
     }
 
-    function test_multiswapRouter_partswapNative_swapViaTwoPairsV3() external {
+    function test_multiswapRouter_partswapWithNative_swapViaTwoPairsV3() external {
         MultiswapRouter.PartswapCalldata memory data;
         data.tokenOut = BUSD;
         data.amountsIn = new uint256[](2);
@@ -352,12 +352,12 @@ contract Partswap is Test {
         data.pairs[1] = WBNB_BUSD_UniV3_500;
 
         hoax(user);
-        router.partswapNative{ value: 1_000_000_000 }(data);
+        router.partswap{ value: 1_000_000_000 }(data);
 
         assertGt(router.profit(address(router), BUSD), 0);
     }
 
-    function test_multiswapRouter_partswapNative_swapViaTwoPairsV2() external {
+    function test_multiswapRouter_partswapWithNative_swapViaTwoPairsV2() external {
         MultiswapRouter.PartswapCalldata memory data;
         data.tokenOut = BUSD;
         data.amountsIn = new uint256[](2);
@@ -368,12 +368,12 @@ contract Partswap is Test {
         data.pairs[1] = WBNB_BUSD_Biswap;
 
         hoax(user);
-        router.partswapNative{ value: 1_000_000_000 }(data);
+        router.partswap{ value: 1_000_000_000 }(data);
 
         assertGt(router.profit(address(router), BUSD), 0);
     }
 
-    function test_multiswapRouter_partswapNative_swapViaTwoPairsV2AndV3_referral() external {
+    function test_multiswapRouter_partswapWithNative_swapViaTwoPairsV2AndV3_referral() external {
         MultiswapRouter.PartswapCalldata memory data;
         data.tokenOut = BUSD;
         data.amountsIn = new uint256[](2);
@@ -385,13 +385,13 @@ contract Partswap is Test {
         data.referralAddress = referral;
 
         hoax(user);
-        router.partswapNative{ value: 1_000_000_000 }(data);
+        router.partswap{ value: 1_000_000_000 }(data);
 
         assertGt(router.profit(address(router), BUSD), 0);
         assertGt(router.profit(referral, BUSD), 0);
     }
 
-    function test_multiswapRouter_partswapNative_swapViaThreePairs() external {
+    function test_multiswapRouter_partswapWithNative_swapViaThreePairs() external {
         MultiswapRouter.PartswapCalldata memory data;
         data.tokenOut = BUSD;
         data.amountsIn = new uint256[](3);
@@ -404,12 +404,12 @@ contract Partswap is Test {
         data.pairs[2] = WBNB_BUSD_Bakery;
 
         hoax(user);
-        router.partswapNative{ value: 1_500_000_000 }(data);
+        router.partswap{ value: 1_500_000_000 }(data);
 
         assertGt(router.profit(address(router), BUSD), 0);
     }
 
-    function test_multiswapRouter_partswapNative_swapViaFourPairs() external {
+    function test_multiswapRouter_partswapWithNative_swapViaFourPairs() external {
         MultiswapRouter.PartswapCalldata memory data;
         data.tokenOut = BUSD;
         data.amountsIn = new uint256[](4);
@@ -424,12 +424,12 @@ contract Partswap is Test {
         data.pairs[3] = WBNB_BUSD_Bakery;
 
         hoax(user);
-        router.partswapNative{ value: 2_000_000_000 }(data);
+        router.partswap{ value: 2_000_000_000 }(data);
 
         assertGt(router.profit(address(router), BUSD), 0);
     }
 
-    function test_multiswapRouter_partswapNative_shouldRevertWithInvalidCalldata() external {
+    function test_multiswapRouter_partswapWithNative_shouldRevertWithInvalidCalldata() external {
         MultiswapRouter.PartswapCalldata memory data;
         data.fullAmount = 2_000_000_000;
         data.tokenIn = WBNB;
@@ -447,7 +447,7 @@ contract Partswap is Test {
 
         hoax(user);
         vm.expectRevert(IMultiswapRouter.MultiswapRouter_InvalidPartswapCalldata.selector);
-        router.partswapNative{ value: 2_000_000_000 }(data);
+        router.partswap{ value: 2_000_000_000 }(data);
 
         data.tokenOut = BUSD;
         data.amountsIn = new uint256[](3);
@@ -462,6 +462,6 @@ contract Partswap is Test {
 
         hoax(user);
         vm.expectRevert(IMultiswapRouter.MultiswapRouter_InvalidPartswapCalldata.selector);
-        router.partswapNative{ value: 2_000_000_000 }(data);
+        router.partswap{ value: 2_000_000_000 }(data);
     }
 }
