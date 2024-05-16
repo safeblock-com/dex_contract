@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "forge-std/Script.sol";
 
 import { MultiswapRouter, IMultiswapRouter } from "../src/MultiswapRouter.sol";
-import { Proxy } from "../src/proxy/Proxy.sol";
+import { Proxy, InitialImplementation } from "../src/proxy/Proxy.sol";
 import { WBNB } from "../test/Helpers.t.sol";
 
 contract MultiswapRouterDeploy is Script {
@@ -13,7 +13,9 @@ contract MultiswapRouterDeploy is Script {
 
         vm.startBroadcast(deployer);
 
-        new Proxy(
+        InitialImplementation proxy = InitialImplementation(address(new Proxy()));
+
+        proxy.upgradeTo(
             address(new MultiswapRouter(WBNB)),
             abi.encodeCall(
                 IMultiswapRouter.initialize,

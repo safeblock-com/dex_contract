@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 
 import { Ownable, IOwnable } from "../../src/external/Ownable.sol";
 import { UUPSUpgradeable, ERC1967Utils } from "../../src/proxy/UUPSUpgradeable.sol";
-import { Proxy } from "../../src/proxy/Proxy.sol";
+import { Proxy, InitialImplementation } from "../../src/proxy/Proxy.sol";
 
 contract Implementation is UUPSUpgradeable, Ownable {
     function initialize() external {
@@ -59,8 +59,38 @@ contract UUPSUpgradeableTest is Test {
         fakeImpl = address(new FakeImplementation());
         notUUPSImplementation = address(new NotUUPSImplementation());
 
-        vm.prank(owner);
-        proxy = address(new Proxy(impl, abi.encodeCall(Implementation.initialize, ())));
+        vm.startPrank(owner);
+        proxy = address(new Proxy());
+        InitialImplementation(proxy).upgradeTo(impl, abi.encodeCall(Implementation.initialize, ()));
+        vm.stopPrank();
+    }
+
+    function test_proxy_initialImplementation_shouldUpgradeImplementation(address _owner, address _notOwner) external {
+        vm.assume(_owner != _notOwner);
+
+        bytes32 __owner;
+        bytes32 slot;
+
+        assembly {
+            __owner := _owner
+            slot := not(0)
+        }
+
+        vm.prank(_owner);
+        InitialImplementation _proxy = InitialImplementation(address(new Proxy()));
+
+        assertEq(vm.load(address(_proxy), slot), __owner);
+
+        vm.prank(_notOwner);
+        vm.expectRevert(abi.encodeWithSelector(InitialImplementation.NotInitialOwner.selector, _notOwner));
+        _proxy.upgradeTo(address(impl), bytes(""));
+
+        vm.prank(_owner);
+        vm.expectEmit();
+        emit Upgraded(impl);
+        _proxy.upgradeTo(address(impl), bytes(""));
+
+        assertEq(vm.load(address(_proxy), slot), 0);
     }
 
     function test_UUPSUpgradeable_proxiableUUID_shouldRevertIfCalledViaProxy(address caller) external {

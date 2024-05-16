@@ -6,7 +6,7 @@ import { IERC20 } from "forge-std/interfaces/IERC20.sol";
 
 import { MultiswapRouter, IMultiswapRouter } from "src/MultiswapRouter.sol";
 import { IOwnable } from "src/external/IOwnable.sol";
-import { Proxy } from "../src/proxy/Proxy.sol";
+import { Proxy, InitialImplementation } from "../src/proxy/Proxy.sol";
 import "./Helpers.t.sol";
 
 contract MultiswapTest is Test {
@@ -22,17 +22,13 @@ contract MultiswapTest is Test {
         deal(WBNB, user, 500e18);
 
         address routerImplementation = address(new MultiswapRouter(WBNB));
-        router = MultiswapRouter(
-            payable(
-                address(
-                    new Proxy(
-                        routerImplementation,
-                        abi.encodeCall(
-                            IMultiswapRouter.initialize,
-                            (300, IMultiswapRouter.ReferralFee({ protocolPart: 200, referralPart: 50 }), owner)
-                        )
-                    )
-                )
+        router = MultiswapRouter(payable(address(new Proxy())));
+
+        InitialImplementation(address(router)).upgradeTo(
+            routerImplementation,
+            abi.encodeCall(
+                IMultiswapRouter.initialize,
+                (300, IMultiswapRouter.ReferralFee({ protocolPart: 200, referralPart: 50 }), owner)
             )
         );
     }

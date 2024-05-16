@@ -3,6 +3,32 @@ pragma solidity 0.8.19;
 
 import { ERC1967Utils } from "./libraries/ERC1967Utils.sol";
 
+/// @dev Initial implementation of an upgradeable proxy.
+/// This contract must be deployed as first proxy implementation
+/// before any other implementation can be deployed.
+contract InitialImplementation {
+    error NotInitialOwner(address caller);
+
+    /// @dev Upgrades the implementation of the proxy to `implementation` and calls `data` on it.
+    /// If `data` is nonempty, it's used as data in a delegate call to `implementation`.
+    /// If caller is not the temporary owner of the proxy (saved in the storage slot not(0)), it will revert.
+    /// Slot not(0) is set to 0 when the proxy is upgraded.
+    function upgradeTo(address implementation, bytes memory data) external {
+        assembly ("memory-safe") {
+            if iszero(eq(caller(), sload(not(0)))) {
+                // NotInitialOwner selector
+                mstore(0, 0x483ffb99)
+                mstore(32, caller())
+                revert(28, 36)
+            }
+
+            sstore(not(0), 0)
+        }
+
+        ERC1967Utils.upgradeToAndCall(implementation, data);
+    }
+}
+
 /// @dev This contract provides a fallback function that delegates all calls to another contract using the EVM
 /// instruction `delegatecall`.
 ///
@@ -22,8 +48,12 @@ contract Proxy {
     /// Requirements:
     ///
     /// - If `data` is empty, `msg.value` must be zero.
-    constructor(address implementation, bytes memory _data) payable {
-        ERC1967Utils.upgradeToAndCall(implementation, _data);
+    constructor() {
+        assembly {
+            sstore(not(0), caller()) // save caller as temporary owner
+        }
+
+        ERC1967Utils.upgradeToAndCall(address(new InitialImplementation()), bytes(""));
     }
 
     // =========================

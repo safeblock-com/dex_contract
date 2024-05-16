@@ -8,7 +8,7 @@ import { IERC20 } from "forge-std/interfaces/IERC20.sol";
 import { IOwnable2Step } from "../src/external/IOwnable2Step.sol";
 import { MultiswapRouter, IMultiswapRouter, Initializable } from "../src/MultiswapRouter.sol";
 import { IOwnable } from "../src/external/Ownable.sol";
-import { Proxy } from "../src/proxy/Proxy.sol";
+import { Proxy, InitialImplementation } from "../src/proxy/Proxy.sol";
 import { UUPSUpgradeable, ERC1967Utils } from "../src/proxy/UUPSUpgradeable.sol";
 
 contract NoPayableRecipient { }
@@ -33,17 +33,13 @@ contract FactoryTest is Test {
     function setUp() external {
         address routerImplementation = address(new MultiswapRouter(wrappedNative));
 
-        router = MultiswapRouter(
-            payable(
-                address(
-                    new Proxy(
-                        routerImplementation,
-                        abi.encodeCall(
-                            IMultiswapRouter.initialize,
-                            (300, IMultiswapRouter.ReferralFee({ protocolPart: 200, referralPart: 50 }), owner)
-                        )
-                    )
-                )
+        router = MultiswapRouter(payable(address(new Proxy())));
+
+        InitialImplementation(address(router)).upgradeTo(
+            routerImplementation,
+            abi.encodeCall(
+                IMultiswapRouter.initialize,
+                (300, IMultiswapRouter.ReferralFee({ protocolPart: 200, referralPart: 50 }), owner)
             )
         );
     }
@@ -97,15 +93,10 @@ contract FactoryTest is Test {
         referralFee.protocolPart = bound(referralFee.protocolPart, 10, 200);
         referralFee.referralPart = bound(referralFee.referralPart, 10, 50);
 
-        MultiswapRouter _router = MultiswapRouter(
-            payable(
-                address(
-                    new Proxy(
-                        address(new MultiswapRouter(wrappedNative)),
-                        abi.encodeCall(IMultiswapRouter.initialize, (protocolFee, referralFee, newOwner))
-                    )
-                )
-            )
+        MultiswapRouter _router = MultiswapRouter(payable(address(new Proxy())));
+        InitialImplementation(address(_router)).upgradeTo(
+            address(new MultiswapRouter(wrappedNative)),
+            abi.encodeCall(IMultiswapRouter.initialize, (protocolFee, referralFee, newOwner))
         );
 
         (uint256 _protocolFee, IMultiswapRouter.ReferralFee memory _referralFee) = _router.fees();
