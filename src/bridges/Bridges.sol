@@ -13,6 +13,8 @@ import { IStargatePool } from "./stargate/IStargatePool.sol";
 import { ILayerZeroEndpointV2, UlnConfig } from "./layerZero/ILayerZeroEndpointV2.sol";
 import { ISendLib } from "./layerZero/ISendLib.sol";
 
+import { IAxelarGateway } from "./axelar/IAxelarGateway.sol";
+
 import { Ownable2Step } from "../external/Ownable2Step.sol";
 
 contract Bridges is Ownable2Step {
@@ -25,12 +27,14 @@ contract Bridges is Ownable2Step {
         address wrappedNative,
         address connext,
         address stargateComposer,
-        address layerZeroEndpoint
+        address layerZeroEndpoint,
+        address axelarGateway
     ) {
         _wrappedNative = wrappedNative;
         _connext = IConnext(connext);
         _stargateComposer = IStargateComposer(stargateComposer);
         _layerZeroEndpoint = ILayerZeroEndpointV2(layerZeroEndpoint);
+        _axelarGateway = IAxelarGateway(axelarGateway);
 
         // TODO to initialize
         _transferOwnership(newOwner);
@@ -513,5 +517,33 @@ contract Bridges is Ownable2Step {
         });
 
         return fee.nativeFee;
+    }
+
+
+
+    // =========================
+    // axelar
+    // =========================
+
+    IAxelarGateway immutable _axelarGateway;
+
+    function senTokensViaAxelar(
+        string memory destinationChain,
+        string memory destinationAddress,
+        string memory symbol,
+        uint256 amount
+    ) external {
+        address tokenAddress = _axelarGateway.tokenAddresses(symbol);
+
+        tokenAddress.safeTransferFrom({ from: msg.sender, to: address(this), value: amount});
+
+        tokenAddress.safeApprove({ spender: address(_axelarGateway), value: amount });    
+
+        _axelarGateway.sendToken({
+            destinationChain: destinationChain,
+            destinationAddress: destinationAddress,
+            symbol: symbol,
+            amount: amount
+        });
     }
 }
