@@ -43,7 +43,7 @@ contract MultiswapTest is Test {
         vm.startPrank(user);
         IERC20(WBNB).approve(address(router), type(uint256).max);
 
-        router.multiswap(data);
+        router.multiswap(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
 
@@ -61,7 +61,7 @@ contract MultiswapTest is Test {
         vm.startPrank(user);
         IERC20(WBNB).approve(address(router), type(uint256).max);
 
-        router.multiswap(data);
+        router.multiswap(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
         assertGt(router.profit(referral, BUSD), 0);
@@ -79,7 +79,7 @@ contract MultiswapTest is Test {
         vm.startPrank(user);
         IERC20(WBNB).approve(address(router), type(uint256).max);
 
-        router.multiswap(data);
+        router.multiswap(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
 
@@ -97,7 +97,7 @@ contract MultiswapTest is Test {
         vm.startPrank(user);
         IERC20(WBNB).approve(address(router), type(uint256).max);
 
-        router.multiswap(data);
+        router.multiswap(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
         assertGt(router.profit(referral, BUSD), 0);
@@ -115,7 +115,7 @@ contract MultiswapTest is Test {
 
         vm.startPrank(user);
         IERC20(WBNB).approve(address(router), type(uint256).max);
-        router.multiswap(data);
+        router.multiswap(data, user);
 
         assertGt(router.profit(address(router), CAKE), 0);
         vm.stopPrank();
@@ -131,7 +131,7 @@ contract MultiswapTest is Test {
 
         vm.startPrank(user);
         IERC20(WBNB).approve(address(router), type(uint256).max);
-        router.multiswap(data);
+        router.multiswap(data, user);
 
         assertGt(router.profit(address(router), CAKE), 0);
         vm.stopPrank();
@@ -148,7 +148,7 @@ contract MultiswapTest is Test {
 
         vm.startPrank(user);
         IERC20(WBNB).approve(address(router), type(uint256).max);
-        router.multiswap(data);
+        router.multiswap(data, user);
 
         assertGt(router.profit(address(router), CAKE), 0);
         assertGt(router.profit(referral, CAKE), 0);
@@ -166,7 +166,7 @@ contract MultiswapTest is Test {
 
         vm.startPrank(user);
         IERC20(WBNB).approve(address(router), type(uint256).max);
-        router.multiswap(data);
+        router.multiswap(data, user);
 
         assertGt(router.profit(address(router), USDC), 0);
         vm.stopPrank();
@@ -184,7 +184,7 @@ contract MultiswapTest is Test {
 
         vm.startPrank(user);
         IERC20(WBNB).approve(address(router), type(uint256).max);
-        router.multiswap(data);
+        router.multiswap(data, user);
 
         assertGt(router.profit(address(router), CAKE), 0);
         vm.stopPrank();
@@ -202,7 +202,7 @@ contract MultiswapTest is Test {
         vm.startPrank(user);
         IERC20(WBNB).approve(address(router), type(uint256).max);
 
-        router.multiswap(data);
+        router.multiswap(data, user);
 
         uint256 fees = router.profit(address(router), BUSD);
         assertGt(fees, 0);
@@ -231,7 +231,7 @@ contract MultiswapTest is Test {
         vm.startPrank(user);
         IERC20(WBNB).approve(address(router), type(uint256).max);
 
-        router.multiswap(data);
+        router.multiswap(data, user);
 
         uint256 fees = router.profit(address(router), BUSD);
         assertGt(fees, 0);
@@ -261,7 +261,7 @@ contract MultiswapTest is Test {
         vm.startPrank(user);
         IERC20(WBNB).approve(address(router), type(uint256).max);
 
-        router.multiswap(data);
+        router.multiswap(data, user);
 
         uint256 fees = router.profit(referral, BUSD);
         assertGt(fees, 0);
@@ -291,7 +291,7 @@ contract MultiswapTest is Test {
         vm.startPrank(user);
         IERC20(WBNB).approve(address(router), type(uint256).max);
 
-        router.multiswap(data);
+        router.multiswap(data, user);
 
         uint256 fees = router.profit(referral, BUSD);
         assertGt(fees, 0);
@@ -318,7 +318,7 @@ contract MultiswapTest is Test {
         data.pairs[0] = WBNB_BUSD_UniV3_3000;
 
         hoax(user);
-        router.multiswap{ value: 500_000_000 }(data);
+        router.multiswap{ value: 500_000_000 }(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
     }
@@ -330,7 +330,7 @@ contract MultiswapTest is Test {
         data.referralAddress = referral;
 
         hoax(user);
-        router.multiswap{ value: 500_000_000 }(data);
+        router.multiswap{ value: 500_000_000 }(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
         assertGt(router.profit(referral, BUSD), 0);
@@ -342,7 +342,7 @@ contract MultiswapTest is Test {
         data.pairs[0] = WBNB_BUSD_Cake;
 
         hoax(user);
-        router.multiswap{ value: 500_000_000 }(data);
+        router.multiswap{ value: 500_000_000 }(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
     }
@@ -354,7 +354,7 @@ contract MultiswapTest is Test {
         data.referralAddress = referral;
 
         hoax(user);
-        router.multiswap{ value: 500_000_000 }(data);
+        router.multiswap{ value: 500_000_000 }(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
         assertGt(router.profit(referral, BUSD), 0);
@@ -367,7 +367,7 @@ contract MultiswapTest is Test {
         data.pairs[1] = BUSD_CAKE_CakeV3_100;
 
         hoax(user);
-        router.multiswap{ value: 500_000_000 }(data);
+        router.multiswap{ value: 500_000_000 }(data, user);
 
         assertGt(router.profit(address(router), CAKE), 0);
     }
@@ -381,7 +381,7 @@ contract MultiswapTest is Test {
         data.pairs[1] = BUSD_CAKE_Cake;
 
         hoax(user);
-        router.multiswap{ value: 500_000_000 }(data);
+        router.multiswap{ value: 500_000_000 }(data, user);
 
         assertGt(router.profit(address(router), CAKE), 0);
     }
@@ -394,7 +394,7 @@ contract MultiswapTest is Test {
         data.referralAddress = referral;
 
         hoax(user);
-        router.multiswap{ value: 500_000_000 }(data);
+        router.multiswap{ value: 500_000_000 }(data, user);
 
         assertGt(router.profit(address(router), CAKE), 0);
         assertGt(router.profit(referral, CAKE), 0);
@@ -408,7 +408,7 @@ contract MultiswapTest is Test {
         data.pairs[2] = USDT_USDC_CakeV3_500;
 
         hoax(user);
-        router.multiswap{ value: 500_000_000 }(data);
+        router.multiswap{ value: 500_000_000 }(data, user);
 
         assertGt(router.profit(address(router), USDC), 0);
     }
@@ -422,7 +422,7 @@ contract MultiswapTest is Test {
         data.pairs[3] = USDC_CAKE_Cake;
 
         hoax(user);
-        router.multiswap{ value: 500_000_000 }(data);
+        router.multiswap{ value: 500_000_000 }(data, user);
 
         assertGt(router.profit(address(router), CAKE), 0);
     }

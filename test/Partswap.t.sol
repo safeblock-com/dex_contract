@@ -45,7 +45,7 @@ contract Partswap is Test {
         vm.startPrank(user);
         IERC20(WBNB).approve(address(router), type(uint256).max);
 
-        router.partswap(data);
+        router.partswap(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
 
@@ -65,7 +65,7 @@ contract Partswap is Test {
         vm.startPrank(user);
         IERC20(WBNB).approve(address(router), type(uint256).max);
 
-        router.partswap(data);
+        router.partswap(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
 
@@ -86,7 +86,7 @@ contract Partswap is Test {
         vm.startPrank(user);
         IERC20(WBNB).approve(address(router), type(uint256).max);
 
-        router.partswap(data);
+        router.partswap(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
         assertGt(router.profit(referral, BUSD), 0);
@@ -108,7 +108,7 @@ contract Partswap is Test {
         vm.startPrank(user);
         IERC20(WBNB).approve(address(router), type(uint256).max);
 
-        router.partswap(data);
+        router.partswap(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
         assertGt(router.profit(referral, BUSD), 0);
@@ -131,7 +131,7 @@ contract Partswap is Test {
         vm.startPrank(user);
         IERC20(WBNB).approve(address(router), type(uint256).max);
 
-        router.partswap(data);
+        router.partswap(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
 
@@ -153,7 +153,7 @@ contract Partswap is Test {
         vm.startPrank(user);
         IERC20(WBNB).approve(address(router), type(uint256).max);
 
-        router.partswap(data);
+        router.partswap(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
 
@@ -176,7 +176,7 @@ contract Partswap is Test {
         vm.startPrank(user);
         IERC20(WBNB).approve(address(router), type(uint256).max);
 
-        router.partswap(data);
+        router.partswap(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
         assertGt(router.profit(referral, BUSD), 0);
@@ -201,7 +201,7 @@ contract Partswap is Test {
         vm.startPrank(user);
         IERC20(WBNB).approve(address(router), type(uint256).max);
 
-        router.partswap(data);
+        router.partswap(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
 
@@ -227,7 +227,7 @@ contract Partswap is Test {
         vm.startPrank(user);
         IERC20(WBNB).approve(address(router), type(uint256).max);
 
-        router.partswap(data);
+        router.partswap(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
 
@@ -252,7 +252,7 @@ contract Partswap is Test {
 
         vm.startPrank(user);
         vm.expectRevert(IMultiswapRouter.MultiswapRouter_InvalidPartswapCalldata.selector);
-        router.partswap(data);
+        router.partswap(data, user);
 
         data.fullAmount = 2_000_000_000;
         data.tokenIn = WBNB;
@@ -269,7 +269,7 @@ contract Partswap is Test {
 
         vm.startPrank(user);
         vm.expectRevert(IMultiswapRouter.MultiswapRouter_InvalidPartswapCalldata.selector);
-        router.partswap(data);
+        router.partswap(data, user);
 
         vm.stopPrank();
     }
@@ -285,7 +285,7 @@ contract Partswap is Test {
         data.pairs[0] = WBNB_BUSD_UniV3_3000;
 
         hoax(user);
-        router.partswap{ value: 500_000_000 }(data);
+        router.partswap{ value: 500_000_000 }(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
     }
@@ -299,7 +299,7 @@ contract Partswap is Test {
         data.pairs[0] = WBNB_BUSD_Cake;
 
         hoax(user);
-        router.partswap{ value: 500_000_000 }(data);
+        router.partswap{ value: 500_000_000 }(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
     }
@@ -314,7 +314,7 @@ contract Partswap is Test {
         data.referralAddress = referral;
 
         hoax(user);
-        router.partswap{ value: 500_000_000 }(data);
+        router.partswap{ value: 500_000_000 }(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
         assertGt(router.profit(referral, BUSD), 0);
@@ -330,7 +330,7 @@ contract Partswap is Test {
         data.referralAddress = referral;
 
         hoax(user);
-        router.partswap{ value: 500_000_000 }(data);
+        router.partswap{ value: 500_000_000 }(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
         assertGt(router.profit(referral, BUSD), 0);
@@ -347,7 +347,7 @@ contract Partswap is Test {
         data.pairs[1] = WBNB_BUSD_UniV3_500;
 
         hoax(user);
-        router.partswap{ value: 1_000_000_000 }(data);
+        router.partswap{ value: 1_000_000_000 }(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
     }
@@ -363,7 +363,7 @@ contract Partswap is Test {
         data.pairs[1] = WBNB_BUSD_Biswap;
 
         hoax(user);
-        router.partswap{ value: 1_000_000_000 }(data);
+        router.partswap{ value: 1_000_000_000 }(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
     }
@@ -380,7 +380,7 @@ contract Partswap is Test {
         data.referralAddress = referral;
 
         hoax(user);
-        router.partswap{ value: 1_000_000_000 }(data);
+        router.partswap{ value: 1_000_000_000 }(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
         assertGt(router.profit(referral, BUSD), 0);
@@ -399,7 +399,7 @@ contract Partswap is Test {
         data.pairs[2] = WBNB_BUSD_Bakery;
 
         hoax(user);
-        router.partswap{ value: 1_500_000_000 }(data);
+        router.partswap{ value: 1_500_000_000 }(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
     }
@@ -419,7 +419,7 @@ contract Partswap is Test {
         data.pairs[3] = WBNB_BUSD_Bakery;
 
         hoax(user);
-        router.partswap{ value: 2_000_000_000 }(data);
+        router.partswap{ value: 2_000_000_000 }(data, user);
 
         assertGt(router.profit(address(router), BUSD), 0);
     }
@@ -442,7 +442,7 @@ contract Partswap is Test {
 
         hoax(user);
         vm.expectRevert(IMultiswapRouter.MultiswapRouter_InvalidPartswapCalldata.selector);
-        router.partswap{ value: 2_000_000_000 }(data);
+        router.partswap{ value: 2_000_000_000 }(data, user);
 
         data.tokenOut = BUSD;
         data.amountsIn = new uint256[](3);
@@ -457,6 +457,6 @@ contract Partswap is Test {
 
         hoax(user);
         vm.expectRevert(IMultiswapRouter.MultiswapRouter_InvalidPartswapCalldata.selector);
-        router.partswap{ value: 2_000_000_000 }(data);
+        router.partswap{ value: 2_000_000_000 }(data, user);
     }
 }

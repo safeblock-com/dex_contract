@@ -172,18 +172,18 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
     // =========================
 
     //// @inheritdoc IMultiswapRouter
-    function multiswap(MultiswapCalldata calldata data) external payable {
+    function multiswap(MultiswapCalldata calldata data, address to) external payable {
         bool isNative = _wrapNative();
 
         address tokenOut;
         uint256 amount;
         (tokenOut, amount, isNative) = _multiswap(isNative, data);
 
-        _sendTokens(isNative, tokenOut, amount, data.unwrap);
+        _sendTokens(isNative, tokenOut, amount, data.unwrap, to == address(0) ? msg.sender : to);
     }
 
     //// @inheritdoc IMultiswapRouter
-    function partswap(PartswapCalldata calldata data) external payable {
+    function partswap(PartswapCalldata calldata data, address to) external payable {
         bool isNative = _wrapNative();
 
         uint256 amount;
@@ -192,7 +192,7 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
             isNative, isNative ? msg.value : data.fullAmount, isNative ? address(_wrappedNative) : data.tokenIn, data
         );
 
-        _sendTokens(isNative, data.tokenOut, amount, data.unwrap);
+        _sendTokens(isNative, data.tokenOut, amount, data.unwrap, to == address(0) ? msg.sender : to);
     }
 
     // for unwrap native currency
@@ -633,12 +633,12 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
     }
 
     /// @dev sends tokens or unwrap and send native
-    function _sendTokens(bool isNative, address token, uint256 amount, bool unwrap) internal {
+    function _sendTokens(bool isNative, address token, uint256 amount, bool unwrap, address to) internal {
         if (isNative && unwrap) {
             _wrappedNative.withdraw(amount);
-            TransferHelper.safeTransferNative(msg.sender, amount);
+            TransferHelper.safeTransferNative(to, amount);
         } else {
-            TransferHelper.safeTransfer(token, msg.sender, amount);
+            TransferHelper.safeTransfer(token, to, amount);
         }
     }
 }
