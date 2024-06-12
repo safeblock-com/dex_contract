@@ -6,7 +6,7 @@ import "forge-std/Script.sol";
 import { MultiswapRouter } from "../src/MultiswapRouter.sol";
 import { WBNB } from "../test/Helpers.t.sol";
 
-contract MultiswapRouterDeploy is Script {
+contract UpgradeMultiswapRouter is Script {
     MultiswapRouter dex = MultiswapRouter(payable(0xd41B295F9695c3E90e845918aBB384D73a85C635));
 
     function run() external {

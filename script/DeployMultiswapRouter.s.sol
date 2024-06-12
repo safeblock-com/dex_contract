@@ -7,7 +7,7 @@ import { MultiswapRouter, IMultiswapRouter } from "../src/MultiswapRouter.sol";
 import { Proxy, InitialImplementation } from "../src/proxy/Proxy.sol";
 import { WBNB } from "../test/Helpers.t.sol";
 
-contract MultiswapRouterDeploy is Script {
+contract DeployMultiswapRouter is Script {
     function run() external {
         address deployer = vm.rememberKey(vm.envUint("PRIVATE_KEY"));
 

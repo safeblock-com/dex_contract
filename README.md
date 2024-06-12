@@ -142,8 +142,15 @@ or withdraw all:
 ## Deploy:
 
 put private key and rpc url to `.env` file
-and run `source .env`
 
 ```bash
-forge script script/MultiswapRouter.s:MultiswapRouterDeploy -vvvv --rpc-url $BSC_URL --broadcast     
+forge script script/DeployMultiswapRouter.s.sol:DeployMultiswapRouter -vvvv --rpc-url bsc --broadcast --verify    
+```
+
+## Upgrade:
+
+put private key and rpc url to `.env` file
+
+```bash
+forge script script/UpgradeMultiswapRouter.s.sol:UpgradeMultiswapRouter -vvvv --rpc-url bsc --broadcast --verify     
 ```
