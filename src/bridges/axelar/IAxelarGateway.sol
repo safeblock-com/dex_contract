@@ -7,7 +7,8 @@ interface IAxelarGateway {
         string memory destinationAddress,
         string memory symbol,
         uint256 amount
-    ) external;
+    )
+        external;
 
-    function tokenAddresses(string memory symbol) external view returns(address);
+    function tokenAddresses(string memory symbol) external view returns (address);
 }
