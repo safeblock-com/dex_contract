@@ -13,6 +13,8 @@ import { TransferHelper } from "./libraries/TransferHelper.sol";
 import { IMultiswapRouterFacet } from "./interfaces/IMultiswapRouterFacet.sol";
 import { IWrappedNative } from "./interfaces/IWrappedNative.sol";
 
+import { CallbackFacetLibrary } from "../libraries/CallbackFacetLibrary.sol";
+
 /// @title Multiswap Router Facet
 /// @notice Router for UniswapV3 and UniswapV2 multiswaps and partswaps
 contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
@@ -22,6 +24,8 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
 
     /// @dev address of the WrappedNative contract for current chain
     IWrappedNative private immutable _wrappedNative;
+
+    address private immutable _self;
 
     /// @dev mask for UniswapV3 pair designation
     /// if `mask & pair == true`, the swap is performed using the UniswapV3 logic
@@ -76,6 +80,8 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
 
     constructor(address wrappedNative_) {
         _wrappedNative = IWrappedNative(wrappedNative_);
+
+        _self = address(this);
     }
 
     // =========================
@@ -148,7 +154,7 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
             unchecked {
                 s.profit[address(this)][token] -= amount;
             }
-            TransferHelper.safeTransfer(token, recipient, amount);
+            TransferHelper.safeTransfer({ token: token, to: recipient, value: amount });
         }
     }
 
@@ -161,7 +167,7 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
             unchecked {
                 s.profit[msg.sender][token] -= amount;
             }
-            TransferHelper.safeTransfer(token, recipient, amount);
+            TransferHelper.safeTransfer({ token: token, to: recipient, value: amount });
         }
     }
 
@@ -174,7 +180,7 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
             unchecked {
                 s.profit[address(this)][token] = 0;
             }
-            TransferHelper.safeTransfer(token, recipient, balanceOf);
+            TransferHelper.safeTransfer({ token: token, to: recipient, value: balanceOf });
         }
     }
 
@@ -187,7 +193,7 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
             unchecked {
                 s.profit[msg.sender][token] = 0;
             }
-            TransferHelper.safeTransfer(token, recipient, balanceOf);
+            TransferHelper.safeTransfer({ token: token, to: recipient, value: balanceOf });
         }
     }
 
@@ -196,11 +202,10 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
     // =========================
 
     //// @inheritdoc IMultiswapRouterFacet
-    function multiswap(MultiswapCalldata calldata data, address to) external payable {
-        bool isNative = _wrapNative();
+    function multiswap(MultiswapCalldata calldata data, address to) external payable returns(uint256 amount) {
+        bool isNative = _wrapNative(data.tokenIn, data.amountIn);
 
         address tokenOut;
-        uint256 amount;
         (tokenOut, amount, isNative) = _multiswap(isNative, data);
 
         _sendTokens(isNative, tokenOut, amount, data.unwrap, to == address(0) ? msg.sender : to);
@@ -208,22 +213,17 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
 
     //// @inheritdoc IMultiswapRouterFacet
     function partswap(PartswapCalldata calldata data, address to) external payable {
-        bool isNative = _wrapNative();
+        address tokenIn = data.tokenIn;
+        uint256 fullAmount = data.fullAmount;
+        bool isNative = _wrapNative(tokenIn, fullAmount);
 
         uint256 amount;
 
         (amount, isNative) = _partswap(
-            isNative, isNative ? msg.value : data.fullAmount, isNative ? address(_wrappedNative) : data.tokenIn, data
+            isNative, fullAmount, isNative ? address(_wrappedNative) : tokenIn, data
         );
 
         _sendTokens(isNative, data.tokenOut, amount, data.unwrap, to == address(0) ? msg.sender : to);
-    }
-
-    // for unwrap native currency
-    receive() external payable {
-        if (msg.sender != address(_wrappedNative)) {
-            revert MultiswapRouterFacet_InvalidNativeSender();
-        }
     }
 
     // for V3Callback
@@ -255,7 +255,7 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
         uint256 amountToPay = amount0Delta > 0 ? uint256(amount0Delta) : uint256(amount1Delta);
 
         // transfer tokens to the pool address
-        TransferHelper.safeTransfer(tokenIn, msg.sender, amountToPay);
+        TransferHelper.safeTransfer({ token: tokenIn, to: msg.sender, value: amountToPay });
     }
 
     // =========================
@@ -280,7 +280,7 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
         bool uni3;
 
         address tokenIn;
-        uint256 amountIn;
+        uint256 amountIn = data.amountIn;
 
         // scope for transfer, avoids stack too deep errors
         {
@@ -295,21 +295,24 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
 
             if (isNative) {
                 tokenIn = address(_wrappedNative);
-                amountIn = msg.value;
 
                 // execute transfer:
                 //     if the pair belongs to version 2 of the protocol -> transfer tokens to the pair
                 if (!uni3) {
-                    TransferHelper.safeTransfer(tokenIn, firstPair, amountIn);
+                    TransferHelper.safeTransfer({ token: tokenIn, to: firstPair, value: amountIn });
                 }
             } else {
                 tokenIn = data.tokenIn;
-                amountIn = data.amountIn;
 
                 // execute transferFrom:
                 //     if the pair belongs to version 2 of the protocol -> transfer tokens to the pair
                 //     if version 3 - to this contract
-                TransferHelper.safeTransferFrom(tokenIn, msg.sender, uni3 ? address(this) : firstPair, amountIn);
+                TransferHelper.safeTransferFrom({
+                    token: tokenIn,
+                    from: msg.sender,
+                    to: uni3 ? address(this) : firstPair,
+                    value: amountIn
+                });
             }
         }
 
@@ -348,7 +351,7 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
             }
         }
 
-        uint256 balanceOutAfterLastSwap = IERC20(tokenIn).balanceOf(address(this));
+        uint256 balanceOutAfterLastSwap = TransferHelper.safeGetBalance({ token: tokenIn, account: address(this) });
 
         if (balanceOutAfterLastSwap < balanceOutBeforeLastSwap) {
             revert MultiswapRouterFacet_InvalidOutAmount();
@@ -403,7 +406,12 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
 
             if (!isNative) {
                 // Transfer full amount in for all swaps
-                TransferHelper.safeTransferFrom(tokenIn, msg.sender, address(this), fullAmount);
+                TransferHelper.safeTransferFrom({
+                    token: tokenIn,
+                    from: msg.sender,
+                    to: address(this),
+                    value: fullAmount
+                });
             }
         }
 
@@ -412,7 +420,7 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
 
         bytes32 pair;
         bool uni3;
-        uint256 amountBefore = IERC20(tokenOut).balanceOf(address(this));
+        uint256 amountBefore = TransferHelper.safeGetBalance({ token: tokenOut, account: address(this) });
 
         for (uint256 i; i < length; i = _unsafeAddOne(i)) {
             pair = data.pairs[i];
@@ -427,12 +435,12 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
                 assembly ("memory-safe") {
                     _pair := and(pair, ADDRESS_MASK)
                 }
-                TransferHelper.safeTransfer(tokenIn, _pair, data.amountsIn[i]);
+                TransferHelper.safeTransfer({ token: tokenIn, to: _pair, value: data.amountsIn[i] });
                 _swapUniV2(false, pair, tokenIn, addressThisBytes32);
             }
         }
 
-        uint256 amountAfter = IERC20(tokenOut).balanceOf(address(this));
+        uint256 amountAfter = TransferHelper.safeGetBalance({ token: tokenOut, account: address(this) });
 
         if (amountAfter < amountBefore) {
             revert MultiswapRouterFacet_InvalidOutAmount();
@@ -508,7 +516,7 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
         }
 
         if (lastSwap) {
-            balanceOutBeforeLastSwap = IERC20(tokenOut).balanceOf(address(this));
+            balanceOutBeforeLastSwap = TransferHelper.safeGetBalance({ token: tokenOut, account: address(this) });
         }
 
         bool zeroForOne = tokenIn < tokenOut;
@@ -519,15 +527,17 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
             revert MultiswapRouterFacet_InvalidIntCast();
         }
 
-        // caching pool address in storage
+        // caching pool address and callback address in storage
         _getLocalStorage().poolAddressCache = address(pool);
-        (int256 amount0, int256 amount1) = pool.swap(
-            destination,
-            zeroForOne,
-            int256(amountIn),
-            (zeroForOne ? MIN_SQRT_RATIO_PLUS_ONE : MAX_SQRT_RATIO_MINUS_ONE),
-            abi.encode(tokenIn)
-        );
+        CallbackFacetLibrary.setCallbackAddress({ callbackAddress: _self });
+
+        (int256 amount0, int256 amount1) = pool.swap({
+            recipient: destination,
+            zeroForOne: zeroForOne,
+            amountSpecified: int256(amountIn),
+            sqrtPriceLimitX96: (zeroForOne ? MIN_SQRT_RATIO_PLUS_ONE : MAX_SQRT_RATIO_MINUS_ONE),
+            data: abi.encode(tokenIn)
+        });
 
         // return the number of tokens received as a result of the swap
         amountOut = uint256(-(zeroForOne ? amount1 : amount0));
@@ -557,7 +567,7 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
         tokenOut = tokenIn == token0 ? pair.token1() : token0;
 
         if (lastSwap) {
-            balanceOutBeforeLastSwap = IERC20(tokenOut).balanceOf(address(this));
+            balanceOutBeforeLastSwap = TransferHelper.safeGetBalance({ token: tokenOut, account: address(this) });
         }
 
         uint256 amountInput;
@@ -571,11 +581,16 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
             // underflow is impossible cause after token transfer via token contract
             // reserves in the pair not updated yet
             unchecked {
-                amountInput = IERC20(tokenIn).balanceOf(address(pair)) - reserveInput;
+                amountInput = TransferHelper.safeGetBalance({ token: tokenIn, account: address(pair) }) - reserveInput;
             }
 
             // get the output number of tokens after swap
-            amountOutput = HelperLib.getAmountOut(amountInput, reserveInput, reserveOutput, fee);
+            amountOutput = HelperLib.getAmountOut({
+                amountIn: amountInput,
+                reserveIn: reserveInput,
+                reserveOut: reserveOutput,
+                feeE4: fee
+            });
         }
 
         (uint256 amount0Out, uint256 amount1Out) =
@@ -616,21 +631,21 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
     }
 
     /// @dev wraps native token if needed
-    function _wrapNative() internal returns (bool isNative) {
-        isNative = msg.value > 0;
+    function _wrapNative(address tokenIn, uint256 amount) internal returns (bool isNative) {
+        isNative = tokenIn == address(0);
 
-        if (isNative) {
-            _wrappedNative.deposit{ value: msg.value }();
+        if (isNative && msg.value >= amount) {
+            _wrappedNative.deposit{ value: amount }();
         }
     }
 
     /// @dev sends tokens or unwrap and send native
     function _sendTokens(bool isNative, address token, uint256 amount, bool unwrap, address to) internal {
         if (isNative && unwrap) {
-            _wrappedNative.withdraw(amount);
-            TransferHelper.safeTransferNative(to, amount);
+            _wrappedNative.withdraw({ wad: amount });
+            TransferHelper.safeTransferNative({ to: to, value: amount });
         } else {
-            TransferHelper.safeTransfer(token, to, amount);
+            TransferHelper.safeTransfer({ token: token, to: to, value: amount });
         }
     }
 }

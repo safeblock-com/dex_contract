@@ -112,7 +112,7 @@ interface IMultiswapRouterFacet {
     }
 
     /// @notice Swaps through the data.pairs array
-    function multiswap(MultiswapCalldata calldata data, address to) external payable;
+    function multiswap(MultiswapCalldata calldata data, address to) external payable  returns(uint256);
 
     struct PartswapCalldata {
         // exact value in for part swap
