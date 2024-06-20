@@ -15,6 +15,8 @@ import { IWrappedNative } from "./interfaces/IWrappedNative.sol";
 
 import { CallbackFacetLibrary } from "../libraries/CallbackFacetLibrary.sol";
 
+import { IFeeContract } from "../interfaces/IFeeContract.sol";
+
 /// @title Multiswap Router Facet
 /// @notice Router for UniswapV3 and UniswapV2 multiswaps and partswaps
 contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
@@ -44,19 +46,10 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
     uint256 private constant CAST_INT_CONSTANT =
         57_896_044_618_658_097_711_785_492_504_343_953_926_634_992_332_820_282_019_728_792_003_956_564_819_967;
 
-    /// @dev fee logic
-    uint256 private constant FEE_MAX = 10_000;
-
-    uint256 private constant PROTOCOL_PART_MASK = 0xffffffffffffffffffffffffffffffff;
-
     struct MultiswapRouterFacetStorage {
-        uint256 protocolFee;
-        /// @dev protocolPart of referralFee: _referralFee & PROTOCOL_PART_MASK
-        /// referralPart of referralFee: _referralFee >> 128
-        uint256 referralFee;
-        mapping(address owner => mapping(address token => uint256 balance)) profit;
         /// @dev cache for swapV3Callback
         address poolAddressCache;
+        IFeeContract feeContract;
     }
 
     /// @dev Storage position for the multiswap router facet, to avoid collisions in storage.
@@ -94,21 +87,8 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
     }
 
     /// @inheritdoc IMultiswapRouterFacet
-    function profit(address owner, address token) external view returns (uint256 balance) {
-        return _getLocalStorage().profit[owner][token];
-    }
-
-    /// @inheritdoc IMultiswapRouterFacet
-    function fees() external view returns (uint256 protocolFee, ReferralFee memory referralFee) {
-        MultiswapRouterFacetStorage storage s = _getLocalStorage();
-
-        assembly ("memory-safe") {
-            protocolFee := sload(s.slot)
-
-            let referralFee_ := sload(add(s.slot, 1))
-            mstore(referralFee, and(PROTOCOL_PART_MASK, referralFee_))
-            mstore(add(referralFee, 32), shr(128, referralFee_))
-        }
+    function feeContract() external view returns (address) {
+        return address(_getLocalStorage().feeContract);
     }
 
     // =========================
@@ -116,85 +96,8 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
     // =========================
 
     /// @inheritdoc IMultiswapRouterFacet
-    function changeProtocolFee(uint256 newProtocolFee) external onlyOwner {
-        if (newProtocolFee > FEE_MAX) {
-            revert MultiswapRouterFacet_InvalidFeeValue();
-        }
-        _getLocalStorage().protocolFee = newProtocolFee;
-    }
-
-    /// @inheritdoc IMultiswapRouterFacet
-    function changeReferralFee(ReferralFee calldata newReferralFee) external onlyOwner {
-        unchecked {
-            uint256 protocolPart = newReferralFee.protocolPart;
-            uint256 referralPart = newReferralFee.referralPart;
-
-            MultiswapRouterFacetStorage storage s = _getLocalStorage();
-
-            if ((referralPart + protocolPart) > s.protocolFee) {
-                revert MultiswapRouterFacet_InvalidFeeValue();
-            }
-
-            assembly ("memory-safe") {
-                sstore(add(s.slot, 1), or(shl(128, referralPart), protocolPart))
-            }
-        }
-    }
-
-    // =========================
-    // fees logic
-    // =========================
-
-    /// @inheritdoc IMultiswapRouterFacet
-    function collectProtocolFees(address token, address recipient, uint256 amount) external onlyOwner {
-        MultiswapRouterFacetStorage storage s = _getLocalStorage();
-
-        uint256 balanceOf = s.profit[address(this)][token];
-        if (balanceOf >= amount) {
-            unchecked {
-                s.profit[address(this)][token] -= amount;
-            }
-            TransferHelper.safeTransfer({ token: token, to: recipient, value: amount });
-        }
-    }
-
-    /// @inheritdoc IMultiswapRouterFacet
-    function collectReferralFees(address token, address recipient, uint256 amount) external {
-        MultiswapRouterFacetStorage storage s = _getLocalStorage();
-
-        uint256 balanceOf = s.profit[msg.sender][token];
-        if (balanceOf >= amount) {
-            unchecked {
-                s.profit[msg.sender][token] -= amount;
-            }
-            TransferHelper.safeTransfer({ token: token, to: recipient, value: amount });
-        }
-    }
-
-    /// @inheritdoc IMultiswapRouterFacet
-    function collectProtocolFees(address token, address recipient) external onlyOwner {
-        MultiswapRouterFacetStorage storage s = _getLocalStorage();
-
-        uint256 balanceOf = s.profit[address(this)][token];
-        if (balanceOf > 0) {
-            unchecked {
-                s.profit[address(this)][token] = 0;
-            }
-            TransferHelper.safeTransfer({ token: token, to: recipient, value: balanceOf });
-        }
-    }
-
-    /// @inheritdoc IMultiswapRouterFacet
-    function collectReferralFees(address token, address recipient) external {
-        MultiswapRouterFacetStorage storage s = _getLocalStorage();
-
-        uint256 balanceOf = s.profit[msg.sender][token];
-        if (balanceOf > 0) {
-            unchecked {
-                s.profit[msg.sender][token] = 0;
-            }
-            TransferHelper.safeTransfer({ token: token, to: recipient, value: balanceOf });
-        }
+    function setFeeContract(address newFeeContract) external onlyOwner {
+        _getLocalStorage().feeContract = IFeeContract(newFeeContract);
     }
 
     // =========================
@@ -202,28 +105,28 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
     // =========================
 
     //// @inheritdoc IMultiswapRouterFacet
-    function multiswap(MultiswapCalldata calldata data, address to) external payable returns(uint256 amount) {
+    function multiswap(MultiswapCalldata calldata data, address to) external payable returns (uint256 amount) {
         bool isNative = _wrapNative(data.tokenIn, data.amountIn);
 
         address tokenOut;
         (tokenOut, amount, isNative) = _multiswap(isNative, data);
 
-        _sendTokens(isNative, tokenOut, amount, data.unwrap, to == address(0) ? msg.sender : to);
+        if (to > address(0)) {
+            _sendTokens(isNative, tokenOut, amount, data.unwrap, to);
+        }
     }
 
     //// @inheritdoc IMultiswapRouterFacet
-    function partswap(PartswapCalldata calldata data, address to) external payable {
+    function partswap(PartswapCalldata calldata data, address to) external payable returns (uint256 amount) {
         address tokenIn = data.tokenIn;
         uint256 fullAmount = data.fullAmount;
         bool isNative = _wrapNative(tokenIn, fullAmount);
 
-        uint256 amount;
+        (amount, isNative) = _partswap(isNative, fullAmount, isNative ? address(_wrappedNative) : tokenIn, data);
 
-        (amount, isNative) = _partswap(
-            isNative, fullAmount, isNative ? address(_wrappedNative) : tokenIn, data
-        );
-
-        _sendTokens(isNative, data.tokenOut, amount, data.unwrap, to == address(0) ? msg.sender : to);
+        if (to > address(0)) {
+            _sendTokens(isNative, data.tokenOut, amount, data.unwrap, to);
+        }
     }
 
     // for V3Callback
@@ -304,15 +207,17 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
             } else {
                 tokenIn = data.tokenIn;
 
-                // execute transferFrom:
-                //     if the pair belongs to version 2 of the protocol -> transfer tokens to the pair
-                //     if version 3 - to this contract
-                TransferHelper.safeTransferFrom({
-                    token: tokenIn,
-                    from: msg.sender,
-                    to: uni3 ? address(this) : firstPair,
-                    value: amountIn
-                });
+                if (TransferHelper.safeGetBalance({ token: tokenIn, account: address(this) }) < amountIn) {
+                    // execute transferFrom:
+                    //     if the pair belongs to version 2 of the protocol -> transfer tokens to the pair
+                    //     if version 3 - to this contract
+                    TransferHelper.safeTransferFrom({
+                        token: tokenIn,
+                        from: msg.sender,
+                        to: uni3 ? address(this) : firstPair,
+                        value: amountIn
+                    });
+                }
             }
         }
 
@@ -366,7 +271,13 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
             revert MultiswapRouterFacet_InvalidOutAmount();
         }
 
-        exactAmountOut = _writeFees(exactAmountOut, data.referralAddress, tokenIn);
+        {
+            IFeeContract _feeContract = _getLocalStorage().feeContract;
+            if (address(_feeContract) != address(0)) {
+                TransferHelper.safeApprove({ token: tokenIn, spender: address(_feeContract), value: exactAmountOut });
+                exactAmountOut = _feeContract.writeFees(data.referralAddress, tokenIn, exactAmountOut);
+            }
+        }
 
         return (tokenIn, exactAmountOut, tokenIn == address(_wrappedNative));
     }
@@ -455,40 +366,15 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
             revert MultiswapRouterFacet_InvalidOutAmount();
         }
 
-        exactAmountOut = _writeFees(exactAmountOut, data.referralAddress, tokenOut);
-
-        return (exactAmountOut, tokenOut == address(_wrappedNative));
-    }
-
-    /// @dev Function that writes protocol and referral fees for swaps
-    function _writeFees(uint256 exactAmount, address referralAddress, address token) internal returns (uint256) {
-        MultiswapRouterFacetStorage storage s = _getLocalStorage();
-
-        if (referralAddress == address(0)) {
-            unchecked {
-                uint256 fee = (exactAmount * s.protocolFee) / FEE_MAX;
-                s.profit[address(this)][token] += fee;
-
-                return exactAmount - fee;
-            }
-        } else {
-            uint256 protocolPart;
-            uint256 referralPart;
-            assembly ("memory-safe") {
-                let referralFee_ := sload(add(s.slot, 1))
-                protocolPart := and(PROTOCOL_PART_MASK, referralFee_)
-                referralPart := shr(128, referralFee_)
-            }
-
-            unchecked {
-                uint256 referralFeePart = (exactAmount * referralPart) / FEE_MAX;
-                uint256 protocolFeePart = (exactAmount * protocolPart) / FEE_MAX;
-                s.profit[referralAddress][token] += referralFeePart;
-                s.profit[address(this)][token] += protocolFeePart;
-
-                return exactAmount - referralFeePart - protocolFeePart;
+        {
+            IFeeContract _feeContract = _getLocalStorage().feeContract;
+            if (address(_feeContract) != address(0)) {
+                TransferHelper.safeApprove({ token: tokenOut, spender: address(_feeContract), value: exactAmountOut });
+                exactAmountOut = _feeContract.writeFees(data.referralAddress, tokenOut, exactAmountOut);
             }
         }
+
+        return (exactAmountOut, tokenOut == address(_wrappedNative));
     }
 
     /// @dev uniswapV3 swap exact tokens

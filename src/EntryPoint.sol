@@ -41,6 +41,8 @@ contract EntryPoint is UUPSUpgradeable, Ownable2Step, Initializable, IEntryPoint
     /// @dev The constructor uses SSTORE2 method to stores the combined facet and selectors
     /// in a specified storage location.
     constructor(bytes memory facetsAndSelectors) {
+        _disableInitializers();
+
         _facetsAndSelectorsAddress = SSTORE2.write({ data: facetsAndSelectors });
     }
 
@@ -48,7 +50,9 @@ contract EntryPoint is UUPSUpgradeable, Ownable2Step, Initializable, IEntryPoint
     function initialize(address newOwner, bytes[] calldata initialCalls) external initializer {
         _transferOwnership(newOwner);
 
-        _multicall(initialCalls);
+        if (initialCalls.length > 0) {
+            _multicall(true, bytes32(0), initialCalls);
+        }
     }
 
     // =========================
@@ -57,7 +61,11 @@ contract EntryPoint is UUPSUpgradeable, Ownable2Step, Initializable, IEntryPoint
 
     /// @inheritdoc IEntryPoint
     function multicall(bytes[] calldata data) external payable {
-        _multicall(data);
+        _multicall(false, bytes32(0), data);
+    }
+
+    function multicall(bytes32 insert, bytes[] calldata data) external {
+        _multicall(true, insert, data);
     }
 
     /// @notice Fallback function to execute facet associated with incoming function selectors.
@@ -91,8 +99,8 @@ contract EntryPoint is UUPSUpgradeable, Ownable2Step, Initializable, IEntryPoint
     // internal function
     // =======================
 
-    function _multicall(bytes[] calldata data) internal {
-        address[] memory facets = _getAddresses(data);
+    function _multicall(bool isOverride, bytes32 insert, bytes[] calldata data) internal {
+        address[] memory facets = _getAddresses(isOverride, data);
 
         assembly ("memory-safe") {
             for {
@@ -100,10 +108,13 @@ contract EntryPoint is UUPSUpgradeable, Ownable2Step, Initializable, IEntryPoint
                 let memoryOffset := add(facets, 32)
                 let ptr := mload(64)
 
-                let cDataStart := 68
-                let cDataOffset := 68
+                let cDataStart := mul(isOverride, 32)
+                let cDataOffset := add(68, cDataStart)
+                cDataStart := add(68, cDataStart)
 
                 let facet
+
+                let argInsert
             } length {
                 length := sub(length, 1)
                 cDataOffset := add(cDataOffset, 32)
@@ -127,9 +138,16 @@ contract EntryPoint is UUPSUpgradeable, Ownable2Step, Initializable, IEntryPoint
                 let cSize := calldataload(offset)
                 calldatacopy(ptr, add(offset, 32), cSize)
 
+                if argInsert { if returndatasize() { returndatacopy(add(ptr, argInsert), 0, returndatasize()) } }
+
                 if iszero(delegatecall(gas(), facet, ptr, cSize, 0, 0)) {
                     returndatacopy(0, 0, returndatasize())
                     revert(0, returndatasize())
+                }
+
+                if insert {
+                    argInsert := and(insert, 0xffff)
+                    insert := shr(insert, 16)
                 }
             }
         }
@@ -153,7 +171,7 @@ contract EntryPoint is UUPSUpgradeable, Ownable2Step, Initializable, IEntryPoint
     /// @dev Uses binary search to find the facet addresses in facetsAndSelectors bytes.
     /// @param datas The calldata to be searched.
     /// @return facets The addresses of the facet contracts.
-    function _getAddresses(bytes[] calldata datas) internal view returns (address[] memory facets) {
+    function _getAddresses(bool isOverride, bytes[] calldata datas) internal view returns (address[] memory facets) {
         uint256 length = datas.length;
         facets = new address[](length);
 
@@ -163,8 +181,13 @@ contract EntryPoint is UUPSUpgradeable, Ownable2Step, Initializable, IEntryPoint
             revert EntryPoint_FunctionDoesNotExist(0x00000000);
         }
 
-        uint256 cDataStart = 68;
-        uint256 offset = 68;
+        uint256 cDataStart;
+        uint256 offset;
+        assembly ("memory-safe") {
+            cDataStart := mul(isOverride, 32)
+            offset := add(68, cDataStart)
+            cDataStart := add(68, cDataStart)
+        }
 
         bytes4 selector;
         for (uint256 i; i < length;) {

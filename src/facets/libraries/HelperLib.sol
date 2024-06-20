@@ -46,16 +46,20 @@ library HelperLib {
         pure
         returns (uint256 amountIn)
     {
-        if (amountIn == 0) {
+        if (amountOut == 0) {
             revert UniswapV2_InsufficientOutputAmount();
         }
         if (reserveIn == 0 || reserveOut == 0) {
             revert UniswapV2_InsufficientLiquidity();
         }
 
+        if(amountOut > reserveOut) {
+            revert UniswapV2_InsufficientLiquidity();
+        }
+
         unchecked {
             uint256 numerator = reserveIn * amountOut * E4;
-            uint256 denominator = reserveOut - amountOut * (E4 - feeE4);
+            uint256 denominator = (reserveOut - amountOut) * (E4 - feeE4);
             amountIn = (numerator / denominator) + 1;
         }
     }

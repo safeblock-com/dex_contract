@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import "forge-std/Test.sol";
 
-import { TransferHelper } from "../src/libraries/TransferHelper.sol";
+import { TransferHelper } from "../src/facets/libraries/TransferHelper.sol";
 
 contract MockTranferHelper {
     using TransferHelper for address;

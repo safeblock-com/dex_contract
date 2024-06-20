@@ -48,44 +48,15 @@ interface IMultiswapRouterFacet {
     /// @notice Returns the address of the `wrappedNative`
     function wrappedNative() external view returns (address);
 
-    /// @notice Returns the balance of the `owner` for the `token`
-    function profit(address owner, address token) external view returns (uint256 balance);
-
-    struct ReferralFee {
-        uint256 protocolPart;
-        uint256 referralPart;
-    }
-
-    /// @notice Returns the protocolFee and the referralFee
-    function fees() external view returns (uint256 protocolFee, ReferralFee memory referralFee);
+    /// @notice Returns the address of the fee contract
+    function feeContract() external view returns (address);
 
     // =========================
     // admin logic
     // =========================
 
-    /// @notice Changes the protocol fee for the contract
-    function changeProtocolFee(uint256 newProtocolFee) external;
-
-    /// @notice Changes the referral fee for the contract
-    function changeReferralFee(ReferralFee memory newReferralFee) external;
-
-    // =========================
-    // fees logic
-    // =========================
-
-    /// @notice Collects the protocol fees with specified `amount`
-    /// @dev Can only be called by the owner
-    function collectProtocolFees(address token, address recipient, uint256 amount) external;
-
-    /// @notice Collects the referral fees for the user with specified `amount`
-    function collectReferralFees(address token, address recipient, uint256 amount) external;
-
-    /// @notice Collects all protocol fees
-    /// @dev Can only be called by the owner
-    function collectProtocolFees(address token, address recipient) external;
-
-    /// @notice Collects all referral fees for the user
-    function collectReferralFees(address token, address recipient) external;
+    /// @notice Changes the fee contract
+    function setFeeContract(address newFeeContract) external;
 
     // =========================
     // main logic
@@ -112,7 +83,7 @@ interface IMultiswapRouterFacet {
     }
 
     /// @notice Swaps through the data.pairs array
-    function multiswap(MultiswapCalldata calldata data, address to) external payable  returns(uint256);
+    function multiswap(MultiswapCalldata calldata data, address to) external payable returns (uint256);
 
     struct PartswapCalldata {
         // exact value in for part swap
@@ -141,5 +112,5 @@ interface IMultiswapRouterFacet {
     /// @notice Swaps tokenIn through each pair separately
     /// @dev each pair in the pairs array must have tokenIn and have the same tokenOut,
     /// the result of swap is the sum after each swap
-    function partswap(PartswapCalldata calldata data, address to) external payable;
+    function partswap(PartswapCalldata calldata data, address to) external payable returns (uint256);
 }

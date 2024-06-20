@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import { IWrappedNative } from "../interfaces/IWrappedNative.sol";
-import { TransferHelper } from "../libraries/TransferHelper.sol";
+import { TransferHelper } from "../facets/libraries/TransferHelper.sol";
 
 import { IConnext } from "./connext/IConnext.sol";
 
