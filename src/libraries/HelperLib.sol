@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 library HelperLib {
-    uint256 constant E4 = 1e4;
+    uint256 constant E6 = 1e6;
 
     error UniswapV2_InsufficientInputAmount();
     error UniswapV2_InsufficientOutputAmount();
@@ -13,7 +13,7 @@ library HelperLib {
         uint256 amountIn,
         uint256 reserveIn,
         uint256 reserveOut,
-        uint256 feeE4
+        uint256 feeE6
     )
         internal
         pure
@@ -28,9 +28,9 @@ library HelperLib {
         }
 
         unchecked {
-            uint256 amountInWithFee = amountIn * (E4 - feeE4);
+            uint256 amountInWithFee = amountIn * (E6 - feeE6);
             uint256 numerator = amountInWithFee * reserveOut;
-            uint256 denominator = reserveIn * E4 + amountInWithFee;
+            uint256 denominator = reserveIn * E6 + amountInWithFee;
             amountOut = numerator / denominator;
         }
     }
@@ -40,7 +40,7 @@ library HelperLib {
         uint256 amountOut,
         uint256 reserveIn,
         uint256 reserveOut,
-        uint256 feeE4
+        uint256 feeE6
     )
         internal
         pure
@@ -54,8 +54,8 @@ library HelperLib {
         }
 
         unchecked {
-            uint256 numerator = reserveIn * amountOut * E4;
-            uint256 denominator = reserveOut - amountOut * (E4 - feeE4);
+            uint256 numerator = reserveIn * amountOut * E6;
+            uint256 denominator = reserveOut - amountOut * (E6 - feeE6);
             amountIn = (numerator / denominator) + 1;
         }
     }
