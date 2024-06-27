@@ -48,9 +48,9 @@ contract Proxy {
     /// Requirements:
     ///
     /// - If `data` is empty, `msg.value` must be zero.
-    constructor() {
+    constructor(address initialOwner) {
         assembly {
-            sstore(not(0), caller()) // save caller as temporary owner
+            sstore(not(0), initialOwner) // save caller as temporary owner
         }
 
         ERC1967Utils.upgradeToAndCall(address(new InitialImplementation()), bytes(""));
