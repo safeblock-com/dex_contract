@@ -11,7 +11,7 @@ import { StargateFacet, MessagingFee } from "../src/facets/bridges/StargateFacet
 contract Tst is Script {
     address lzEndpoint = 0x6EDCE65403992e310A62460808c4b910D972f10f;
 
-    StargateFacet stargate = StargateFacet(0x387f7c5A79bCb3B5C281c505b39fd48Cec0B814C);
+    StargateFacet stargate = StargateFacet(0x9d5b514435EE72bA227453E907835724Fff6715e);
 
     // sepolia
     address stargateNativePool = 0xa5A8481790BB57CF3FA0a4f24Dc28121A491447f;
@@ -19,7 +19,7 @@ contract Tst is Script {
     address USDT = 0xB15a3F6E64D2CaffAF7927431AB0D1c21e429644; // 18 decimals
 
     // arb
-    address arbStargateNativePool = 0x0a0C1221f451Ac54Ef9F21940569E252161a2495;
+    address arbStargateNativePool = 0x1E8A86EcC9dc41106d3834c6F1033D86939B1e0D;
 
     // bnb
     address bnbStargateUSDTPool = 0x0a0C1221f451Ac54Ef9F21940569E252161a2495;
@@ -30,33 +30,33 @@ contract Tst is Script {
 
         vm.startBroadcast(deployer);
 
-        (,,,MessagingFee memory fee) =stargate.prepareTransferAndCall(
-            bnbStargateUSDTPool,
-            40_161,
-            384200,
+        (, uint256 valueToSend,,) = stargate.prepareTransferAndCall(
+            stargateNativePool,
+            40231,
+            3026000000000000,
             address(stargate),
             abi.encode(
-                USDT,
+                address(0),
                 deployer,
-                bytes32(0x0000000000000000000000000000000000000000000000000000000000000044),
-                abi.encodeCall(TransferFacet.transfer, (address(USDT), address(deployer), 0))
+                bytes32(0x0000000000000000000000000000000000000000000000000000000000000024),
+                abi.encodeCall(TransferFacet.transferNative, (address(deployer), 0))
             ),
             350_000
         );
 
-        IERC20(bnbUSDT).approve(address(stargate), 384200);
+        // IERC20(bnbUSDT).approve(address(stargate), 384200);
 
-        stargate.sendStargate{value:fee.nativeFee}(
-            bnbStargateUSDTPool,
-            40_161,
-            384200,
+        stargate.sendStargate{ value: valueToSend }(
+            stargateNativePool,
+            40231,
+            3026000000000000,
             address(stargate),
             350_000,
             abi.encode(
-                USDT,
+                address(0),
                 deployer,
-                bytes32(0x0000000000000000000000000000000000000000000000000000000000000044),
-                abi.encodeCall(TransferFacet.transfer, (address(USDT), address(deployer), 0))
+                bytes32(0x0000000000000000000000000000000000000000000000000000000000000024),
+                abi.encodeCall(TransferFacet.transferNative, (address(deployer), 0))
             ),
             deployer
         );

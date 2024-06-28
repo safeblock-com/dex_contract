@@ -17,7 +17,6 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer {
     using TransferHelper for address;
 
     address private immutable _endpoint;
-    address private immutable _stargate;
 
     event ReceivedOnDestination(address token);
 
@@ -31,16 +30,14 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer {
     // errors
     // =========================
 
-    error ForwarderXReceiver__onlyConnext(address sender);
-    error ForwarderXReceiver__prepareAndForward_notThis(address sender);
+    error NotLZEndpoint();
 
     // =========================
     // constructor
     // =========================
 
-    constructor(address endpoint, address stargate) {
+    constructor(address endpoint) {
         _endpoint = endpoint;
-        _stargate = stargate;
     }
 
     // =========================
@@ -49,10 +46,6 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer {
 
     function lzEndpoint() external view returns (address) {
         return _endpoint;
-    }
-
-    function stargateEndpoint() external view returns (address) {
-        return _stargate;
     }
 
     // =========================
@@ -107,11 +100,8 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer {
     // receive
     // =========================
 
-    error NotStargate();
-    error NotLZEndpoint();
-
     function lzCompose(
-        address from,
+        address, /* from */
         bytes32, /* guid */
         bytes calldata message,
         address, /* executor */
@@ -120,9 +110,6 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer {
         external
         payable
     {
-        // if(from != _stargate) {
-        // revert NotStargate();
-        // }
         if (msg.sender != _endpoint) {
             revert NotLZEndpoint();
         }
@@ -147,7 +134,12 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer {
 
         if (!successfulCall) {
             emit CallFailed(payload);
-            TransferHelper.safeTransfer({ token: asset, to: fallbackAddress, value: amountLD });
+
+            if (asset == address(0)) {
+                TransferHelper.safeTransferNative({ to: fallbackAddress, value: amountLD });
+            } else {
+                TransferHelper.safeTransfer({ token: asset, to: fallbackAddress, value: amountLD });
+            }
         }
     }
 

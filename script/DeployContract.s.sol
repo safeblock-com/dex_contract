@@ -18,9 +18,9 @@ contract Deploy is Script {
     address transferFacet = address(0);
     address stargateFacet = address(0);
 
-    address proxy = 0x387f7c5A79bCb3B5C281c505b39fd48Cec0B814C;
+    address proxy = 0x9d5b514435EE72bA227453E907835724Fff6715e;
 
-    bytes32 salt = keccak256("dev_salt-1");
+    bytes32 salt = keccak256("dev_salt-2");
 
     // testnet
     address lzEndpoint = 0x6EDCE65403992e310A62460808c4b910D972f10f;
@@ -56,8 +56,7 @@ contract Deploy is Script {
         }
 
         if (stargateFacet == address(0)) {
-            // TODO
-            stargateFacet = address(new StargateFacet(lzEndpoint, lzEndpoint));
+            stargateFacet = address(new StargateFacet(lzEndpoint));
         }
     }
 
@@ -88,11 +87,10 @@ contract Deploy is Script {
 
         // Stargate Facet
         selectors[i++] = StargateFacet.lzEndpoint.selector;
-        selectors[i++] = StargateFacet.stargateEndpoint.selector;
         selectors[i++] = StargateFacet.prepareTransferAndCall.selector;
         selectors[i++] = StargateFacet.sendStargate.selector;
         selectors[i++] = StargateFacet.lzCompose.selector;
-        for (uint256 k; k < 5; ++k) {
+        for (uint256 k; k < 4; ++k) {
             facetAddresses[j++] = stargateFacet;
         }
 

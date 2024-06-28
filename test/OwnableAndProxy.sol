@@ -38,7 +38,7 @@ contract OwnableAndProxyTest is Test {
         feeContract = new FeeContract(owner);
 
         address entryPointImplementation = address(new EntryPoint(bytes("")));
-        entryPoint = EntryPoint(payable(address(new Proxy())));
+        entryPoint = EntryPoint(payable(address(new Proxy(owner))));
 
         InitialImplementation(address(entryPoint)).upgradeTo(
             entryPointImplementation, abi.encodeCall(EntryPoint.initialize, (owner, new bytes[](0)))
@@ -65,7 +65,7 @@ contract OwnableAndProxyTest is Test {
     function test_entryPoint_initialize_shouldInitializeContract(address newOwner) external {
         assumeNotZeroAddress(newOwner);
 
-        EntryPoint _entryPoint = EntryPoint(payable(address(new Proxy())));
+        EntryPoint _entryPoint = EntryPoint(payable(address(new Proxy(address(this)))));
         InitialImplementation(address(_entryPoint)).upgradeTo(
             address(new EntryPoint(bytes(""))), abi.encodeCall(EntryPoint.initialize, (newOwner, new bytes[](0)))
         );

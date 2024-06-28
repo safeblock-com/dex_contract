@@ -60,26 +60,10 @@ contract Proxy {
     // fallbacks
     // =========================
 
-    /// @dev Fallback function that delegates calls to the address returned by `_implementation()`.
+    /// @dev Fallback function that delegates calls to the address returned by `ERC1967Utils.getImplementation()`.
     /// Will run if no other function in the contract matches the call data.
     fallback() external payable {
-        _fallback();
-    }
-
-    /// @dev Fallback function that delegates calls to the address returned by `_implementation()`.
-    /// Will run if call data is empty.
-    receive() external payable {
-        _fallback();
-    }
-
-    // =========================
-    // private functions
-    // =========================
-
-    /// @dev Delegates the current call to the address returned by `_implementation()`.
-    /// This function does not return to its internal call site, it will return directly to the external caller.
-    function _fallback() private {
-        address implementation = _implementation();
+        address implementation = ERC1967Utils.getImplementation();
 
         assembly ("memory-safe") {
             // Copy msg.data. We take full control of memory in this inline assembly
@@ -101,9 +85,6 @@ contract Proxy {
         }
     }
 
-    /// @dev This is a function that should returns the address to which the fallback
-    /// function and {_fallback} should delegate.
-    function _implementation() private view returns (address) {
-        return ERC1967Utils.getImplementation();
-    }
+    /// @notice Function to receive Native currency.
+    receive() external payable { }
 }

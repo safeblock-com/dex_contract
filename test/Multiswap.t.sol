@@ -36,7 +36,7 @@ contract MultiswapTest is Test {
         feeContract.changeReferralFee(IFeeContract.ReferralFee({ protocolPart: 200, referralPart: 50 }));
 
         address routerImplementation = address(new MultiswapRouterFacet(WBNB));
-        router = MultiswapRouterFacet(address(new Proxy()));
+        router = MultiswapRouterFacet(address(new Proxy(owner)));
 
         feeContract.changeRouter(address(router));
 
