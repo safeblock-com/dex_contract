@@ -25,8 +25,6 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer {
     /// @dev Address of the stargate composer for cross-chain messaging
     IStargateComposer private immutable _stargateComposer;
 
-    event ReceivedOnDestination(address token);
-
     // =========================
     // events
     // =========================
@@ -115,17 +113,17 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer {
 
         bool isEth = _stargateComposer.stargateEthVaults(srcPoolId) > address(0);
 
-        unchecked {
-            _validateMsgValue(isEth ? amount + fee : fee);
-        }
-
-        if (!isEth) {
+        if (isEth) {
+            unchecked {
+                fee += amount;
+            }
+        } else {
             address token =
                 IStargatePool(IStargateFactory(_stargateComposer.factory()).getPool({ poolId: srcPoolId })).token();
-
             token.safeTransferFrom({ from: msg.sender, to: address(this), value: amount });
             token.safeApprove({ spender: address(_stargateComposer), value: amount });
         }
+        _validateMsgValue(fee);
 
         _stargateComposer.swap{ value: fee }({
             dstChainId: dstChainId,
