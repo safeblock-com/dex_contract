@@ -118,7 +118,7 @@ interface IMultiswapRouter {
     }
 
     /// @notice Swaps through the data.pairs array
-    function multiswap(MultiswapCalldata calldata data, address to) external payable;
+    function multiswap(MultiswapCalldata calldata data, address to) external payable returns(uint256);
 
     struct PartswapCalldata {
         // exact value in for part swap
@@ -147,5 +147,5 @@ interface IMultiswapRouter {
     /// @notice Swaps tokenIn through each pair separately
     /// @dev each pair in the pairs array must have tokenIn and have the same tokenOut,
     /// the result of swap is the sum after each swap
-    function partswap(PartswapCalldata calldata data, address to) external payable;
+    function partswap(PartswapCalldata calldata data, address to) external payable returns(uint256);
 }

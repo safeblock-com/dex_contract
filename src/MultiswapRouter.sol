@@ -172,7 +172,7 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
     // =========================
 
     //// @inheritdoc IMultiswapRouter
-    function multiswap(MultiswapCalldata calldata data, address to) external payable {
+    function multiswap(MultiswapCalldata calldata data, address to) external payable returns(uint256) {
         bool isNative = _wrapNative();
 
         address tokenOut;
@@ -180,10 +180,12 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
         (tokenOut, amount, isNative) = _multiswap(isNative, data);
 
         _sendTokens(isNative, tokenOut, amount, data.unwrap, to == address(0) ? msg.sender : to);
+
+        return amount;
     }
 
     //// @inheritdoc IMultiswapRouter
-    function partswap(PartswapCalldata calldata data, address to) external payable {
+    function partswap(PartswapCalldata calldata data, address to) external payable returns (uint256) {
         bool isNative = _wrapNative();
 
         uint256 amount;
@@ -193,6 +195,8 @@ contract MultiswapRouter is UUPSUpgradeable, Initializable, Ownable2Step, IMulti
         );
 
         _sendTokens(isNative, data.tokenOut, amount, data.unwrap, to == address(0) ? msg.sender : to);
+
+        return amount;
     }
 
     // for unwrap native currency
