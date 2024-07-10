@@ -475,7 +475,7 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
                 amountIn: amountInput,
                 reserveIn: reserveInput,
                 reserveOut: reserveOutput,
-                feeE4: fee
+                feeE6: fee
             });
         }
 
