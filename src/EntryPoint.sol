@@ -15,7 +15,7 @@ import { CallbackFacetLibrary } from "./libraries/CallbackFacetLibrary.sol";
 /// @title EntryPoint
 /// @notice This contract serves as a proxy for dynamic function execution.
 /// @dev It maps function selectors to their corresponding facet contracts.
-contract EntryPoint is UUPSUpgradeable, Ownable2Step, Initializable, IEntryPoint {
+contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint {
     //-----------------------------------------------------------------------//
     // function selectors and facet addresses are stored as bytes data:      //
     // selector . address                                                    //
@@ -46,7 +46,7 @@ contract EntryPoint is UUPSUpgradeable, Ownable2Step, Initializable, IEntryPoint
         _facetsAndSelectorsAddress = SSTORE2.write({ data: facetsAndSelectors });
     }
 
-    /// @notice Initializes a EntryPoint contract.
+    /// @inheritdoc IEntryPoint
     function initialize(address newOwner, bytes[] calldata initialCalls) external initializer {
         _transferOwnership(newOwner);
 
@@ -56,7 +56,7 @@ contract EntryPoint is UUPSUpgradeable, Ownable2Step, Initializable, IEntryPoint
     }
 
     // =========================
-    // fallback function
+    // fallback functions
     // =========================
 
     /// @inheritdoc IEntryPoint
@@ -64,8 +64,9 @@ contract EntryPoint is UUPSUpgradeable, Ownable2Step, Initializable, IEntryPoint
         _multicall(false, bytes32(0), data);
     }
 
-    function multicall(bytes32 insert, bytes[] calldata data) external {
-        _multicall(true, insert, data);
+    /// @inheritdoc IEntryPoint
+    function multicall(bytes32 replace, bytes[] calldata data) external {
+        _multicall(true, replace, data);
     }
 
     /// @notice Fallback function to execute facet associated with incoming function selectors.
@@ -78,7 +79,7 @@ contract EntryPoint is UUPSUpgradeable, Ownable2Step, Initializable, IEntryPoint
             facet = _getAddress(msg.sig);
 
             if (facet == address(0)) {
-                revert EntryPoint_FunctionDoesNotExist(msg.sig);
+                revert IEntryPoint.EntryPoint_FunctionDoesNotExist(msg.sig);
             }
         }
 
@@ -99,7 +100,7 @@ contract EntryPoint is UUPSUpgradeable, Ownable2Step, Initializable, IEntryPoint
     // internal function
     // =======================
 
-    function _multicall(bool isOverride, bytes32 insert, bytes[] calldata data) internal {
+    function _multicall(bool isOverride, bytes32 replace, bytes[] calldata data) internal {
         address[] memory facets = _getAddresses(isOverride, data);
 
         assembly ("memory-safe") {
@@ -114,7 +115,7 @@ contract EntryPoint is UUPSUpgradeable, Ownable2Step, Initializable, IEntryPoint
 
                 let facet
 
-                let argInsert
+                let argReplace
             } length {
                 length := sub(length, 1)
                 cDataOffset := add(cDataOffset, 32)
@@ -123,7 +124,7 @@ contract EntryPoint is UUPSUpgradeable, Ownable2Step, Initializable, IEntryPoint
                 facet := mload(memoryOffset)
                 let offset := add(cDataStart, calldataload(cDataOffset))
                 if iszero(facet) {
-                    // revert EntryPoint_FunctionDoesNotExist(selector);
+                    // revert IEntryPoint.EntryPoint_FunctionDoesNotExist(selector);
                     mstore(0, 0x9365f537)
                     mstore(
                         32,
@@ -138,16 +139,17 @@ contract EntryPoint is UUPSUpgradeable, Ownable2Step, Initializable, IEntryPoint
                 let cSize := calldataload(offset)
                 calldatacopy(ptr, add(offset, 32), cSize)
 
-                if argInsert { if returndatasize() { returndatacopy(add(ptr, argInsert), 0, returndatasize()) } }
+                // all methods will return only 32 bytes
+                if argReplace { if returndatasize() { returndatacopy(add(ptr, argReplace), 0, 32) } }
 
                 if iszero(delegatecall(gas(), facet, ptr, cSize, 0, 0)) {
                     returndatacopy(0, 0, returndatasize())
                     revert(0, returndatasize())
                 }
 
-                if insert {
-                    argInsert := and(insert, 0xffff)
-                    insert := shr(insert, 16)
+                if replace {
+                    argReplace := and(replace, 0xffff)
+                    replace := shr(replace, 16)
                 }
             }
         }
@@ -161,7 +163,7 @@ contract EntryPoint is UUPSUpgradeable, Ownable2Step, Initializable, IEntryPoint
         bytes memory facetsAndSelectors = SSTORE2.read(_facetsAndSelectorsAddress);
 
         if (facetsAndSelectors.length < 24) {
-            revert EntryPoint_FunctionDoesNotExist(selector);
+            revert IEntryPoint.EntryPoint_FunctionDoesNotExist(selector);
         }
 
         return BinarySearch.binarySearch({ selector: selector, facetsAndSelectors: facetsAndSelectors });
@@ -178,7 +180,7 @@ contract EntryPoint is UUPSUpgradeable, Ownable2Step, Initializable, IEntryPoint
         bytes memory facetsAndSelectors = SSTORE2.read(_facetsAndSelectorsAddress);
 
         if (facetsAndSelectors.length < 24) {
-            revert EntryPoint_FunctionDoesNotExist(0x00000000);
+            revert IEntryPoint.EntryPoint_FunctionDoesNotExist(0x00000000);
         }
 
         uint256 cDataStart;
@@ -214,7 +216,7 @@ contract EntryPoint is UUPSUpgradeable, Ownable2Step, Initializable, IEntryPoint
         }
     }
 
-    /// @dev Function that should revert when `msg.sender` is not authorized to upgrade the contract. Called by
+    /// @dev Function that should revert IEntryPoint.when `msg.sender` is not authorized to upgrade the contract. Called by
     /// {upgradeTo} and {upgradeToAndCall}.
     ///
     /// Normally, this function will use an xref:access.adoc[access control] modifier such as {Ownable-onlyOwner}.
