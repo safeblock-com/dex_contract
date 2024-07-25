@@ -35,7 +35,7 @@ contract Deploy is Script {
         vm.startBroadcast(deployer);
 
         _deployImplemetations();
-        address entryPoint = _deployEntryPoint();
+        address entryPoint = DeployEntryPoint.deployEntryPoint(transferFacet, multiswapRouterFacet);
 
         if (proxy == address(0)) {
             proxy = address(new Proxy{ salt: salt }(deployer));
@@ -56,7 +56,7 @@ contract Deploy is Script {
         }
 
         if (transferFacet == address(0)) {
-            transferFacet = address(new TransferFacet());
+            transferFacet = address(new TransferFacet(WBNB));
         }
 
         if (stargateFacet == address(0)) {
@@ -70,22 +70,28 @@ contract Deploy is Script {
             );
         }
     }
+}
 
-    function _deployEntryPoint() internal returns (address) {
+library DeployEntryPoint {
+    function deployEntryPoint(address transferFacet, address multiswapRouterFacet) internal returns (address) {
         bytes4[] memory selectors = new bytes4[](250);
         address[] memory facetAddresses = new address[](250);
 
         uint256 i;
         uint256 j;
 
-        // ERC20 Facet
-        selectors[i++] = TransferFacet.transfer.selector;
-        selectors[i++] = TransferFacet.transferNative.selector;
-        facetAddresses[j++] = transferFacet;
-        facetAddresses[j++] = transferFacet;
+        if (transferFacet != address(0)) {
+            // transfer Facet
+            selectors[i++] = TransferFacet.transferToken.selector;
+            selectors[i++] = TransferFacet.transferNative.selector;
+            selectors[i++] = TransferFacet.unwrapNativeAndTransferTo.selector;
+            for (uint256 k; k < 3; ++k) {
+                facetAddresses[j++] = transferFacet;
+            }
+        }
 
-        if (multiswapRouterFacet != address(1)) {
-            // Multiswap Facet
+        if (multiswapRouterFacet != address(0)) {
+            // multiswap Facet
             selectors[i++] = MultiswapRouterFacet.wrappedNative.selector;
             selectors[i++] = MultiswapRouterFacet.feeContract.selector;
             selectors[i++] = MultiswapRouterFacet.setFeeContract.selector;
@@ -96,18 +102,18 @@ contract Deploy is Script {
             }
         }
 
-        // Stargate Facet
-        selectors[i++] = StargateFacet.lzEndpoint.selector;
-        selectors[i++] = StargateFacet.stargateV1Composer.selector;
-        selectors[i++] = StargateFacet.quoteV1.selector;
-        selectors[i++] = StargateFacet.quoteV2.selector;
-        selectors[i++] = StargateFacet.sendStargateV1.selector;
-        selectors[i++] = StargateFacet.sendStargateV2.selector;
-        selectors[i++] = StargateFacet.sgReceive.selector;
-        selectors[i++] = StargateFacet.lzCompose.selector;
-        for (uint256 k; k < 8; ++k) {
-            facetAddresses[j++] = stargateFacet;
-        }
+        // TODO Stargate Facet
+        // selectors[i++] = StargateFacet.lzEndpoint.selector;
+        // selectors[i++] = StargateFacet.stargateV1Composer.selector;
+        // selectors[i++] = StargateFacet.quoteV1.selector;
+        // selectors[i++] = StargateFacet.quoteV2.selector;
+        // selectors[i++] = StargateFacet.sendStargateV1.selector;
+        // selectors[i++] = StargateFacet.sendStargateV2.selector;
+        // selectors[i++] = StargateFacet.sgReceive.selector;
+        // selectors[i++] = StargateFacet.lzCompose.selector;
+        // for (uint256 k; k < 8; ++k) {
+        //     facetAddresses[j++] = stargateFacet;
+        // }
 
         assembly {
             mstore(selectors, i)
