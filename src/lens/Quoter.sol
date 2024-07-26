@@ -109,7 +109,7 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
         bool uni3;
         bytes32 pair;
 
-        for (uint256 i; i < length; ) {
+        for (uint256 i; i < length;) {
             pair = data.pairs[i];
 
             assembly ("memory-safe") {
@@ -164,7 +164,7 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
             index = length - 1;
         }
 
-        for (uint256 i; i < length; ) {
+        for (uint256 i; i < length;) {
             pair = data.pairs[index];
 
             assembly ("memory-safe") {
@@ -178,7 +178,7 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
 
             (amountOut, tokenOut) = _quoteExactOutput(tokenOut, pool, amountOut, fee, uni3);
 
-            if(amountOut == type(uint256).max) {
+            if (amountOut == type(uint256).max) {
                 break;
             }
         }
@@ -208,7 +208,7 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
 
         {
             uint256 fullAmountCheck;
-            for (uint256 i; i < length; ) {
+            for (uint256 i; i < length;) {
                 unchecked {
                     fullAmountCheck += data.amountsIn[i];
                     ++i;
@@ -229,21 +229,20 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
         bytes32 pair;
         uint256 amountOut;
 
-        for (uint256 i; i < length; ) {
+        for (uint256 i; i < length;) {
             pair = data.pairs[i];
 
             assembly ("memory-safe") {
                 pool := and(pair, ADDRESS_MASK)
                 fee := and(shr(160, pair), FEE_MASK)
                 uni3 := and(pair, UNISWAP_V3_MASK)
-
-                i := add(i, 1)
             }
 
-            (amountOut, ) = _quoteExactInput(tokenIn, pool, data.amountsIn[i], fee, uni3);
+            (amountOut,) = _quoteExactInput(tokenIn, pool, data.amountsIn[i], fee, uni3);
 
             unchecked {
                 amount += amountOut;
+                ++i;
             }
         }
 

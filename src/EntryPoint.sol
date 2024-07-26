@@ -10,7 +10,7 @@ import { BinarySearch } from "./libraries/BinarySearch.sol";
 import { IEntryPoint } from "./interfaces/IEntryPoint.sol";
 import { Ownable2Step } from "./external/Ownable2Step.sol";
 
-import { CallbackFacetLibrary } from "./libraries/CallbackFacetLibrary.sol";
+import { TransientStorageFacetLibrary } from "./libraries/TransientStorageFacetLibrary.sol";
 
 /// @title EntryPoint
 /// @notice This contract serves as a proxy for dynamic function execution.
@@ -65,7 +65,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
     }
 
     /// @inheritdoc IEntryPoint
-    function multicall(bytes32 replace, bytes[] calldata data) external {
+    function multicall(bytes32 replace, bytes[] calldata data) external payable {
         _multicall(true, replace, data);
     }
 
@@ -73,7 +73,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
     /// @dev If a facet for the incoming selector is found, it delegates the call to that facet.
     /// @dev If callback address in storage is not address(0) - it delegates the call to that address.
     fallback() external payable {
-        address facet = CallbackFacetLibrary.getCallbackAddress();
+        address facet = TransientStorageFacetLibrary.getCallbackAddress();
 
         if (facet == address(0)) {
             facet = _getAddress(msg.sig);
@@ -103,6 +103,8 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
     function _multicall(bool isOverride, bytes32 replace, bytes[] calldata data) internal {
         address[] memory facets = _getAddresses(isOverride, data);
 
+        TransientStorageFacetLibrary.setSenderAddress(msg.sender);
+
         assembly ("memory-safe") {
             for {
                 let length := data.length
@@ -116,6 +118,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
                 let facet
 
                 let argReplace
+                let notFirstCall
             } length {
                 length := sub(length, 1)
                 cDataOffset := add(cDataOffset, 32)
@@ -142,9 +145,19 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
                 // all methods will return only 32 bytes
                 if argReplace { if returndatasize() { returndatacopy(add(ptr, argReplace), 0, 32) } }
 
-                if iszero(delegatecall(gas(), facet, ptr, cSize, 0, 0)) {
-                    returndatacopy(0, 0, returndatasize())
-                    revert(0, returndatasize())
+                switch notFirstCall
+                case 1 {
+                    if iszero(callcode(gas(), facet, 0, ptr, cSize, 0, 0)) {
+                        returndatacopy(0, 0, returndatasize())
+                        revert(0, returndatasize())
+                    }
+                }
+                default {
+                    notFirstCall := 1
+                    if iszero(delegatecall(gas(), facet, ptr, cSize, 0, 0)) {
+                        returndatacopy(0, 0, returndatasize())
+                        revert(0, returndatasize())
+                    }
                 }
 
                 if replace {
@@ -153,6 +166,8 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
                 }
             }
         }
+
+        TransientStorageFacetLibrary.setSenderAddress(address(0));
     }
 
     /// @dev Searches for the facet address associated with a function `selector`.

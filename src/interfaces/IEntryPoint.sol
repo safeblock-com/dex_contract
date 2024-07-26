@@ -31,5 +31,5 @@ interface IEntryPoint {
     ///     If the first 16-bit bit after a call is non-zero,
     ///     the result of the call replaces the calldata for the next call at that offset.
     /// @param data An array of call data to be executed.
-    function multicall(bytes32 replace, bytes[] calldata data) external;
+    function multicall(bytes32 replace, bytes[] calldata data) external payable;
 }
