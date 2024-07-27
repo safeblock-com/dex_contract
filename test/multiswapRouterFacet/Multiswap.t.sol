@@ -88,6 +88,30 @@ contract MultiswapTest is Test {
     }
 
     // =========================
+    // transferNative
+    // =========================
+
+    function test_transferFacet_transferNative_shouldTransferNativeFromContract() external {
+        deal(address(router), 10e18);
+
+        startHoax(user);
+
+        uint256 balanceBefore = user.balance;
+
+        router.multicall(Solarray.bytess(abi.encodeCall(TransferFacet.transferNative, (user, 5e18))));
+
+        uint256 balanceAfter = user.balance;
+
+        assertEq(balanceAfter - balanceBefore, 5e18);
+
+        router.multicall(Solarray.bytess(abi.encodeCall(TransferFacet.transferNative, (user, 5e18))));
+
+        assertEq(user.balance - balanceAfter, 5e18);
+
+        vm.stopPrank();
+    }
+
+    // =========================
     // multiswap
     // =========================
 
