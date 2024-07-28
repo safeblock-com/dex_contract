@@ -3,6 +3,8 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Script.sol";
 
+import { Quoter } from "../src/lens/Quoter.sol";
+
 import { EntryPoint } from "../src/EntryPoint.sol";
 import { Proxy, InitialImplementation } from "../src/proxy/Proxy.sol";
 import { MultiswapRouterFacet } from "../src/facets/MultiswapRouterFacet.sol";
@@ -14,37 +16,52 @@ import { DeployEngine } from "./DeployEngine.sol";
 import "../test/Helpers.t.sol";
 
 contract Deploy is Script {
-    address multiswapRouterFacet = address(1);
-    address transferFacet = address(0);
-    address stargateFacet = address(0);
+    address quoter = 0x46f4ce97aFd70cd668984C874795941E7Fc591CA;
+    address quoterProxy = 0x51a85c557cD6Aa35880D55799849dDCD6c20B5Cd;
 
-    address proxy = 0x9d5b514435EE72bA227453E907835724Fff6715e;
+    address multiswapRouterFacet = 0x8973bdDC469c0CE56D9b41dA25C4f1b4D0c4DBa9;
+    address transferFacet = 0x3BBcB05884ff9b8149E94FcfC7Bd013d18d12D2f;
 
-    bytes32 salt = keccak256("dev_salt-2");
+    address proxy = 0x2Ea84370660448fd9017715f2F36727AE64f5Fe3;
 
-    // testnet
-    address lzEndpoint = 0x6EDCE65403992e310A62460808c4b910D972f10f;
+    bool upgrade;
 
-    address arbStargateComposer = 0xb2d85b2484c910A6953D28De5D3B8d204f7DDf15;
-    address bnbStargateComposer = 0x75D573607f5047C728D3a786BE3Ba33765712875;
-    address sepStargateComposer = 0x4febD509277f485A5feB90fb20DC0D3FAe6Bf856;
+    bytes32 salt = keccak256("entry-point-salt-1");
+    bytes32 quotersalt = keccak256("quoter-salt-1");
 
     function run() external {
         address deployer = vm.rememberKey(vm.envUint("PRIVATE_KEY"));
 
         vm.startBroadcast(deployer);
 
+        if (quoter == address(0)) {
+            quoter = address(new Quoter(WBNB));
+
+            if (quoterProxy == address(0)) {
+                quoterProxy = address(new Proxy{ salt: quotersalt }(deployer));
+
+                InitialImplementation(quoterProxy).upgradeTo(quoter, abi.encodeCall(Quoter.initialize, (deployer)));
+            } else {
+                Quoter(quoterProxy).upgradeTo(quoter);
+            }
+        }
+
         _deployImplemetations();
-        address entryPoint = DeployEntryPoint.deployEntryPoint(transferFacet, multiswapRouterFacet);
 
-        if (proxy == address(0)) {
-            proxy = address(new Proxy{ salt: salt }(deployer));
+        if (upgrade) {
+            address entryPoint = DeployEntryPoint.deployEntryPoint(transferFacet, multiswapRouterFacet);
 
-            InitialImplementation(proxy).upgradeTo(
-                entryPoint, abi.encodeCall(EntryPoint.initialize, (deployer, new bytes[](0)))
-            );
-        } else {
-            EntryPoint(payable(proxy)).upgradeTo(entryPoint);
+            if (proxy == address(0)) {
+                proxy = address(new Proxy{ salt: salt }(deployer));
+
+                bytes[] memory initCalls = new bytes[](0);
+
+                InitialImplementation(proxy).upgradeTo(
+                    entryPoint, abi.encodeCall(EntryPoint.initialize, (deployer, initCalls))
+                );
+            } else {
+                EntryPoint(payable(proxy)).upgradeTo(entryPoint);
+            }
         }
 
         vm.stopBroadcast();
@@ -52,22 +69,15 @@ contract Deploy is Script {
 
     function _deployImplemetations() internal {
         if (multiswapRouterFacet == address(0)) {
+            upgrade = true;
+
             multiswapRouterFacet = address(new MultiswapRouterFacet(WBNB));
         }
 
         if (transferFacet == address(0)) {
-            transferFacet = address(new TransferFacet(WBNB));
-        }
+            upgrade = true;
 
-        if (stargateFacet == address(0)) {
-            stargateFacet = address(
-                new StargateFacet(
-                    lzEndpoint,
-                    block.chainid == 11_155_111
-                        ? sepStargateComposer
-                        : block.chainid == 97 ? bnbStargateComposer : arbStargateComposer
-                )
-            );
+            transferFacet = address(new TransferFacet(WBNB));
         }
     }
 }

@@ -64,7 +64,7 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
     }
 
     //// @inheritdoc IMultiswapRouterFacet
-    function partswap(IMultiswapRouterFacet.PartswapCalldata calldata data) external payable returns (uint256 amount) {
+    function partswap(IMultiswapRouterFacet.PartswapCalldata calldata data) external view returns (uint256 amount) {
         address tokenIn = data.tokenIn;
         uint256 fullAmount = data.fullAmount;
 
