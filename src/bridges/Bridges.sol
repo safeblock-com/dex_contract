@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import { IWrappedNative } from "../interfaces/IWrappedNative.sol";
-import { TransferHelper } from "../libraries/TransferHelper.sol";
+import { TransferHelper } from "../facets/libraries/TransferHelper.sol";
 
 import { IConnext } from "./connext/IConnext.sol";
 
@@ -519,8 +519,6 @@ contract Bridges is Ownable2Step {
         return fee.nativeFee;
     }
 
-
-
     // =========================
     // axelar
     // =========================
@@ -532,12 +530,14 @@ contract Bridges is Ownable2Step {
         string memory destinationAddress,
         string memory symbol,
         uint256 amount
-    ) external {
+    )
+        external
+    {
         address tokenAddress = _axelarGateway.tokenAddresses(symbol);
 
-        tokenAddress.safeTransferFrom({ from: msg.sender, to: address(this), value: amount});
+        tokenAddress.safeTransferFrom({ from: msg.sender, to: address(this), value: amount });
 
-        tokenAddress.safeApprove({ spender: address(_axelarGateway), value: amount });    
+        tokenAddress.safeApprove({ spender: address(_axelarGateway), value: amount });
 
         _axelarGateway.sendToken({
             destinationChain: destinationChain,

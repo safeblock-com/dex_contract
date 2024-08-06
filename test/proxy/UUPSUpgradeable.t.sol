@@ -60,7 +60,7 @@ contract UUPSUpgradeableTest is Test {
         notUUPSImplementation = address(new NotUUPSImplementation());
 
         vm.startPrank(owner);
-        proxy = address(new Proxy());
+        proxy = address(new Proxy(owner));
         InitialImplementation(proxy).upgradeTo(impl, abi.encodeCall(Implementation.initialize, ()));
         vm.stopPrank();
     }
@@ -77,7 +77,7 @@ contract UUPSUpgradeableTest is Test {
         }
 
         vm.prank(_owner);
-        InitialImplementation _proxy = InitialImplementation(address(new Proxy()));
+        InitialImplementation _proxy = InitialImplementation(address(new Proxy(_owner)));
 
         assertEq(vm.load(address(_proxy), slot), __owner);
 

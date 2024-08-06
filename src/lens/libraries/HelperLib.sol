@@ -6,7 +6,6 @@ library HelperLib {
 
     error UniswapV2_InsufficientInputAmount();
     error UniswapV2_InsufficientOutputAmount();
-    error UniswapV2_InsufficientLiquidity();
 
     // given an input amount of an asset and pair reserves, returns the maximum output amount of the other asset
     function getAmountOut(
@@ -24,7 +23,7 @@ library HelperLib {
         }
 
         if (reserveIn == 0 || reserveOut == 0) {
-            revert UniswapV2_InsufficientLiquidity();
+            return 0;
         }
 
         unchecked {
@@ -46,16 +45,20 @@ library HelperLib {
         pure
         returns (uint256 amountIn)
     {
-        if (amountIn == 0) {
+        if (amountOut == 0) {
             revert UniswapV2_InsufficientOutputAmount();
         }
         if (reserveIn == 0 || reserveOut == 0) {
-            revert UniswapV2_InsufficientLiquidity();
+            return type(uint256).max;
+        }
+
+        if (amountOut > reserveOut) {
+            return type(uint256).max;
         }
 
         unchecked {
             uint256 numerator = reserveIn * amountOut * E6;
-            uint256 denominator = reserveOut - amountOut * (E6 - feeE6);
+            uint256 denominator = (reserveOut - amountOut) * (E6 - feeE6);
             amountIn = (numerator / denominator) + 1;
         }
     }
