@@ -59,11 +59,7 @@ library HelperLib {
 
         unchecked {
             uint256 numerator = reserveIn * amountOut * E6;
-<<<<<<< HEAD:src/libraries/HelperLib.sol
-            uint256 denominator = reserveOut - amountOut * (E6 - feeE6);
-=======
             uint256 denominator = (reserveOut - amountOut) * (E6 - feeE6);
->>>>>>> origin/multiswap-test:src/facets/libraries/HelperLib.sol
             amountIn = (numerator / denominator) + 1;
         }
     }
