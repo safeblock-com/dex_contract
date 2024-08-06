@@ -33,7 +33,7 @@ contract PartswapTest is Test {
     address entryPointImplementation;
 
     function setUp() external {
-        vm.createSelectFork(vm.envString("BNB_RPC_URL"));
+        vm.createSelectFork(vm.rpcUrl("bsc"));
 
         deal(USDT, user, 1000e18);
 
@@ -44,7 +44,7 @@ contract PartswapTest is Test {
         multiswapRouterFacet = address(new MultiswapRouterFacet(WBNB));
         transferFacet = address(new TransferFacet(WBNB));
 
-        entryPointImplementation = DeployEntryPoint.deployEntryPoint(transferFacet, multiswapRouterFacet);
+        entryPointImplementation = DeployEntryPoint.deployEntryPoint(transferFacet, multiswapRouterFacet, address(0));
 
         router = IEntryPoint(address(new Proxy(owner)));
 
