@@ -5,17 +5,14 @@ import "forge-std/Test.sol";
 import { IERC20 } from "forge-std/interfaces/IERC20.sol";
 
 import { Solarray } from "solarray/Solarray.sol";
-import { DeployEntryPoint } from "../../script/DeployContract.s.sol";
+import { DeployEngine, Contracts, getContracts } from "../../script/DeployEngine.sol";
 
 import { Proxy, InitialImplementation } from "../../src/proxy/Proxy.sol";
 
-import { TransferHelper } from "../../src/facets/libraries/TransferHelper.sol";
-
 import { IEntryPoint } from "../../src/EntryPoint.sol";
-import { MultiswapRouterFacet, IMultiswapRouterFacet } from "../../src/facets/MultiswapRouterFacet.sol";
+import { IMultiswapRouterFacet } from "../../src/facets/MultiswapRouterFacet.sol";
 import { TransferFacet } from "../../src/facets/TransferFacet.sol";
 import { StargateFacet, IStargateFacet, IStargateComposer } from "../../src/facets/bridges/StargateFacet.sol";
-import { IOwnable } from "../../src/external/IOwnable.sol";
 import { TransferHelper } from "../../src/facets/libraries/TransferHelper.sol";
 
 import { Quoter } from "../../src/lens/Quoter.sol";
@@ -29,29 +26,22 @@ contract StargateFacetTest is Test {
     address owner = makeAddr("owner");
     address user = makeAddr("user");
 
-    address multiswapRouterFacet;
-    address transferFacet;
-    address stargateFacet;
     address entryPointImplementation;
-
-    // bnb mainnet
-    address endpointV2 = 0x1a44076050125825900e736c501f859c50fE728c;
-    address stargateComposerV1 = 0xeCc19E177d24551aA7ed6Bc6FE566eCa726CC8a9;
+    Contracts contracts;
 
     function setUp() external {
         vm.createSelectFork(vm.rpcUrl("bsc"));
+
+        contracts = getContracts(56);
+        (contracts,) = DeployEngine.deployImplemetations(contracts, true);
 
         deal(USDT, user, 1000e18);
 
         startHoax(owner);
 
-        quoter = new Quoter(WBNB);
+        quoter = new Quoter(contracts.wrappedNative);
 
-        multiswapRouterFacet = address(new MultiswapRouterFacet(WBNB));
-        transferFacet = address(new TransferFacet(WBNB));
-        stargateFacet = address(new StargateFacet(endpointV2, stargateComposerV1));
-
-        entryPointImplementation = DeployEntryPoint.deployEntryPoint(transferFacet, multiswapRouterFacet, stargateFacet);
+        entryPointImplementation = DeployEngine.deployEntryPoint(contracts);
 
         bridge = IEntryPoint(address(new Proxy(owner)));
 
@@ -67,10 +57,10 @@ contract StargateFacetTest is Test {
     // =========================
 
     function test_stargateFacet_constructor_shouldInitializeInConstructor() external {
-        StargateFacet _stargateFacet = new StargateFacet(endpointV2, stargateComposerV1);
+        StargateFacet _stargateFacet = new StargateFacet(contracts.endpointV2, contracts.stargateComposerV1);
 
-        assertEq(_stargateFacet.lzEndpoint(), endpointV2);
-        assertEq(_stargateFacet.stargateV1Composer(), stargateComposerV1);
+        assertEq(_stargateFacet.lzEndpoint(), contracts.endpointV2);
+        assertEq(_stargateFacet.stargateV1Composer(), contracts.stargateComposerV1);
     }
 
     // =========================
@@ -363,7 +353,7 @@ contract StargateFacetTest is Test {
         bridge.multicall{ value: fee }(
             0x0000000000000000000000000000000000000000000000000000000000240064,
             Solarray.bytess(
-                abi.encodeCall(MultiswapRouterFacet.multiswap, (mData)),
+                abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
                 abi.encodeCall(
                     StargateFacet.sendStargateV1,
                     (
@@ -406,7 +396,7 @@ contract StargateFacetTest is Test {
         bridge.multicall{ value: fee }(
             0x0000000000000000000000000000000000000000000000000000000000240044,
             Solarray.bytess(
-                abi.encodeCall(MultiswapRouterFacet.multiswap, (mData)),
+                abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
                 abi.encodeCall(StargateFacet.sendStargateV2, (stargatePool, dstEidV2, 0, user, 0, bytes(""))),
                 abi.encodeCall(TransferFacet.transferToken, (USDT, 0, user))
             )

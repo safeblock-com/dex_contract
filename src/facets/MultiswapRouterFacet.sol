@@ -58,10 +58,10 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
     bytes32 private constant MULTISWAP_ROUTER_FACET_STORAGE =
         0x73a3a170c596aa083fa5166abc0f3239e53b41143f45c8bd25a602694c09d735;
 
-    /// @dev Returns the storage slot for the entry point logic.
+    /// @dev Returns the storage slot for the multiswapRouterFacet.
     /// @dev This function utilizes inline assembly to directly access the desired storage position.
     ///
-    /// @return s The storage slot pointer for the entry point logic.
+    /// @return s The storage slot pointer for the multiswapRouterFacet.
     function _getLocalStorage() internal pure returns (MultiswapRouterFacetStorage storage s) {
         assembly ("memory-safe") {
             s.slot := MULTISWAP_ROUTER_FACET_STORAGE
