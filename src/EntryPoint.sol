@@ -118,7 +118,6 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
                 let facet
 
                 let argReplace
-                let notFirstCall
             } length {
                 length := sub(length, 1)
                 cDataOffset := add(cDataOffset, 32)
@@ -143,21 +142,14 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
                 calldatacopy(ptr, add(offset, 32), cSize)
 
                 // all methods will return only 32 bytes
-                if argReplace { if returndatasize() { returndatacopy(add(ptr, argReplace), 0, 32) } }
-
-                switch notFirstCall
-                case 1 {
-                    if iszero(callcode(gas(), facet, 0, ptr, cSize, 0, 0)) {
-                        returndatacopy(0, 0, returndatasize())
-                        revert(0, returndatasize())
-                    }
+                if argReplace {
+                    if returndatasize() { returndatacopy(add(ptr, argReplace), 0, 32) }
+                    argReplace := 0
                 }
-                default {
-                    notFirstCall := 1
-                    if iszero(delegatecall(gas(), facet, ptr, cSize, 0, 0)) {
-                        returndatacopy(0, 0, returndatasize())
-                        revert(0, returndatasize())
-                    }
+
+                if iszero(callcode(gas(), facet, 0, ptr, cSize, 0, 0)) {
+                    returndatacopy(0, 0, returndatasize())
+                    revert(0, returndatasize())
                 }
 
                 if replace {

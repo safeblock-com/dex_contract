@@ -48,7 +48,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             transferFacet: 0x63C870276Ba8f7dC248B89320a7d24f938B5F14C,
             multiswapRouterFacet: 0xaA0e646040eC978059E835764E594af3A130f5Ac,
             stargateFacet: 0xB1368ce5FF0b927F62C41226c630083a8Ea259EF,
-            layerZeroFacet: 0x55a8745B020817B4822077F6Ca3113B0E5510cC0,
+            layerZeroFacet: 0x285297B6c29F67baa92b2333FCcBE906917b7137,
             //
             quoter: 0x46f4ce97aFd70cd668984C874795941E7Fc591CA,
             quoterProxy: 0x51a85c557cD6Aa35880D55799849dDCD6c20B5Cd,
@@ -66,7 +66,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             transferFacet: 0x29F4Bf32E90cAcb299fC82569670f670d334630a,
             multiswapRouterFacet: 0xD4366D4b3af01111a9a3c97c0dfEdc44A3e8C2cF,
             stargateFacet: 0x29588c2cd38631d3892b3d6B7D0CB0Ad342067F0,
-            layerZeroFacet: 0xFB7BeD3D0012C988A107fd3F7A1959e3D9dd30eC,
+            layerZeroFacet: 0xd4f528eC9D963467F3ED1f51CB4e197e88c8eBA3,
             //
             quoter: 0xFC08aCb8ab29159Cc864D7c7EC8AF2b611DE0820,
             quoterProxy: 0x51a85c557cD6Aa35880D55799849dDCD6c20B5Cd,

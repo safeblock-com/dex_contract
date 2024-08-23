@@ -209,7 +209,7 @@ contract LayerZeroFacet is Ownable, ILayerZeroFacet {
 
         uint256 fee = _quote(dstEid, options);
 
-        if (fee < address(this).balance) {
+        if (fee > address(this).balance) {
             revert LayerZeroFacet_FeeNotMet();
         }
 
