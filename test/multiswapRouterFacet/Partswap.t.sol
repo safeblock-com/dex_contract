@@ -5,12 +5,12 @@ import "forge-std/Test.sol";
 import { IERC20 } from "forge-std/interfaces/IERC20.sol";
 
 import { Solarray } from "solarray/Solarray.sol";
-import { DeployEntryPoint } from "../../script/DeployContract.s.sol";
+import { DeployEngine, Contracts, getContracts } from "../../script/DeployEngine.sol";
 
 import { Proxy, InitialImplementation } from "../../src/proxy/Proxy.sol";
 
 import { IEntryPoint } from "../../src/EntryPoint.sol";
-import { MultiswapRouterFacet, IMultiswapRouterFacet } from "../../src/facets/MultiswapRouterFacet.sol";
+import { IMultiswapRouterFacet } from "../../src/facets/MultiswapRouterFacet.sol";
 import { TransferFacet } from "../../src/facets/TransferFacet.sol";
 import { TransferHelper } from "../../src/facets/libraries/TransferHelper.sol";
 
@@ -28,23 +28,22 @@ contract PartswapTest is Test {
     address owner = makeAddr("owner");
     address user = makeAddr("user");
 
-    address multiswapRouterFacet;
-    address transferFacet;
     address entryPointImplementation;
+    Contracts contracts;
 
     function setUp() external {
-        vm.createSelectFork(vm.envString("BNB_RPC_URL"));
+        vm.createSelectFork(vm.rpcUrl("bsc"));
+
+        contracts = getContracts(56);
+        (contracts,) = DeployEngine.deployImplemetations(contracts, true);
 
         deal(USDT, user, 1000e18);
 
         startHoax(owner);
 
-        quoter = new Quoter(WBNB);
+        quoter = new Quoter(contracts.wrappedNative);
 
-        multiswapRouterFacet = address(new MultiswapRouterFacet(WBNB));
-        transferFacet = address(new TransferFacet(WBNB));
-
-        entryPointImplementation = DeployEntryPoint.deployEntryPoint(transferFacet, multiswapRouterFacet);
+        entryPointImplementation = DeployEngine.deployEntryPoint(contracts);
 
         router = IEntryPoint(address(new Proxy(owner)));
 
