@@ -8,17 +8,6 @@ import { IERC20 } from "forge-std/interfaces/IERC20.sol";
 /// @dev Provides safe functions for ERC20 token and native currency transfers.
 library TransferHelper {
     // =========================
-    // events
-    // =========================
-
-    /// @notice Emits when a transfer is successfully executed.
-    /// @param token The address of the token (address(0) for native currency).
-    /// @param from The address of the sender.
-    /// @param to The address of the recipient.
-    /// @param value The number of tokens (or native currency) transferred.
-    event TransferHelperTransfer(address indexed token, address indexed from, address indexed to, uint256 value);
-
-    // =========================
     // errors
     // =========================
 
@@ -51,8 +40,6 @@ library TransferHelper {
         if (!_makeCall(token, abi.encodeCall(IERC20.transferFrom, (from, to, value)))) {
             revert TransferHelper_TransferFromError();
         }
-
-        emit TransferHelperTransfer(token, from, to, value);
     }
 
     /// @notice Executes a safe transfer.
@@ -64,8 +51,6 @@ library TransferHelper {
         if (!_makeCall(token, abi.encodeCall(IERC20.transfer, (to, value)))) {
             revert TransferHelper_TransferError();
         }
-
-        emit TransferHelperTransfer(token, address(this), to, value);
     }
 
     /// @notice Executes a safe approval.
@@ -106,8 +91,6 @@ library TransferHelper {
         if (!success) {
             revert TransferHelper_TransferNativeError();
         }
-
-        emit TransferHelperTransfer(address(0), address(this), to, value);
     }
 
     // =========================

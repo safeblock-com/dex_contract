@@ -55,7 +55,9 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
         amount = _multiswap(data.tokenIn == address(0), data);
     }
 
-    function multiswapReverse(IMultiswapRouterFacet.MultiswapCalldata calldata data)
+    function multiswapReverse(
+        IMultiswapRouterFacet.MultiswapCalldata calldata data
+    )
         external
         view
         returns (uint256 amount)

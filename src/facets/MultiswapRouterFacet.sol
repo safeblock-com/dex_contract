@@ -106,7 +106,9 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
     // =========================
 
     /// @inheritdoc IMultiswapRouterFacet
-    function multiswap(IMultiswapRouterFacet.MultiswapCalldata calldata data)
+    function multiswap(
+        IMultiswapRouterFacet.MultiswapCalldata calldata data
+    )
         external
         payable
         returns (uint256 amount)
@@ -235,22 +237,24 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
                 if (i == lastIndex) {
                     // if the pair is the last in the array - the next token recipient after the swap is address(this)
                     destination = addressThisBytes32;
+                    uni3Next = true;
                 } else {
                     // otherwise take the next pair
                     destination = data.pairs[_unsafeAddOne(i)];
-                }
 
-                assembly ("memory-safe") {
-                    // if the next pair belongs to version 3 of the protocol - the address
-                    // of the router is set as the recipient, otherwise - the next pair
-                    uni3Next := and(destination, UNISWAP_V3_MASK)
+                    assembly ("memory-safe") {
+                        // if the next pair belongs to version 3 of the protocol - the address
+                        // of the router is set as the recipient, otherwise - the next pair
+                        uni3Next := and(destination, UNISWAP_V3_MASK)
+                    }
                 }
 
                 if (uni3) {
                     (amountIn, tokenIn) =
-                        _swapUniV3(pair, amountIn, tokenIn, uni3Next ? addressThisBytes32 : destination);
+                        _swapUniV3(pair, amountIn, tokenIn, uni3Next ? addressThisBytes32 : destination, uni3Next);
                 } else {
-                    (amountIn, tokenIn) = _swapUniV2(pair, tokenIn, uni3Next ? addressThisBytes32 : destination);
+                    (amountIn, tokenIn) =
+                        _swapUniV2(pair, tokenIn, uni3Next ? addressThisBytes32 : destination, uni3Next);
                 }
 
                 // upgrade the pair for the next swap
@@ -360,14 +364,14 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
 
                 if (amountIn > 0) {
                     if (uni3) {
-                        (amountIn,) = _swapUniV3(pair, amountIn, tokenIn, addressThisBytes32);
+                        (amountIn,) = _swapUniV3(pair, amountIn, tokenIn, addressThisBytes32, true);
                     } else {
                         address _pair;
                         assembly ("memory-safe") {
                             _pair := and(pair, ADDRESS_MASK)
                         }
                         TransferHelper.safeTransfer({ token: tokenIn, to: _pair, value: amountIn });
-                        (amountIn,) = _swapUniV2(pair, tokenIn, addressThisBytes32);
+                        (amountIn,) = _swapUniV2(pair, tokenIn, addressThisBytes32, true);
                     }
 
                     unchecked {
@@ -397,7 +401,7 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
             // }
         }
 
-        return (exactAmountOut);
+        return exactAmountOut;
     }
 
     /// @dev uniswapV3 swap exact tokens
@@ -405,7 +409,8 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
         bytes32 _pool,
         uint256 amountIn,
         address tokenIn,
-        bytes32 _destination
+        bytes32 _destination,
+        bool destinationIsAddressThis
     )
         internal
         returns (uint256 amountOut, address tokenOut)
@@ -417,9 +422,8 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
             destination := and(_destination, ADDRESS_MASK)
         }
 
-        (, tokenOut) = _validateTokenInPair(pool, tokenIn);
-
-        bool zeroForOne = tokenIn < tokenOut;
+        bool zeroForOne;
+        (zeroForOne, tokenOut) = _validateTokenInPair(pool, tokenIn);
 
         // cast a uint256 to a int256, revert on overflow
         // https://github.com/Uniswap/v3-core/blob/main/contracts/libraries/SafeCast.sol#L24
@@ -431,7 +435,10 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
         _getLocalStorage().poolAddressCache = address(pool);
         TransientStorageFacetLibrary.setCallbackAddress({ callbackAddress: _self });
 
-        uint256 balanceOutBeforeSwap = TransferHelper.safeGetBalance({ token: tokenOut, account: address(this) });
+        uint256 balanceOutBeforeSwap;
+        if (destinationIsAddressThis) {
+            balanceOutBeforeSwap = TransferHelper.safeGetBalance({ token: tokenOut, account: address(this) });
+        }
 
         pool.swap({
             recipient: destination,
@@ -441,12 +448,14 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
             data: abi.encode(tokenIn)
         });
 
-        uint256 balanceOutAfterSwap = TransferHelper.safeGetBalance({ token: tokenOut, account: address(this) });
-        _checkOutputAmount(balanceOutAfterSwap, balanceOutBeforeSwap);
+        if (destinationIsAddressThis) {
+            uint256 balanceOutAfterSwap = TransferHelper.safeGetBalance({ token: tokenOut, account: address(this) });
+            _checkOutputAmount(balanceOutAfterSwap, balanceOutBeforeSwap);
 
-        unchecked {
-            // return the exact amount of tokens as a result of the swap
-            amountOut = balanceOutAfterSwap - balanceOutBeforeSwap;
+            unchecked {
+                // return the exact amount of tokens as a result of the swap
+                amountOut = balanceOutAfterSwap - balanceOutBeforeSwap;
+            }
         }
     }
 
@@ -454,7 +463,8 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
     function _swapUniV2(
         bytes32 _pair,
         address tokenIn,
-        bytes32 _destination
+        bytes32 _destination,
+        bool destinationIsAddressThis
     )
         internal
         returns (uint256 amountOut, address tokenOut)
@@ -496,7 +506,10 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
 
         (uint256 amount0Out, uint256 amount1Out) = tokenInIsToken0 ? (uint256(0), amountOut) : (amountOut, uint256(0));
 
-        uint256 balanceOutBeforeSwap = TransferHelper.safeGetBalance({ token: tokenOut, account: address(this) });
+        uint256 balanceOutBeforeSwap;
+        if (destinationIsAddressThis) {
+            balanceOutBeforeSwap = TransferHelper.safeGetBalance({ token: tokenOut, account: address(this) });
+        }
 
         if (
             // first do the swap via the most common swap function selector
@@ -512,12 +525,14 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
             }
         }
 
-        uint256 balanceOutAfterSwap = TransferHelper.safeGetBalance({ token: tokenOut, account: address(this) });
-        _checkOutputAmount(balanceOutAfterSwap, balanceOutBeforeSwap);
+        if (destinationIsAddressThis) {
+            uint256 balanceOutAfterSwap = TransferHelper.safeGetBalance({ token: tokenOut, account: address(this) });
+            _checkOutputAmount(balanceOutAfterSwap, balanceOutBeforeSwap);
 
-        unchecked {
-            // return the exact amount of tokens as a result of the swap
-            amountOut = balanceOutAfterSwap - balanceOutBeforeSwap;
+            unchecked {
+                // return the exact amount of tokens as a result of the swap
+                amountOut = balanceOutAfterSwap - balanceOutBeforeSwap;
+            }
         }
     }
 

@@ -107,7 +107,9 @@ interface IOFT {
      * @return oftFeeDetails The details of OFT fees.
      * @return receipt The OFT receipt information.
      */
-    function quoteOFT(SendParam calldata _sendParam)
+    function quoteOFT(
+        SendParam calldata _sendParam
+    )
         external
         view
         returns (OFTLimit memory, OFTFeeDetail[] memory oftFeeDetails, OFTReceipt memory);

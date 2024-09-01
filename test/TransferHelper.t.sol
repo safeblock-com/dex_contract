@@ -3,6 +3,8 @@ pragma solidity 0.8.19;
 
 import "forge-std/Test.sol";
 
+import { IERC20 } from "forge-std/interfaces/IERC20.sol";
+
 import { TransferHelper } from "../src/facets/libraries/TransferHelper.sol";
 
 contract MockTranferHelper {
@@ -148,14 +150,13 @@ contract TransferHelperTest is Test {
     }
 
     function test_transferHelper_safeTransferFrom_shouldEmitEvent(uint256 tokenAmount) external {
-        vm.expectEmit();
-        emit TransferHelper.TransferHelperTransfer(address(fakeToken), address(this), address(1), tokenAmount);
+        _expectERC20TransferFromCall(address(fakeToken), address(this), address(1), tokenAmount);
         mock.transferFrom(address(fakeToken), address(this), address(1), tokenAmount);
 
         // function return nothing (like USDT on eth mainnet)
         fakeToken.setFlagReturnZero(true);
-        vm.expectEmit();
-        emit TransferHelper.TransferHelperTransfer(address(fakeToken), address(this), address(1), tokenAmount);
+
+        _expectERC20TransferFromCall(address(fakeToken), address(this), address(1), tokenAmount);
         mock.transferFrom(address(fakeToken), address(this), address(1), tokenAmount);
     }
 
@@ -166,14 +167,13 @@ contract TransferHelperTest is Test {
     }
 
     function test_transferHelper_safeTransfer_shouldEmitEvent(uint256 tokenAmount) external {
-        vm.expectEmit();
-        emit TransferHelper.TransferHelperTransfer(address(fakeToken), address(mock), address(1), tokenAmount);
+        _expectERC20TransferCall(address(fakeToken), address(1), tokenAmount);
         mock.transfer(address(fakeToken), address(1), tokenAmount);
 
         // function return nothing (like USDT on eth mainnet)
         fakeToken.setFlagReturnZero(true);
-        vm.expectEmit();
-        emit TransferHelper.TransferHelperTransfer(address(fakeToken), address(mock), address(1), tokenAmount);
+
+        _expectERC20TransferCall(address(fakeToken), address(1), tokenAmount);
         mock.transfer(address(fakeToken), address(1), tokenAmount);
     }
 
@@ -188,12 +188,15 @@ contract TransferHelperTest is Test {
 
         assertEq(fakeToken.allowance(address(mock), address(1)), 0);
 
+        _expectERC20ApproveCall(address(fakeToken), address(1), tokenAmount);
         mock.approve(address(fakeToken), address(1), tokenAmount);
+
         assertEq(fakeToken.allowance(address(mock), address(1)), tokenAmount);
 
         // function return nothing (like USDT on eth mainnet)
         fakeToken.setFlagReturnZero(true);
 
+        _expectERC20ApproveCall(address(fakeToken), address(1), tokenAmount);
         mock.approve(address(fakeToken), address(1), tokenAmount);
 
         assertEq(fakeToken.allowance(address(mock), address(1)), tokenAmount);
@@ -202,11 +205,17 @@ contract TransferHelperTest is Test {
     function test_transferHelper_approve_USDTLikeApprove(uint256 tokenAmount) external {
         // Should lower the allowance to 0 before raising it (like USDT on eth mainnet)
         assertEq(fakeToken.allowance(address(mock), address(1)), 0);
+
+        _expectERC20ApproveCall(address(fakeToken), address(1), tokenAmount);
         mock.approve(address(fakeToken), address(1), tokenAmount);
+
         assertEq(fakeToken.allowance(address(mock), address(1)), tokenAmount);
 
         fakeToken.setFlagRevert(true);
+
+        _expectERC20ApproveCall(address(fakeToken), address(1), tokenAmount);
         mock.approve(address(fakeToken), address(1), tokenAmount);
+
         assertEq(fakeToken.allowance(address(mock), address(1)), tokenAmount);
     }
 
@@ -220,9 +229,9 @@ contract TransferHelperTest is Test {
     function test_transferHelper_safeTransferNative_shouldEmitEvent(uint256 tokenAmount) external {
         deal(address(mock), tokenAmount);
 
-        vm.expectEmit();
-        emit TransferHelper.TransferHelperTransfer(address(0), address(mock), address(1), tokenAmount);
         mock.transferNative(address(1), tokenAmount);
+
+        assertEq(address(mock).balance, 0);
     }
 
     function test_transferHelper_safeTransferNative_shouldRevert() external {
@@ -243,5 +252,19 @@ contract TransferHelperTest is Test {
         fakeToken.setFlagRevert(true);
         vm.expectRevert(TransferHelper.TransferHelper_GetBalanceError.selector);
         mock.getBalance(address(fakeToken), address(1));
+    }
+
+    // helpers
+
+    function _expectERC20TransferCall(address token, address to, uint256 amount) internal {
+        vm.expectCall(token, abi.encodeCall(IERC20.transfer, (to, amount)));
+    }
+
+    function _expectERC20ApproveCall(address token, address to, uint256 amount) internal {
+        vm.expectCall(token, abi.encodeCall(IERC20.approve, (to, amount)));
+    }
+
+    function _expectERC20TransferFromCall(address token, address from, address to, uint256 amount) internal {
+        vm.expectCall(token, abi.encodeCall(IERC20.transferFrom, (from, to, amount)));
     }
 }

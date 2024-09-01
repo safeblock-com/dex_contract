@@ -208,7 +208,9 @@ library HelperV3Lib {
         (, liquidityNet,,,,,,) = abi.decode(data, (uint128, int128, uint256, uint256, int256, uint256, uint256, bool));
     }
 
-    function getFeeTickSpacingAndLiquidity(IUniswapV3Pool pool)
+    function getFeeTickSpacingAndLiquidity(
+        IUniswapV3Pool pool
+    )
         internal
         view
         returns (uint24 fee, int24 tickSpacing, uint128 liquidity)
@@ -231,7 +233,9 @@ library HelperV3Lib {
         liquidity = abi.decode(data, (uint128));
     }
 
-    function getSlot0(IUniswapV3Pool pool)
+    function getSlot0(
+        IUniswapV3Pool pool
+    )
         internal
         view
         returns (uint160 sqrtPriceX96, int24 tick, uint256 feeProtocol)
