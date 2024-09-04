@@ -218,16 +218,21 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
                 if (TransferHelper.safeGetBalance({ token: tokenIn, account: address(this) }) < amountIn) {
                     // execute transferFrom:
                     //     if the pair belongs to version 2 of the protocol -> transfer tokens to the pair
-                    //     if version 3 - to this contract
+                    //     if version 3 -> to this contract
                     TransferHelper.safeTransferFrom({
                         token: tokenIn,
                         from: TransientStorageFacetLibrary.getSenderAddress(),
                         to: uni3 ? address(this) : firstPair,
                         value: amountIn
                     });
+                } else if (!uni3) {
+                    // execute transfer:
+                    //     if the pair belongs to version 2 of the protocol -> transfer tokens to the pair
+                    TransferHelper.safeTransfer({ token: tokenIn, to: firstPair, value: amountIn });
                 }
             }
         }
+        
         // scope for swaps, avoids stack too deep errors
         {
             bytes32 addressThisBytes32 = _addressThisBytes32();
@@ -241,7 +246,7 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
                 } else {
                     // otherwise take the next pair
                     destination = data.pairs[_unsafeAddOne(i)];
-
+                    
                     assembly ("memory-safe") {
                         // if the next pair belongs to version 3 of the protocol - the address
                         // of the router is set as the recipient, otherwise - the next pair
@@ -341,8 +346,7 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
         bytes32 pair;
         bool uni3;
 
-        uint256 exactAmountOut;
-
+        uint256 exactAmountOut = TransferHelper.safeGetBalance({ token: data.tokenOut, account: address(this) });
         {
             uint256 remain = fullAmount;
 
@@ -364,18 +368,14 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
 
                 if (amountIn > 0) {
                     if (uni3) {
-                        (amountIn,) = _swapUniV3(pair, amountIn, tokenIn, addressThisBytes32, true);
+                        _swapUniV3(pair, amountIn, tokenIn, addressThisBytes32, false);
                     } else {
                         address _pair;
                         assembly ("memory-safe") {
                             _pair := and(pair, ADDRESS_MASK)
                         }
                         TransferHelper.safeTransfer({ token: tokenIn, to: _pair, value: amountIn });
-                        (amountIn,) = _swapUniV2(pair, tokenIn, addressThisBytes32, true);
-                    }
-
-                    unchecked {
-                        exactAmountOut += amountIn;
+                        _swapUniV2(pair, tokenIn, addressThisBytes32, false);
                     }
                 }
 
@@ -387,6 +387,11 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
             if (remain > 0) {
                 TransferHelper.safeTransfer({ token: tokenIn, to: sender, value: remain });
             }
+        }
+
+        unchecked {
+            exactAmountOut =
+                TransferHelper.safeGetBalance({ token: data.tokenOut, account: address(this) }) - exactAmountOut;
         }
 
         _checkOutputAmount(exactAmountOut, data.minAmountOut);
