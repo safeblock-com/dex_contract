@@ -17,6 +17,8 @@ struct Contracts {
     address quoter;
     address quoterProxy;
     address proxy;
+    address feeContract;
+    address feeContractProxy;
     //
     address wrappedNative;
     address endpointV2;
@@ -34,6 +36,8 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             quoter: address(0),
             quoterProxy: address(0),
             proxy: address(0),
+            feeContract: address(0),
+            feeContractProxy: address(0),
             //
             wrappedNative: 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2,
             endpointV2: 0x1a44076050125825900e736c501f859c50fE728c
@@ -43,14 +47,16 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // bnb
     if (chainId == 56) {
         return Contracts({
-            transferFacet: 0x63C870276Ba8f7dC248B89320a7d24f938B5F14C,
-            multiswapRouterFacet: 0xaA0e646040eC978059E835764E594af3A130f5Ac,
-            stargateFacet: 0xB1368ce5FF0b927F62C41226c630083a8Ea259EF,
-            layerZeroFacet: 0x285297B6c29F67baa92b2333FCcBE906917b7137,
+            transferFacet: 0xC0D032E84682c43e101E1e6578E0dEded5d224eD,
+            multiswapRouterFacet: 0x65DfbA5338137e0De3c7e9C11D9BFEd0B02c33b8,
+            stargateFacet: 0xdd4ec4bFecAb02CbE60CdBA8De49821a1105c24f,
+            layerZeroFacet: 0xC2F6a6c1712899fCA57df645cfA0E9d04e0B5A38,
             //
-            quoter: 0x46f4ce97aFd70cd668984C874795941E7Fc591CA,
-            quoterProxy: 0x51a85c557cD6Aa35880D55799849dDCD6c20B5Cd,
-            proxy: 0x2Ea84370660448fd9017715f2F36727AE64f5Fe3,
+            quoter: 0xEd02D5A7822d474c21F6e239b81e2ACf1137Ace8,
+            quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
+            proxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
+            feeContract: 0xA41be65A7C167D401F8bD980ebb019AF5a7bfe26,
+            feeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
             //
             wrappedNative: 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c,
             endpointV2: 0x1a44076050125825900e736c501f859c50fE728c
@@ -60,16 +66,75 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // polygon
     if (chainId == 137) {
         return Contracts({
-            transferFacet: 0x29F4Bf32E90cAcb299fC82569670f670d334630a,
-            multiswapRouterFacet: 0xD4366D4b3af01111a9a3c97c0dfEdc44A3e8C2cF,
-            stargateFacet: 0x29588c2cd38631d3892b3d6B7D0CB0Ad342067F0,
-            layerZeroFacet: 0xd4f528eC9D963467F3ED1f51CB4e197e88c8eBA3,
+            transferFacet: 0x48229df22D71eecFf545A3698ACbacc5CF41D658,
+            multiswapRouterFacet: 0x995f1B46F71Bc83a90653286e85185D27956687e,
+            stargateFacet: 0x40EC78B5A9170b66Aa12B17627A97429f596a185,
+            layerZeroFacet: 0x10255Eb3cd67406b07D6C82E69460848BCa83022,
             //
-            quoter: 0xFC08aCb8ab29159Cc864D7c7EC8AF2b611DE0820,
-            quoterProxy: 0x51a85c557cD6Aa35880D55799849dDCD6c20B5Cd,
-            proxy: 0x2Ea84370660448fd9017715f2F36727AE64f5Fe3,
+            quoter: 0xEd02D5A7822d474c21F6e239b81e2ACf1137Ace8,
+            quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
+            proxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
+            feeContract: 0x911eEd36e5fB42d0202FAA2b0A848d35777eB05F,
+            feeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
             //
             wrappedNative: 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270,
+            endpointV2: 0x1a44076050125825900e736c501f859c50fE728c
+        });
+    }
+
+    // avalanche
+    if (chainId == 43_114) {
+        return Contracts({
+            transferFacet: 0x10255Eb3cd67406b07D6C82E69460848BCa83022,
+            multiswapRouterFacet: 0x649BC4A713de188d4e68977ad61f9A5AD795D276,
+            stargateFacet: 0x40EC78B5A9170b66Aa12B17627A97429f596a185,
+            layerZeroFacet: 0xC0D032E84682c43e101E1e6578E0dEded5d224eD,
+            //
+            quoter: 0x995f1B46F71Bc83a90653286e85185D27956687e,
+            quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
+            proxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
+            feeContract: 0x861fF1De5877d91ebE37cE8fB95274524f5f8E21,
+            feeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
+            //
+            wrappedNative: 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7,
+            endpointV2: 0x1a44076050125825900e736c501f859c50fE728c
+        });
+    }
+
+    // optimism
+    if (chainId == 10) {
+        return Contracts({
+            transferFacet: 0x48229df22D71eecFf545A3698ACbacc5CF41D658,
+            multiswapRouterFacet: 0x995f1B46F71Bc83a90653286e85185D27956687e,
+            stargateFacet: 0x6bF6c75738dC7114E162fB4df10ABADCF1b5bDb0,
+            layerZeroFacet: 0x10255Eb3cd67406b07D6C82E69460848BCa83022,
+            //
+            quoter: 0xEd02D5A7822d474c21F6e239b81e2ACf1137Ace8,
+            quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
+            proxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
+            feeContract: 0x911eEd36e5fB42d0202FAA2b0A848d35777eB05F,
+            feeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
+            //
+            wrappedNative: 0x4200000000000000000000000000000000000006,
+            endpointV2: 0x1a44076050125825900e736c501f859c50fE728c
+        });
+    }
+
+    // arbitrum
+    if (chainId == 42_161) {
+        return Contracts({
+            transferFacet: 0x48229df22D71eecFf545A3698ACbacc5CF41D658,
+            multiswapRouterFacet: 0x995f1B46F71Bc83a90653286e85185D27956687e,
+            stargateFacet: 0x6bF6c75738dC7114E162fB4df10ABADCF1b5bDb0,
+            layerZeroFacet: 0x10255Eb3cd67406b07D6C82E69460848BCa83022,
+            //
+            quoter: 0xEd02D5A7822d474c21F6e239b81e2ACf1137Ace8,
+            quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
+            proxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
+            feeContract: 0x911eEd36e5fB42d0202FAA2b0A848d35777eB05F,
+            feeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
+            //
+            wrappedNative: 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1,
             endpointV2: 0x1a44076050125825900e736c501f859c50fE728c
         });
     }

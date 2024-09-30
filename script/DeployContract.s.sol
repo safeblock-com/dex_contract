@@ -10,11 +10,15 @@ import { InitialImplementation, Proxy } from "../src/proxy/Proxy.sol";
 
 import { DeployEngine, Contracts, getContracts } from "./DeployEngine.sol";
 
+import { FeeContract } from "../src/FeeContract.sol";
+
+import { MultiswapRouterFacet } from "../src/facets/MultiswapRouterFacet.sol";
 import { LayerZeroFacet } from "../src/facets/bridges/LayerZeroFacet.sol";
 
 contract Deploy is Script {
-    bytes32 salt = keccak256("entry-point-salt-1");
-    bytes32 quotersalt = keccak256("quoter-salt-1");
+    bytes32 constant salt = keccak256("entry-point-salt-1");
+    bytes32 constant quoterSalt = keccak256("quoter-salt-1");
+    bytes32 constant feeContractSalt = keccak256("fee-contract-salt-1");
 
     // ===================
 
@@ -29,7 +33,7 @@ contract Deploy is Script {
             contracts.quoter = address(new Quoter({ wrappedNative_: contracts.wrappedNative }));
 
             if (contracts.quoterProxy == address(0)) {
-                contracts.quoterProxy = address(new Proxy{ salt: quotersalt }({ initialOwner: deployer }));
+                contracts.quoterProxy = address(new Proxy{ salt: quoterSalt }({ initialOwner: deployer }));
 
                 InitialImplementation(contracts.quoterProxy).upgradeTo({
                     implementation: contracts.quoter,
@@ -60,6 +64,26 @@ contract Deploy is Script {
             }
         }
 
+        if (contracts.feeContract == address(0)) {
+            contracts.feeContract = address(new FeeContract());
+
+            if (contracts.feeContractProxy == address(0)) {
+                contracts.feeContractProxy = address(new Proxy{ salt: feeContractSalt }({ initialOwner: deployer }));
+
+                InitialImplementation(contracts.feeContractProxy).upgradeTo({
+                    implementation: contracts.feeContract,
+                    data: abi.encodeCall(FeeContract.initialize, (deployer, contracts.proxy))
+                });
+            } else {
+                FeeContract(contracts.feeContractProxy).upgradeTo({ newImplementation: contracts.feeContract });
+            }
+        }
+
+        if (FeeContract(contracts.feeContractProxy).fees() == 0) {
+            // 0.03%
+            FeeContract(contracts.feeContractProxy).setProtocolFee({ newProtocolFee: 300 });
+        }
+
         LayerZeroFacet _layerZeroFacet = LayerZeroFacet(contracts.proxy);
 
         if (_layerZeroFacet.getDelegate() == address(0)) {
@@ -67,6 +91,10 @@ contract Deploy is Script {
         }
         if (_layerZeroFacet.defaultGasLimit() == 0) {
             _layerZeroFacet.setDefaultGasLimit({ newDefaultGasLimit: 50_000 });
+        }
+
+        if (MultiswapRouterFacet(contracts.proxy).feeContract() == address(0)) {
+            MultiswapRouterFacet(contracts.proxy).setFeeContract({ newFeeContract: contracts.feeContractProxy });
         }
 
         vm.stopBroadcast();

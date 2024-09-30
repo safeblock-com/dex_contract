@@ -86,8 +86,10 @@ contract StargateFacetTest is BaseTest {
         assertApproxEqAbs(amountOut, 1000e18, 1000e18 * 0.997e18 / 1e18);
 
         entryPoint.multicall{ value: fee }({
+            replace: 0x0000000000000000000000000000000000000000000000000000000000000024,
             data: Solarray.bytess(
-                abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool, dstEidV2, 1000e18, user, 0, bytes("")))
+                abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool, dstEidV2, 1000e18, user, 0, bytes(""))),
+                abi.encodeCall(ITransferFacet.transferToken, (USDT, 0, user))
             )
         });
     }
