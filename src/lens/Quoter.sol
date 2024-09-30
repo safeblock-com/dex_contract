@@ -55,9 +55,7 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
         amount = _multiswap(data.tokenIn == address(0), data);
     }
 
-    function multiswapReverse(
-        IMultiswapRouterFacet.MultiswapCalldata calldata data
-    )
+    function multiswapReverse(IMultiswapRouterFacet.MultiswapCalldata calldata data)
         external
         view
         returns (uint256 amount)
@@ -121,7 +119,9 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
 
                 i := add(i, 1)
 
-                if iszero(uni3) { amountIn := sub(amountIn, div(mul(amountIn, and(shr(184, pair), FEE_MASK)), 1000000)) }
+                if iszero(uni3) {
+                    amountIn := sub(amountIn, div(mul(amountIn, and(shr(184, pair), FEE_MASK)), 1000000))
+                }
             }
 
             (amountIn, tokenIn) = _quoteExactInput(tokenIn, pool, amountIn, fee, uni3);
@@ -179,7 +179,9 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
                 i := add(i, 1)
                 index := sub(index, 1)
 
-                if iszero(uni3) { amountOut := add(amountOut, div(mul(amountOut, and(shr(184, pair), FEE_MASK)), 1000000)) }
+                if iszero(uni3) {
+                    amountOut := add(amountOut, div(mul(amountOut, and(shr(184, pair), FEE_MASK)), 1000000))
+                }
             }
 
             (amountOut, tokenOut) = _quoteExactOutput(tokenOut, pool, amountOut, fee, uni3);

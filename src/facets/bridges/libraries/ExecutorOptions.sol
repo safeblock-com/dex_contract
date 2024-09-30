@@ -65,9 +65,7 @@ library ExecutorOptions {
         receiver = _option.toB32(16);
     }
 
-    function decodeLzComposeOption(
-        bytes calldata _option
-    )
+    function decodeLzComposeOption(bytes calldata _option)
         internal
         pure
         returns (uint16 index, uint128 gas, uint128 value)
