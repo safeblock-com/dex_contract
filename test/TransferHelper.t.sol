@@ -1,33 +1,29 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.19;
 
-import "forge-std/Test.sol";
-
-import { IERC20 } from "forge-std/interfaces/IERC20.sol";
-
-import { TransferHelper } from "../src/facets/libraries/TransferHelper.sol";
+import { BaseTest, TransferHelper } from "./BaseTest.t.sol";
 
 contract MockTranferHelper {
     using TransferHelper for address;
 
     function transferFrom(address token, address from, address to, uint256 value) external {
-        TransferHelper.safeTransferFrom(token, from, to, value);
+        TransferHelper.safeTransferFrom({ token: token, from: from, to: to, value: value });
     }
 
     function transfer(address token, address to, uint256 value) external {
-        TransferHelper.safeTransfer(token, to, value);
+        TransferHelper.safeTransfer({ token: token, to: to, value: value });
     }
 
     function approve(address token, address to, uint256 value) external {
-        TransferHelper.safeApprove(token, to, value);
+        TransferHelper.safeApprove({ token: token, spender: to, value: value });
     }
 
     function getBalance(address token, address account) external view returns (uint256) {
-        return TransferHelper.safeGetBalance(token, account);
+        return TransferHelper.safeGetBalance({ token: token, account: account });
     }
 
     function transferNative(address to, uint256 value) external {
-        TransferHelper.safeTransferNative(to, value);
+        TransferHelper.safeTransferNative({ to: to, value: value });
     }
 }
 
@@ -89,7 +85,7 @@ contract FakeERC20 {
         return true;
     }
 
-    mapping(address => mapping(address => uint256)) public allowance;
+    mapping(address owner => mapping(address spender => uint256)) public allowance;
 
     function approve(address to, uint256 value) external returns (bool) {
         to;
@@ -140,7 +136,7 @@ contract FakeERC20 {
     }
 }
 
-contract TransferHelperTest is Test {
+contract TransferHelperTest is BaseTest {
     MockTranferHelper mock;
     FakeERC20 fakeToken;
 
@@ -151,120 +147,106 @@ contract TransferHelperTest is Test {
 
     function test_transferHelper_safeTransferFrom_shouldEmitEvent(uint256 tokenAmount) external {
         _expectERC20TransferFromCall(address(fakeToken), address(this), address(1), tokenAmount);
-        mock.transferFrom(address(fakeToken), address(this), address(1), tokenAmount);
+        mock.transferFrom({ token: address(fakeToken), from: address(this), to: address(1), value: tokenAmount });
 
         // function return nothing (like USDT on eth mainnet)
-        fakeToken.setFlagReturnZero(true);
+        fakeToken.setFlagReturnZero({ value: true });
 
         _expectERC20TransferFromCall(address(fakeToken), address(this), address(1), tokenAmount);
-        mock.transferFrom(address(fakeToken), address(this), address(1), tokenAmount);
+        mock.transferFrom({ token: address(fakeToken), from: address(this), to: address(1), value: tokenAmount });
     }
 
     function test_transferHelper_safeTransferFrom_shouldRevert() external {
-        fakeToken.setFlagRevert(true);
+        fakeToken.setFlagRevert({ value: true });
         vm.expectRevert(TransferHelper.TransferHelper_TransferFromError.selector);
-        mock.transferFrom(address(fakeToken), address(this), address(1), 1 ether);
+        mock.transferFrom({ token: address(fakeToken), from: address(this), to: address(1), value: 1 ether });
     }
 
     function test_transferHelper_safeTransfer_shouldEmitEvent(uint256 tokenAmount) external {
         _expectERC20TransferCall(address(fakeToken), address(1), tokenAmount);
-        mock.transfer(address(fakeToken), address(1), tokenAmount);
+        mock.transfer({ token: address(fakeToken), to: address(1), value: tokenAmount });
 
         // function return nothing (like USDT on eth mainnet)
-        fakeToken.setFlagReturnZero(true);
+        fakeToken.setFlagReturnZero({ value: true });
 
         _expectERC20TransferCall(address(fakeToken), address(1), tokenAmount);
-        mock.transfer(address(fakeToken), address(1), tokenAmount);
+        mock.transfer({ token: address(fakeToken), to: address(1), value: tokenAmount });
     }
 
     function test_transferHelper_safeTransfer_shouldRevert() external {
-        fakeToken.setFlagRevert(true);
+        fakeToken.setFlagRevert({ value: true });
         vm.expectRevert(TransferHelper.TransferHelper_TransferError.selector);
-        mock.transfer(address(fakeToken), address(1), 1 ether);
+        mock.transfer({ token: address(fakeToken), to: address(1), value: 1 ether });
     }
 
     function test_transferHelper_approve(uint256 tokenAmount) external {
         vm.assume(tokenAmount > 0);
 
-        assertEq(fakeToken.allowance(address(mock), address(1)), 0);
+        assertEq(fakeToken.allowance({ owner: address(mock), spender: address(1) }), 0);
 
         _expectERC20ApproveCall(address(fakeToken), address(1), tokenAmount);
-        mock.approve(address(fakeToken), address(1), tokenAmount);
+        mock.approve({ token: address(fakeToken), to: address(1), value: tokenAmount });
 
-        assertEq(fakeToken.allowance(address(mock), address(1)), tokenAmount);
+        assertEq(fakeToken.allowance({ owner: address(mock), spender: address(1) }), tokenAmount);
 
         // function return nothing (like USDT on eth mainnet)
-        fakeToken.setFlagReturnZero(true);
+        fakeToken.setFlagReturnZero({ value: true });
 
         _expectERC20ApproveCall(address(fakeToken), address(1), tokenAmount);
-        mock.approve(address(fakeToken), address(1), tokenAmount);
+        mock.approve({ token: address(fakeToken), to: address(1), value: tokenAmount });
 
-        assertEq(fakeToken.allowance(address(mock), address(1)), tokenAmount);
+        assertEq(fakeToken.allowance({ owner: address(mock), spender: address(1) }), tokenAmount);
     }
 
     function test_transferHelper_approve_USDTLikeApprove(uint256 tokenAmount) external {
         // Should lower the allowance to 0 before raising it (like USDT on eth mainnet)
-        assertEq(fakeToken.allowance(address(mock), address(1)), 0);
+        assertEq(fakeToken.allowance({ owner: address(mock), spender: address(1) }), 0);
 
         _expectERC20ApproveCall(address(fakeToken), address(1), tokenAmount);
-        mock.approve(address(fakeToken), address(1), tokenAmount);
+        mock.approve({ token: address(fakeToken), to: address(1), value: tokenAmount });
 
-        assertEq(fakeToken.allowance(address(mock), address(1)), tokenAmount);
+        assertEq(fakeToken.allowance({ owner: address(mock), spender: address(1) }), tokenAmount);
 
-        fakeToken.setFlagRevert(true);
+        fakeToken.setFlagRevert({ value: true });
 
         _expectERC20ApproveCall(address(fakeToken), address(1), tokenAmount);
-        mock.approve(address(fakeToken), address(1), tokenAmount);
+        mock.approve({ token: address(fakeToken), to: address(1), value: tokenAmount });
 
-        assertEq(fakeToken.allowance(address(mock), address(1)), tokenAmount);
+        assertEq(fakeToken.allowance({ owner: address(mock), spender: address(1) }), tokenAmount);
     }
 
     function test_transferHelper_approve_shouldRevert() external {
-        fakeToken.setFlagRevertBothCalls(true);
+        fakeToken.setFlagRevertBothCalls({ value: true });
 
         vm.expectRevert(TransferHelper.TransferHelper_ApproveError.selector);
-        mock.approve(address(fakeToken), address(1), 1);
+        mock.approve({ token: address(fakeToken), to: address(1), value: 1 });
     }
 
     function test_transferHelper_safeTransferNative_shouldEmitEvent(uint256 tokenAmount) external {
         deal(address(mock), tokenAmount);
 
-        mock.transferNative(address(1), tokenAmount);
+        mock.transferNative({ to: address(1), value: tokenAmount });
 
         assertEq(address(mock).balance, 0);
     }
 
     function test_transferHelper_safeTransferNative_shouldRevert() external {
         vm.expectRevert(TransferHelper.TransferHelper_TransferNativeError.selector);
-        mock.transferNative(address(this), 1 ether);
+        mock.transferNative({ to: address(this), value: 1 ether });
     }
 
     function test_transferHelper_safeGetBalance_shouldReturnValue() external view {
-        assertEq(mock.getBalance(address(fakeToken), address(1)), 1000);
+        assertEq(mock.getBalance({ token: address(fakeToken), account: address(1) }), 1000);
     }
 
     function test_transferHelper_safeGetBalance_shouldRevert() external {
-        fakeToken.setFlagReturnZero(true);
+        fakeToken.setFlagReturnZero({ value: true });
         vm.expectRevert(TransferHelper.TransferHelper_GetBalanceError.selector);
-        mock.getBalance(address(fakeToken), address(1));
+        mock.getBalance({ token: address(fakeToken), account: address(1) });
 
-        fakeToken.setFlagReturnZero(false);
-        fakeToken.setFlagRevert(true);
+        fakeToken.setFlagReturnZero({ value: false });
+        fakeToken.setFlagRevert({ value: true });
         vm.expectRevert(TransferHelper.TransferHelper_GetBalanceError.selector);
-        mock.getBalance(address(fakeToken), address(1));
-    }
-
-    // helpers
-
-    function _expectERC20TransferCall(address token, address to, uint256 amount) internal {
-        vm.expectCall(token, abi.encodeCall(IERC20.transfer, (to, amount)));
-    }
-
-    function _expectERC20ApproveCall(address token, address to, uint256 amount) internal {
-        vm.expectCall(token, abi.encodeCall(IERC20.approve, (to, amount)));
-    }
-
-    function _expectERC20TransferFromCall(address token, address from, address to, uint256 amount) internal {
-        vm.expectCall(token, abi.encodeCall(IERC20.transferFrom, (from, to, amount)));
+        mock.getBalance({ token: address(fakeToken), account: address(1) });
     }
 }
