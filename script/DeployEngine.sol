@@ -20,7 +20,6 @@ struct Contracts {
     //
     address wrappedNative;
     address endpointV2;
-    address stargateComposerV1;
 }
 
 function getContracts(uint256 chainId) pure returns (Contracts memory) {
@@ -36,9 +35,8 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             quoterProxy: address(0),
             proxy: address(0),
             //
-            wrappedNative: address(0),
-            endpointV2: address(0),
-            stargateComposerV1: address(0)
+            wrappedNative: 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2,
+            endpointV2: 0x1a44076050125825900e736c501f859c50fE728c
         });
     }
 
@@ -55,8 +53,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             proxy: 0x2Ea84370660448fd9017715f2F36727AE64f5Fe3,
             //
             wrappedNative: 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c,
-            endpointV2: 0x1a44076050125825900e736c501f859c50fE728c,
-            stargateComposerV1: 0xeCc19E177d24551aA7ed6Bc6FE566eCa726CC8a9
+            endpointV2: 0x1a44076050125825900e736c501f859c50fE728c
         });
     }
 
@@ -73,8 +70,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             proxy: 0x2Ea84370660448fd9017715f2F36727AE64f5Fe3,
             //
             wrappedNative: 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270,
-            endpointV2: 0x1a44076050125825900e736c501f859c50fE728c,
-            stargateComposerV1: 0xeCc19E177d24551aA7ed6Bc6FE566eCa726CC8a9
+            endpointV2: 0x1a44076050125825900e736c501f859c50fE728c
         });
     }
 
@@ -115,18 +111,14 @@ library DeployEngine {
 
         if (contracts.stargateFacet != address(0)) {
             selectors[i++] = StargateFacet.lzEndpoint.selector;
-            selectors[i++] = StargateFacet.stargateV1Composer.selector;
-            selectors[i++] = StargateFacet.quoteV1.selector;
             selectors[i++] = StargateFacet.quoteV2.selector;
-            selectors[i++] = StargateFacet.sendStargateV1.selector;
             selectors[i++] = StargateFacet.sendStargateV2.selector;
-            selectors[i++] = StargateFacet.sgReceive.selector;
             selectors[i++] = StargateFacet.lzCompose.selector;
-            for (uint256 k; k < 8; ++k) {
+            for (uint256 k; k < 4; ++k) {
                 facetAddresses[j++] = contracts.stargateFacet;
             }
         }
-
+        // TODO remove duplicates
         if (contracts.layerZeroFacet != address(0)) {
             selectors[i++] = LayerZeroFacet.eid.selector;
             selectors[i++] = LayerZeroFacet.defaultGasLimit.selector;
@@ -156,7 +148,11 @@ library DeployEngine {
             mstore(facetAddresses, j)
         }
 
-        return address(new EntryPoint(getBytesArray(selectors, facetAddresses)));
+        return address(
+            new EntryPoint({
+                facetsAndSelectors: getBytesArray({ selectors: selectors, facetAddresses: facetAddresses })
+            })
+        );
     }
 
     function deployImplemetations(
@@ -169,25 +165,26 @@ library DeployEngine {
         if (contracts.multiswapRouterFacet == address(0) || isTest) {
             upgrade = true;
 
-            contracts.multiswapRouterFacet = address(new MultiswapRouterFacet(contracts.wrappedNative));
+            contracts.multiswapRouterFacet =
+                address(new MultiswapRouterFacet({ wrappedNative_: contracts.wrappedNative }));
         }
 
         if (contracts.transferFacet == address(0) || isTest) {
             upgrade = true;
 
-            contracts.transferFacet = address(new TransferFacet(contracts.wrappedNative));
+            contracts.transferFacet = address(new TransferFacet({ wrappedNative: contracts.wrappedNative }));
         }
 
         if (contracts.stargateFacet == address(0) || isTest) {
             upgrade = true;
 
-            contracts.stargateFacet = address(new StargateFacet(contracts.endpointV2, contracts.stargateComposerV1));
+            contracts.stargateFacet = address(new StargateFacet({ endpointV2: contracts.endpointV2 }));
         }
 
         if (contracts.layerZeroFacet == address(0) || isTest) {
             upgrade = true;
 
-            contracts.layerZeroFacet = address(new LayerZeroFacet(contracts.endpointV2));
+            contracts.layerZeroFacet = address(new LayerZeroFacet({ endpointV2: contracts.endpointV2 }));
         }
 
         return (contracts, upgrade);
@@ -195,17 +192,17 @@ library DeployEngine {
 
     function getBytesArray(
         bytes4[] memory selectors,
-        address[] memory logicAddresses
+        address[] memory facetAddresses
     )
         internal
         pure
         returns (bytes memory logicsAndSelectors)
     {
-        quickSort(selectors, logicAddresses);
+        quickSort(selectors, facetAddresses);
 
         uint256 selectorsLength = selectors.length;
-        if (selectorsLength != logicAddresses.length) {
-            revert("length of selectors and logicAddresses must be equal");
+        if (selectorsLength != facetAddresses.length) {
+            revert("length of selectors and facetAddresses must be equal");
         }
 
         if (selectorsLength > 0) {
@@ -238,7 +235,7 @@ library DeployEngine {
             // offset in memory to the beginning of selectors array values
             let selectorsOffset := add(selectors, 32)
             // offset in memory to beginning of logicsAddresses array values
-            let logicsAddressesOffset := add(logicAddresses, 32)
+            let logicsAddressesOffset := add(facetAddresses, 32)
             // offset in memory to beginning of logicsAndSelectorsOffset bytes
             let logicsAndSelectorsOffset := add(logicsAndSelectors, 32)
 
@@ -258,7 +255,7 @@ library DeployEngine {
         }
     }
 
-    function quickSort(bytes4[] memory selectors, address[] memory logicAddresses) internal pure {
+    function quickSort(bytes4[] memory selectors, address[] memory facetAddresses) internal pure {
         if (selectors.length <= 1) {
             return;
         }
@@ -279,7 +276,7 @@ library DeployEngine {
             low = stack[uint256(top)];
             --top;
 
-            int256 pivotIndex = _partition(selectors, logicAddresses, low, high);
+            int256 pivotIndex = _partition(selectors, facetAddresses, low, high);
 
             if (pivotIndex - 1 > low) {
                 ++top;
@@ -299,7 +296,7 @@ library DeployEngine {
 
     function _partition(
         bytes4[] memory selectors,
-        address[] memory logicAddresses,
+        address[] memory facetAddresses,
         int256 low,
         int256 high
     )
@@ -315,18 +312,18 @@ library DeployEngine {
                 i++;
                 (selectors[uint256(i)], selectors[uint256(j)]) = (selectors[uint256(j)], selectors[uint256(i)]);
 
-                if (logicAddresses.length == selectors.length) {
-                    (logicAddresses[uint256(i)], logicAddresses[uint256(j)]) =
-                        (logicAddresses[uint256(j)], logicAddresses[uint256(i)]);
+                if (facetAddresses.length == selectors.length) {
+                    (facetAddresses[uint256(i)], facetAddresses[uint256(j)]) =
+                        (facetAddresses[uint256(j)], facetAddresses[uint256(i)]);
                 }
             }
         }
 
         (selectors[uint256(i + 1)], selectors[uint256(high)]) = (selectors[uint256(high)], selectors[uint256(i + 1)]);
 
-        if (logicAddresses.length == selectors.length) {
-            (logicAddresses[uint256(i + 1)], logicAddresses[uint256(high)]) =
-                (logicAddresses[uint256(high)], logicAddresses[uint256(i + 1)]);
+        if (facetAddresses.length == selectors.length) {
+            (facetAddresses[uint256(i + 1)], facetAddresses[uint256(high)]) =
+                (facetAddresses[uint256(high)], facetAddresses[uint256(i + 1)]);
         }
 
         return i + 1;
