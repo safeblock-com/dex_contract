@@ -52,7 +52,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             stargateFacet: 0xdd4ec4bFecAb02CbE60CdBA8De49821a1105c24f,
             layerZeroFacet: 0xC2F6a6c1712899fCA57df645cfA0E9d04e0B5A38,
             //
-            quoter: 0xEd02D5A7822d474c21F6e239b81e2ACf1137Ace8,
+            quoter: 0x2ef78f53965cB6b6BE3DF79e143D07790c3E84b3,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             feeContract: 0xA41be65A7C167D401F8bD980ebb019AF5a7bfe26,
@@ -71,7 +71,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             stargateFacet: 0x40EC78B5A9170b66Aa12B17627A97429f596a185,
             layerZeroFacet: 0x10255Eb3cd67406b07D6C82E69460848BCa83022,
             //
-            quoter: 0xEd02D5A7822d474c21F6e239b81e2ACf1137Ace8,
+            quoter: 0x33E3337E3d68aB3b56C86613CCF34CB0d006Ab04,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             feeContract: 0x911eEd36e5fB42d0202FAA2b0A848d35777eB05F,
@@ -90,7 +90,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             stargateFacet: 0x40EC78B5A9170b66Aa12B17627A97429f596a185,
             layerZeroFacet: 0xC0D032E84682c43e101E1e6578E0dEded5d224eD,
             //
-            quoter: 0x995f1B46F71Bc83a90653286e85185D27956687e,
+            quoter: 0x33E3337E3d68aB3b56C86613CCF34CB0d006Ab04,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             feeContract: 0x861fF1De5877d91ebE37cE8fB95274524f5f8E21,
@@ -109,7 +109,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             stargateFacet: 0x6bF6c75738dC7114E162fB4df10ABADCF1b5bDb0,
             layerZeroFacet: 0x10255Eb3cd67406b07D6C82E69460848BCa83022,
             //
-            quoter: 0xEd02D5A7822d474c21F6e239b81e2ACf1137Ace8,
+            quoter: 0x033D438b5a95216740F14e80b6Ce045C0E65d610,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             feeContract: 0x911eEd36e5fB42d0202FAA2b0A848d35777eB05F,
@@ -128,7 +128,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             stargateFacet: 0x6bF6c75738dC7114E162fB4df10ABADCF1b5bDb0,
             layerZeroFacet: 0x10255Eb3cd67406b07D6C82E69460848BCa83022,
             //
-            quoter: 0xEd02D5A7822d474c21F6e239b81e2ACf1137Ace8,
+            quoter: 0x033D438b5a95216740F14e80b6Ce045C0E65d610,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             feeContract: 0x911eEd36e5fB42d0202FAA2b0A848d35777eB05F,

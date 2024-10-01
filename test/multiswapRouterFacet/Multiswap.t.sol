@@ -350,6 +350,11 @@ contract MultiswapTest is BaseTest {
     // =========================
 
     function test_multiswapRouterFacet_multiswap_shouldCalculateFee() external {
+        _resetPrank(owner);
+        quoter.setFeeContract({ newFeeContract: address(feeContract) });
+        // 0.03%
+        feeContract.setProtocolFee({ newProtocolFee: 300 });
+
         IMultiswapRouterFacet.MultiswapCalldata memory mData;
 
         mData.amountIn = 100e18;
@@ -362,10 +367,6 @@ contract MultiswapTest is BaseTest {
 
         mData.minAmountOut = quoterAmountOut;
 
-        _resetPrank(owner);
-        // 0.03%
-        feeContract.setProtocolFee({ newProtocolFee: 300 });
-
         _resetPrank(user);
         IERC20(USDT).approve({ spender: address(entryPoint), amount: 100e18 });
 
@@ -377,9 +378,7 @@ contract MultiswapTest is BaseTest {
             )
         });
 
-        uint256 fee = quoterAmountOut * 300 / 1e6;
-
-        assertEq(IERC20(ETH).balanceOf({ account: user }), quoterAmountOut - fee);
-        assertEq(feeContract.profit({ owner: address(feeContract), token: ETH }), fee);
+        assertEq(IERC20(ETH).balanceOf({ account: user }), quoterAmountOut);
+        assertEq(feeContract.profit({ owner: address(feeContract), token: ETH }), quoterAmountOut * 300 / (1e6 - 300));
     }
 }

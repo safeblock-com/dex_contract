@@ -97,6 +97,10 @@ contract Deploy is Script {
             MultiswapRouterFacet(contracts.proxy).setFeeContract({ newFeeContract: contracts.feeContractProxy });
         }
 
+        if (Quoter(contracts.quoterProxy).getFeeContract() == address(0)) {
+            Quoter(contracts.quoterProxy).setFeeContract({ newFeeContract: contracts.feeContractProxy });
+        }
+
         vm.stopBroadcast();
     }
 }

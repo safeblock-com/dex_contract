@@ -15,6 +15,8 @@ import { IMultiswapRouterFacet } from "../facets/interfaces/IMultiswapRouterFace
 import { IWrappedNative } from "../interfaces/IWrappedNative.sol";
 import { IRouter } from "../interfaces/IRouter.sol";
 
+import { IFeeContract } from "../interfaces/IFeeContract.sol";
+
 /// @title Multiswap-Partswap Quoter contract
 contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
     // =========================
@@ -34,6 +36,8 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
     /// fee mask: `mask & (pair >> 160) == fee in pair`
     uint24 private constant FEE_MASK = 0xffffff;
 
+    IFeeContract private _feeContract;
+
     // =========================
     // constructor
     // =========================
@@ -46,6 +50,14 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
         _transferOwnership(newOwner);
     }
 
+    function getFeeContract() external view returns (address) {
+        return address(_feeContract);
+    }
+
+    function setFeeContract(address newFeeContract) external onlyOwner {
+        _feeContract = IFeeContract(newFeeContract);
+    }
+
     // =========================
     // main logic
     // =========================
@@ -53,6 +65,18 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
     //// @inheritdoc IMultiswapRouterFacet
     function multiswap(IMultiswapRouterFacet.MultiswapCalldata calldata data) external view returns (uint256 amount) {
         amount = _multiswap(data.tokenIn == address(0), data);
+
+        IFeeContract feeContract = _feeContract;
+
+        if (address(feeContract) > address(0) && amount != type(uint256).max) {
+            uint256 fee = feeContract.fees();
+
+            if (fee > 0) {
+                unchecked {
+                    amount -= amount * fee / 1e6;
+                }
+            }
+        }
     }
 
     function multiswapReverse(IMultiswapRouterFacet.MultiswapCalldata calldata data)
@@ -69,6 +93,18 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
         uint256 fullAmount = data.fullAmount;
 
         amount = _partswap(fullAmount, tokenIn == address(0) ? address(_wrappedNative) : tokenIn, data);
+
+        IFeeContract feeContract = _feeContract;
+
+        if (address(feeContract) > address(0) && amount != type(uint256).max) {
+            uint256 fee = feeContract.fees();
+
+            if (fee > 0) {
+                unchecked {
+                    amount -= amount * fee / 1e6;
+                }
+            }
+        }
     }
 
     // =========================
@@ -151,6 +187,20 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
 
         address tokenOut;
         uint256 amountOut = data.amountIn;
+
+        {
+            IFeeContract feeContract = _feeContract;
+
+            if (address(feeContract) > address(0)) {
+                uint256 protocolFee = feeContract.fees();
+
+                if (protocolFee > 0) {
+                    unchecked {
+                        amountOut = amountOut * 1e6 / (1e6 - protocolFee);
+                    }
+                }
+            }
+        }
 
         if (isNative) {
             tokenOut = address(_wrappedNative);
