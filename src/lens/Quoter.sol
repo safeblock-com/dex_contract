@@ -13,7 +13,7 @@ import { HelperV3Lib } from "./libraries/HelperV3Lib.sol";
 
 import { IMultiswapRouterFacet } from "../facets/interfaces/IMultiswapRouterFacet.sol";
 import { IWrappedNative } from "../interfaces/IWrappedNative.sol";
-import { IRouter } from "../interfaces/IRouter.sol";
+import { IRouter } from "../facets/interfaces/IRouter.sol";
 
 import { IFeeContract } from "../interfaces/IFeeContract.sol";
 
@@ -142,6 +142,7 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
 
         IUniswapV3Pool pool;
         uint256 fee;
+        uint256 isSolidly;
         bool uni3;
         bytes32 pair;
 
@@ -152,6 +153,7 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
                 pool := and(pair, ADDRESS_MASK)
                 fee := and(shr(160, pair), FEE_MASK)
                 uni3 := and(pair, UNISWAP_V3_MASK)
+                isSolidly := and(shr(184, pair), 0xff)
 
                 i := add(i, 1)
 
@@ -160,7 +162,7 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
                 }
             }
 
-            (amountIn, tokenIn) = _quoteExactInput(tokenIn, pool, amountIn, fee, uni3);
+            (amountIn, tokenIn) = _quoteExactInput(uni3, tokenIn, pool, isSolidly, amountIn, fee);
 
             if (amountIn == 0) {
                 break;
@@ -284,6 +286,7 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
         IUniswapV3Pool pool;
         uint256 fee;
         bool uni3;
+        uint256 isSolidly;
         bytes32 pair;
         uint256 amountOut;
 
@@ -296,7 +299,7 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
                 uni3 := and(pair, UNISWAP_V3_MASK)
             }
 
-            (amountOut,) = _quoteExactInput(tokenIn, pool, data.amountsIn[i], fee, uni3);
+            (amountOut,) = _quoteExactInput(uni3, tokenIn, pool, isSolidly, data.amountsIn[i], fee);
 
             unchecked {
                 amount += amountOut;
@@ -308,11 +311,12 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
     }
 
     function _quoteExactInput(
+        bool uni3,
         address tokenIn,
         IUniswapV3Pool pool,
+        uint256 isSolidly,
         uint256 amountIn,
-        uint256 fee,
-        bool uni3
+        uint256 fee
     )
         internal
         view
@@ -344,12 +348,16 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
                     (uint256 reserveInput, uint256 reserveOutput) =
                         tokenIn == _token0 ? (reserve0, reserve1) : (reserve1, reserve0);
 
-                    amountOut = HelperLib.getAmountOut({
-                        amountIn: amountIn,
-                        reserveIn: reserveInput,
-                        reserveOut: reserveOutput,
-                        feeE6: fee
-                    });
+                    if (isSolidly == 0) {
+                        amountOut = HelperLib.getAmountOut({
+                            amountIn: amountIn,
+                            reserveIn: reserveInput,
+                            reserveOut: reserveOutput,
+                            feeE6: fee
+                        });
+                    } else {
+                        amountOut = IRouter(address(pool)).getAmountOut({ amountIn: amountIn, tokenIn: tokenIn });
+                    }
                 } catch {
                     return (0, address(0));
                 }

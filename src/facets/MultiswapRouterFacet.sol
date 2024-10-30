@@ -482,12 +482,14 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
         returns (uint256 amountOut, address tokenOut)
     {
         IRouter pair;
-        uint256 fee;
+        uint256 isSolidly;
         address destination;
+        uint256 fee;
         assembly ("memory-safe") {
             pair := and(_pair, ADDRESS_MASK)
-            fee := and(FEE_MASK, shr(160, _pair))
+            fee := and(shr(160, _pair), FEE_MASK)
             destination := and(_destination, ADDRESS_MASK)
+            isSolidly := and(shr(184, _pair), 0xff)
         }
 
         bool tokenInIsToken0;
@@ -496,9 +498,12 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
         uint256 amountInput;
         // scope to avoid stack too deep errors
         {
-            (uint256 reserve0, uint256 reserve1,) = pair.getReserves();
-            (uint256 reserveInput, uint256 reserveOutput) =
-                tokenInIsToken0 ? (reserve0, reserve1) : (reserve1, reserve0);
+            uint256 reserveInput;
+            uint256 reserveOutput;
+            {
+                (uint256 reserve0, uint256 reserve1,) = pair.getReserves();
+                (reserveInput, reserveOutput) = tokenInIsToken0 ? (reserve0, reserve1) : (reserve1, reserve0);
+            }
 
             // get the exact number of tokens that were sent to the pair
             // underflow is impossible cause after token transfer via token contract
@@ -507,13 +512,17 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
                 amountInput = TransferHelper.safeGetBalance({ token: tokenIn, account: address(pair) }) - reserveInput;
             }
 
-            // get the output number of tokens after swap
-            amountOut = HelperLib.getAmountOut({
-                amountIn: amountInput,
-                reserveIn: reserveInput,
-                reserveOut: reserveOutput,
-                feeE6: fee
-            });
+            if (isSolidly == 0) {
+                // get the output number of tokens after swap
+                amountOut = HelperLib.getAmountOut({
+                    amountIn: amountInput,
+                    reserveIn: reserveInput,
+                    reserveOut: reserveOutput,
+                    feeE6: fee
+                });
+            } else {
+                amountOut = pair.getAmountOut({ amountIn: amountInput, tokenIn: tokenIn });
+            }
         }
 
         (uint256 amount0Out, uint256 amount1Out) = tokenInIsToken0 ? (uint256(0), amountOut) : (amountOut, uint256(0));
