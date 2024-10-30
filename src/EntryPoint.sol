@@ -79,7 +79,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
             facet = _getAddress(msg.sig);
 
             if (facet == address(0)) {
-                revert IEntryPoint.EntryPoint_FunctionDoesNotExist(msg.sig);
+                revert IEntryPoint.EntryPoint_FunctionDoesNotExist({ selector: msg.sig });
             }
         }
 
@@ -103,7 +103,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
     function _multicall(bool isOverride, bytes32 replace, bytes[] calldata data) internal {
         address[] memory facets = _getAddresses(isOverride, data);
 
-        TransientStorageFacetLibrary.setSenderAddress(msg.sender);
+        TransientStorageFacetLibrary.setSenderAddress({ senderAddress: msg.sender });
 
         assembly ("memory-safe") {
             for {
@@ -159,7 +159,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
             }
         }
 
-        TransientStorageFacetLibrary.setSenderAddress(address(0));
+        TransientStorageFacetLibrary.setSenderAddress({ senderAddress: address(0) });
     }
 
     /// @dev Searches for the facet address associated with a function `selector`.
@@ -170,7 +170,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
         bytes memory facetsAndSelectors = SSTORE2.read(_facetsAndSelectorsAddress);
 
         if (facetsAndSelectors.length < 24) {
-            revert IEntryPoint.EntryPoint_FunctionDoesNotExist(selector);
+            revert IEntryPoint.EntryPoint_FunctionDoesNotExist({ selector: selector });
         }
 
         return BinarySearch.binarySearch({ selector: selector, facetsAndSelectors: facetsAndSelectors });
@@ -187,7 +187,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
         bytes memory facetsAndSelectors = SSTORE2.read(_facetsAndSelectorsAddress);
 
         if (facetsAndSelectors.length < 24) {
-            revert IEntryPoint.EntryPoint_FunctionDoesNotExist(0x00000000);
+            revert IEntryPoint.EntryPoint_FunctionDoesNotExist({ selector: 0x00000000 });
         }
 
         uint256 cDataStart;

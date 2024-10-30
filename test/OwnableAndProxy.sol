@@ -1,15 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-import "forge-std/Test.sol";
+import { BaseTest, IOwnable2Step, IOwnable, EntryPoint, Initializable, IFeeContract } from "./BaseTest.t.sol";
 
-import { IERC20 } from "forge-std/interfaces/IERC20.sol";
-import { Solarray } from "solarray/Solarray.sol";
-
-import { IOwnable2Step } from "../src/external/IOwnable2Step.sol";
-import { EntryPoint, IEntryPoint, Initializable } from "../src/EntryPoint.sol";
-import { IOwnable } from "../src/external/Ownable.sol";
-import { FeeContract, IFeeContract } from "../src/FeeContract.sol";
 import { Proxy, InitialImplementation } from "../src/proxy/Proxy.sol";
 import { UUPSUpgradeable, ERC1967Utils } from "../src/proxy/UUPSUpgradeable.sol";
 
@@ -19,31 +12,13 @@ contract NewImplementation is UUPSUpgradeable {
     function _authorizeUpgrade(address) internal override { }
 }
 
-contract OwnableAndProxyTest is Test {
-    address owner = makeAddr("owner");
-    FeeContract feeContract;
-
-    address wrappedNative = makeAddr("wrappedNative");
-
-    EntryPoint entryPoint;
-
-    bytes32 beaconProxyInitCodeHash;
-
-    address logic;
-
-    IERC20 mockERC20 = IERC20(address(deployMockERC20("mockERC20", "MockERC20", 18)));
-
+contract OwnableAndProxyTest is BaseTest {
     function setUp() external {
-        startHoax(owner);
-        feeContract = new FeeContract(owner);
+        _createUsers();
 
-        address entryPointImplementation = address(new EntryPoint(bytes("")));
-        entryPoint = EntryPoint(payable(address(new Proxy(owner))));
+        _resetPrank(owner);
 
-        InitialImplementation(address(entryPoint)).upgradeTo(
-            entryPointImplementation, abi.encodeCall(EntryPoint.initialize, (owner, new bytes[](0)))
-        );
-        vm.stopPrank();
+        deployForTest();
     }
 
     // =========================
@@ -51,24 +26,27 @@ contract OwnableAndProxyTest is Test {
     // =========================
 
     function test_entryPoint_disableInitializers(address newOwner) external {
-        EntryPoint entryPointImplementation = new EntryPoint(bytes(""));
+        EntryPoint entryPointImplementation = new EntryPoint({ facetsAndSelectors: bytes("") });
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        entryPointImplementation.initialize(newOwner, new bytes[](0));
+        entryPointImplementation.initialize({ newOwner: newOwner, initialCalls: new bytes[](0) });
     }
 
     function test_entryPoint_initialize_cannotBeInitializedAgain(address newOwner) external {
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        entryPoint.initialize(newOwner, new bytes[](0));
+        entryPoint.initialize({ newOwner: newOwner, initialCalls: new bytes[](0) });
     }
 
     function test_entryPoint_initialize_shouldInitializeContract(address newOwner) external {
-        assumeNotZeroAddress(newOwner);
+        assumeNotZeroAddress({ addr: newOwner });
 
-        EntryPoint _entryPoint = EntryPoint(payable(address(new Proxy(address(this)))));
-        InitialImplementation(address(_entryPoint)).upgradeTo(
-            address(new EntryPoint(bytes(""))), abi.encodeCall(EntryPoint.initialize, (newOwner, new bytes[](0)))
-        );
+        _resetPrank(owner);
+
+        EntryPoint _entryPoint = EntryPoint(payable(address(new Proxy({ initialOwner: owner }))));
+        InitialImplementation(address(_entryPoint)).upgradeTo({
+            implementation: address(new EntryPoint({ facetsAndSelectors: bytes("") })),
+            data: abi.encodeCall(EntryPoint.initialize, (newOwner, new bytes[](0)))
+        });
         assertEq(_entryPoint.owner(), newOwner);
     }
 
@@ -83,35 +61,30 @@ contract OwnableAndProxyTest is Test {
     function test_entryPointOwnable2Step_shouldRevertIfNotOwner(address notOwner) external {
         vm.assume(notOwner != owner);
 
-        vm.startPrank(notOwner);
+        _resetPrank(notOwner);
 
         vm.expectRevert(abi.encodeWithSelector(IOwnable.Ownable_SenderIsNotOwner.selector, notOwner));
         entryPoint.renounceOwnership();
 
         vm.expectRevert(abi.encodeWithSelector(IOwnable.Ownable_SenderIsNotOwner.selector, notOwner));
-        entryPoint.transferOwnership(notOwner);
+        entryPoint.transferOwnership({ newOwner: notOwner });
 
         vm.expectRevert(abi.encodeWithSelector(IOwnable.Ownable_SenderIsNotOwner.selector, notOwner));
-        feeContract.changeProtocolFee(123);
+        feeContract.setProtocolFee({ newProtocolFee: 123 });
 
         vm.expectRevert(abi.encodeWithSelector(IOwnable.Ownable_SenderIsNotOwner.selector, notOwner));
-        feeContract.changeReferralFee(IFeeContract.ReferralFee({ protocolPart: 50, referralPart: 50 }));
+        feeContract.setRouter({ newRouter: notOwner });
 
         vm.expectRevert(abi.encodeWithSelector(IOwnable.Ownable_SenderIsNotOwner.selector, notOwner));
-        feeContract.collectProtocolFees(address(0), address(1), 1);
-
-        vm.expectRevert(abi.encodeWithSelector(IOwnable.Ownable_SenderIsNotOwner.selector, notOwner));
-        feeContract.collectProtocolFees(address(0), address(1));
-
-        vm.stopPrank();
+        feeContract.collectProtocolFees({ token: address(0), recipient: address(1), amount: 1 });
     }
 
     function test_entryPointOwnable2Step_renounceOwnership_shouldRenounceOwnership() external {
         assertEq(entryPoint.owner(), owner);
 
-        vm.prank(owner);
+        _resetPrank(owner);
         vm.expectEmit();
-        emit OwnershipTransferred(owner, address(0));
+        emit OwnershipTransferred({ previousOwner: owner, newOwner: address(0) });
         entryPoint.renounceOwnership();
 
         assertEq(entryPoint.owner(), address(0));
@@ -120,21 +93,21 @@ contract OwnableAndProxyTest is Test {
     function test_entryPointOwnable2Step_transferOwnership_shouldRevertIfNewOwnerIsAddressZero() external {
         assertEq(entryPoint.owner(), owner);
 
-        vm.prank(owner);
+        _resetPrank(owner);
         vm.expectRevert(IOwnable2Step.Ownable_NewOwnerCannotBeAddressZero.selector);
-        entryPoint.transferOwnership(address(0));
+        entryPoint.transferOwnership({ newOwner: address(0) });
     }
 
     function test_entryPointOwnable2Step_transferOwnership_shouldStartTransferOwnership(address newOwner) external {
-        assumeNotZeroAddress(newOwner);
+        assumeNotZeroAddress({ addr: newOwner });
 
         assertEq(entryPoint.owner(), owner);
         assertEq(entryPoint.pendingOwner(), address(0));
 
-        vm.prank(owner);
+        _resetPrank(owner);
         vm.expectEmit();
         emit OwnershipTransferStarted(owner, newOwner);
-        entryPoint.transferOwnership(newOwner);
+        entryPoint.transferOwnership({ newOwner: newOwner });
 
         assertEq(entryPoint.owner(), owner);
         assertEq(entryPoint.pendingOwner(), newOwner);
@@ -147,41 +120,41 @@ contract OwnableAndProxyTest is Test {
         external
     {
         vm.assume(pendingOwner != notPendingOwner);
-        assumeNotZeroAddress(pendingOwner);
+        assumeNotZeroAddress({ addr: pendingOwner });
 
         assertEq(entryPoint.owner(), owner);
         assertEq(entryPoint.pendingOwner(), address(0));
 
-        vm.prank(owner);
+        _resetPrank(owner);
         vm.expectEmit();
         emit OwnershipTransferStarted(owner, pendingOwner);
-        entryPoint.transferOwnership(pendingOwner);
+        entryPoint.transferOwnership({ newOwner: pendingOwner });
 
         assertEq(entryPoint.owner(), owner);
         assertEq(entryPoint.pendingOwner(), pendingOwner);
 
-        vm.prank(notPendingOwner);
+        _resetPrank(notPendingOwner);
         vm.expectRevert(abi.encodeWithSelector(IOwnable2Step.Ownable_CallerIsNotTheNewOwner.selector, notPendingOwner));
         entryPoint.acceptOwnership();
     }
 
     function test_entryPointOwnable2Step_acceptOwnership_shouldTransferOwnership(address pendingOwner) external {
-        assumeNotZeroAddress(pendingOwner);
+        assumeNotZeroAddress({ addr: pendingOwner });
 
         assertEq(entryPoint.owner(), owner);
         assertEq(entryPoint.pendingOwner(), address(0));
 
-        vm.prank(owner);
+        _resetPrank(owner);
         vm.expectEmit();
         emit OwnershipTransferStarted(owner, pendingOwner);
-        entryPoint.transferOwnership(pendingOwner);
+        entryPoint.transferOwnership({ newOwner: pendingOwner });
 
         assertEq(entryPoint.owner(), owner);
         assertEq(entryPoint.pendingOwner(), pendingOwner);
 
-        vm.prank(pendingOwner);
+        _resetPrank(pendingOwner);
         vm.expectEmit();
-        emit OwnershipTransferred(owner, pendingOwner);
+        emit OwnershipTransferred({ previousOwner: owner, newOwner: pendingOwner });
         entryPoint.acceptOwnership();
 
         assertEq(entryPoint.owner(), pendingOwner);
@@ -197,9 +170,9 @@ contract OwnableAndProxyTest is Test {
 
         address impl = address(new NewImplementation());
 
-        vm.prank(notOwner);
+        _resetPrank(notOwner);
         vm.expectRevert(abi.encodeWithSelector(IOwnable.Ownable_SenderIsNotOwner.selector, notOwner));
-        entryPoint.upgradeTo(impl);
+        entryPoint.upgradeTo({ newImplementation: impl });
     }
 
     event Upgraded(address indexed implementation);
@@ -207,10 +180,10 @@ contract OwnableAndProxyTest is Test {
     function test_entryPoint_upgradeImplementation_shouldUpgradeImplementation() external {
         address impl = address(new NewImplementation());
 
-        vm.prank(owner);
+        _resetPrank(owner);
         vm.expectEmit();
-        emit Upgraded(impl);
-        entryPoint.upgradeTo(impl);
+        emit Upgraded({ implementation: impl });
+        entryPoint.upgradeTo({ newImplementation: impl });
 
         address impl_ = address(uint160(uint256(vm.load(address(entryPoint), ERC1967Utils.IMPLEMENTATION_SLOT))));
 
@@ -222,33 +195,32 @@ contract OwnableAndProxyTest is Test {
     // =========================
 
     function test_feeContract_changeFees_shouldRevertIfDataInvalid() external {
-        vm.prank(owner);
+        _resetPrank(owner);
         vm.expectRevert(IFeeContract.FeeContract_InvalidFeeValue.selector);
-        feeContract.changeProtocolFee(10_001);
-
-        vm.prank(owner);
-        vm.expectRevert(IFeeContract.FeeContract_InvalidFeeValue.selector);
-        feeContract.changeReferralFee(IFeeContract.ReferralFee({ protocolPart: 300, referralPart: 1 }));
+        feeContract.setProtocolFee({ newProtocolFee: 1_000_001 });
     }
 
-    function test_feeContract_changeFees_shouldSuccessfulChangeFees(
-        uint256 newPotocolFee,
-        IFeeContract.ReferralFee memory newReferralFee
-    )
-        external
-    {
+    function test_feeContract_changeFees_shouldSuccessfulChangeFees(uint256 newPotocolFee) external {
         newPotocolFee = bound(newPotocolFee, 300, 10_000);
-        newReferralFee.protocolPart = bound(newReferralFee.protocolPart, 10, 200);
-        newReferralFee.referralPart = bound(newReferralFee.referralPart, 10, 50);
 
-        vm.startPrank(owner);
-        feeContract.changeProtocolFee(newPotocolFee);
-        feeContract.changeReferralFee(newReferralFee);
+        _resetPrank(owner);
+        feeContract.setProtocolFee({ newProtocolFee: newPotocolFee });
 
-        (uint256 protocolFee, IFeeContract.ReferralFee memory referralFee) = feeContract.fees();
+        uint256 protocolFee = feeContract.fees();
 
         assertEq(protocolFee, newPotocolFee);
-        assertEq(referralFee.protocolPart, newReferralFee.protocolPart);
-        assertEq(referralFee.referralPart, newReferralFee.referralPart);
+    }
+
+    // =========================
+    // setRouter
+    // =========================
+
+    function test_feeContract_setRouter_shouldSetNewRouter(address newRouter) external {
+        assertEq(feeContract.router(), address(entryPoint));
+
+        _resetPrank(owner);
+        feeContract.setRouter({ newRouter: newRouter });
+
+        assertEq(feeContract.router(), newRouter);
     }
 }

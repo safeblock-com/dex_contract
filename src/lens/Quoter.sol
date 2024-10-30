@@ -13,7 +13,9 @@ import { HelperV3Lib } from "./libraries/HelperV3Lib.sol";
 
 import { IMultiswapRouterFacet } from "../facets/interfaces/IMultiswapRouterFacet.sol";
 import { IWrappedNative } from "../interfaces/IWrappedNative.sol";
-import { IRouter } from "../interfaces/IRouter.sol";
+import { IRouter } from "../facets/interfaces/IRouter.sol";
+
+import { IFeeContract } from "../interfaces/IFeeContract.sol";
 
 /// @title Multiswap-Partswap Quoter contract
 contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
@@ -34,6 +36,8 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
     /// fee mask: `mask & (pair >> 160) == fee in pair`
     uint24 private constant FEE_MASK = 0xffffff;
 
+    IFeeContract private _feeContract;
+
     // =========================
     // constructor
     // =========================
@@ -46,6 +50,14 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
         _transferOwnership(newOwner);
     }
 
+    function getFeeContract() external view returns (address) {
+        return address(_feeContract);
+    }
+
+    function setFeeContract(address newFeeContract) external onlyOwner {
+        _feeContract = IFeeContract(newFeeContract);
+    }
+
     // =========================
     // main logic
     // =========================
@@ -53,6 +65,18 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
     //// @inheritdoc IMultiswapRouterFacet
     function multiswap(IMultiswapRouterFacet.MultiswapCalldata calldata data) external view returns (uint256 amount) {
         amount = _multiswap(data.tokenIn == address(0), data);
+
+        IFeeContract feeContract = _feeContract;
+
+        if (address(feeContract) > address(0) && amount != type(uint256).max) {
+            uint256 fee = feeContract.fees();
+
+            if (fee > 0) {
+                unchecked {
+                    amount -= amount * fee / 1e6;
+                }
+            }
+        }
     }
 
     function multiswapReverse(IMultiswapRouterFacet.MultiswapCalldata calldata data)
@@ -69,6 +93,18 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
         uint256 fullAmount = data.fullAmount;
 
         amount = _partswap(fullAmount, tokenIn == address(0) ? address(_wrappedNative) : tokenIn, data);
+
+        IFeeContract feeContract = _feeContract;
+
+        if (address(feeContract) > address(0) && amount != type(uint256).max) {
+            uint256 fee = feeContract.fees();
+
+            if (fee > 0) {
+                unchecked {
+                    amount -= amount * fee / 1e6;
+                }
+            }
+        }
     }
 
     // =========================
@@ -106,6 +142,7 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
 
         IUniswapV3Pool pool;
         uint256 fee;
+        uint256 isSolidly;
         bool uni3;
         bytes32 pair;
 
@@ -116,11 +153,16 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
                 pool := and(pair, ADDRESS_MASK)
                 fee := and(shr(160, pair), FEE_MASK)
                 uni3 := and(pair, UNISWAP_V3_MASK)
+                isSolidly := and(shr(184, pair), 0xff)
 
                 i := add(i, 1)
+
+                if iszero(uni3) {
+                    amountIn := sub(amountIn, div(mul(amountIn, and(shr(184, pair), FEE_MASK)), 1000000))
+                }
             }
 
-            (amountIn, tokenIn) = _quoteExactInput(tokenIn, pool, amountIn, fee, uni3);
+            (amountIn, tokenIn) = _quoteExactInput(uni3, tokenIn, pool, isSolidly, amountIn, fee);
 
             if (amountIn == 0) {
                 break;
@@ -148,6 +190,20 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
         address tokenOut;
         uint256 amountOut = data.amountIn;
 
+        {
+            IFeeContract feeContract = _feeContract;
+
+            if (address(feeContract) > address(0)) {
+                uint256 protocolFee = feeContract.fees();
+
+                if (protocolFee > 0) {
+                    unchecked {
+                        amountOut = amountOut * 1e6 / (1e6 - protocolFee);
+                    }
+                }
+            }
+        }
+
         if (isNative) {
             tokenOut = address(_wrappedNative);
         } else {
@@ -174,6 +230,10 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
 
                 i := add(i, 1)
                 index := sub(index, 1)
+
+                if iszero(uni3) {
+                    amountOut := add(amountOut, div(mul(amountOut, and(shr(184, pair), FEE_MASK)), 1000000))
+                }
             }
 
             (amountOut, tokenOut) = _quoteExactOutput(tokenOut, pool, amountOut, fee, uni3);
@@ -226,6 +286,7 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
         IUniswapV3Pool pool;
         uint256 fee;
         bool uni3;
+        uint256 isSolidly;
         bytes32 pair;
         uint256 amountOut;
 
@@ -238,7 +299,7 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
                 uni3 := and(pair, UNISWAP_V3_MASK)
             }
 
-            (amountOut,) = _quoteExactInput(tokenIn, pool, data.amountsIn[i], fee, uni3);
+            (amountOut,) = _quoteExactInput(uni3, tokenIn, pool, isSolidly, data.amountsIn[i], fee);
 
             unchecked {
                 amount += amountOut;
@@ -250,11 +311,12 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
     }
 
     function _quoteExactInput(
+        bool uni3,
         address tokenIn,
         IUniswapV3Pool pool,
+        uint256 isSolidly,
         uint256 amountIn,
-        uint256 fee,
-        bool uni3
+        uint256 fee
     )
         internal
         view
@@ -286,12 +348,16 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
                     (uint256 reserveInput, uint256 reserveOutput) =
                         tokenIn == _token0 ? (reserve0, reserve1) : (reserve1, reserve0);
 
-                    amountOut = HelperLib.getAmountOut({
-                        amountIn: amountIn,
-                        reserveIn: reserveInput,
-                        reserveOut: reserveOutput,
-                        feeE6: fee
-                    });
+                    if (isSolidly == 0) {
+                        amountOut = HelperLib.getAmountOut({
+                            amountIn: amountIn,
+                            reserveIn: reserveInput,
+                            reserveOut: reserveOutput,
+                            feeE6: fee
+                        });
+                    } else {
+                        amountOut = IRouter(address(pool)).getAmountOut({ amountIn: amountIn, tokenIn: tokenIn });
+                    }
                 } catch {
                     return (0, address(0));
                 }

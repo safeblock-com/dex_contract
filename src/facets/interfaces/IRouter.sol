@@ -24,4 +24,6 @@ interface IRouter {
     function token1() external view returns (address);
 
     function getReserves() external view returns (uint256, uint256, uint32);
+
+    function getAmountOut(uint256 amountIn, address tokenIn) external view returns (uint256);
 }

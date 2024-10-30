@@ -12,10 +12,6 @@ import { ILayerZeroComposer } from "./stargate/ILayerZeroComposer.sol";
 import { OptionsBuilder } from "./libraries/OptionsBuilder.sol";
 import { OFTComposeMsgCodec } from "./libraries/OFTComposeMsgCodec.sol";
 
-import { IStargateComposer } from "./stargate/IStargateComposer.sol";
-import { IStargateFactory } from "./stargate/IStargateFactory.sol";
-import { IStargatePool } from "./stargate/IStargatePool.sol";
-
 import { TransientStorageFacetLibrary } from "../../libraries/TransientStorageFacetLibrary.sol";
 
 import { IStargateFacet } from "./interfaces/IStargateFacet.sol";
@@ -29,16 +25,12 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
     /// @dev Address of the layerzero endpoint
     address private immutable _lzEndpointV2;
 
-    /// @dev Address of the stargate composer for cross-chain messaging
-    IStargateComposer private immutable _stargateComposer;
-
     // =========================
     // constructor
     // =========================
 
-    constructor(address endpointV2, address stargateComposer) {
+    constructor(address endpointV2) {
         _lzEndpointV2 = endpointV2;
-        _stargateComposer = IStargateComposer(stargateComposer);
     }
 
     // =========================
@@ -50,28 +42,9 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
         return _lzEndpointV2;
     }
 
-    /// @inheritdoc IStargateFacet
-    function stargateV1Composer() external view returns (address) {
-        return address(_stargateComposer);
-    }
-
     // =========================
     // quoter
     // =========================
-
-    /// @inheritdoc IStargateFacet
-    function quoteV1(
-        uint16 dstChainId,
-        address receiver,
-        bytes memory payload,
-        IStargateComposer.lzTxObj calldata lzTxParams
-    )
-        external
-        view
-        returns (uint256)
-    {
-        return _quoteV1(dstChainId, receiver, payload, lzTxParams);
-    }
 
     /// @inheritdoc IStargateFacet
     function quoteV2(
@@ -97,86 +70,6 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
     // =========================
 
     /// @inheritdoc IStargateFacet
-    function sendStargateV1(
-        uint16 dstChainId,
-        uint256 srcPoolId,
-        uint256 dstPoolId,
-        uint256 amountLD,
-        uint256 amountOutMinLD,
-        address receiver,
-        bytes memory payload,
-        IStargateComposer.lzTxObj calldata lzTxParams
-    )
-        external
-        payable
-        returns (uint256)
-    {
-        {
-            uint256 fee = _quoteV1(dstChainId, receiver, payload, lzTxParams);
-
-            address sender = TransientStorageFacetLibrary.getSenderAddress();
-
-            if (_stargateComposer.stargateEthVaults(srcPoolId) > address(0)) {
-                unchecked {
-                    fee += amountLD;
-                }
-
-                assembly ("memory-safe") {
-                    mstore(0, selfbalance())
-                }
-            } else {
-                address _token =
-                    IStargatePool(IStargateFactory(_stargateComposer.factory()).getPool({ poolId: srcPoolId })).token();
-
-                uint256 _balanceBefore = _token.safeGetBalance({ account: address(this) });
-
-                assembly ("memory-safe") {
-                    mstore(0, _balanceBefore)
-                    mstore(32, _token)
-                }
-
-                if (_balanceBefore < amountLD) {
-                    _token.safeTransferFrom({ from: sender, to: address(this), value: amountLD });
-                }
-                _token.safeApprove({ spender: address(_stargateComposer), value: amountLD });
-            }
-
-            _validateNativeBalance(fee);
-
-            _stargateComposer.swap{ value: fee }({
-                dstChainId: dstChainId,
-                srcPoolId: srcPoolId,
-                dstPoolId: dstPoolId,
-                refundAddress: payable(sender),
-                amountLD: amountLD,
-                minAmountLD: amountOutMinLD,
-                lzTxParams: lzTxParams,
-                to: abi.encodePacked(receiver),
-                payload: payload
-            });
-        }
-
-        uint256 balanceBefore;
-        address token;
-        uint256 balanceAfter;
-
-        assembly ("memory-safe") {
-            balanceBefore := mload(0)
-            token := mload(32)
-        }
-
-        if (token == address(0)) {
-            balanceAfter = address(this).balance;
-        } else {
-            balanceAfter = token.safeGetBalance({ account: address(this) });
-        }
-
-        unchecked {
-            return amountLD - (balanceBefore - balanceAfter);
-        }
-    }
-
-    /// @inheritdoc IStargateFacet
     function sendStargateV2(
         address poolAddress,
         uint32 dstEid,
@@ -198,13 +91,12 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
 
         uint256 balanceBefore;
 
-        if (token == address(0)) {
-            balanceBefore = address(this).balance;
-        } else {
+        if (token > address(0)) {
             balanceBefore = token.safeGetBalance({ account: address(this) });
 
             if (balanceBefore < amountLD) {
                 token.safeTransferFrom({ from: sender, to: address(this), value: amountLD });
+                balanceBefore = token.safeGetBalance({ account: address(this) });
             }
 
             token.safeApprove({ spender: poolAddress, value: amountLD });
@@ -216,43 +108,18 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
             refundAddress: sender
         });
 
-        uint256 balanceAfter;
         if (token == address(0)) {
-            balanceAfter = address(this).balance;
+            return 0;
         } else {
-            balanceAfter = token.safeGetBalance({ account: address(this) });
-        }
-
-        unchecked {
-            return amountLD - (balanceBefore - balanceAfter);
+            unchecked {
+                return amountLD - (balanceBefore - token.safeGetBalance({ account: address(this) }));
+            }
         }
     }
 
     // =========================
     // receive
     // =========================
-
-    /// @inheritdoc IStargateFacet
-    function sgReceive(
-        uint16, /* srcEid */
-        bytes memory, /* srcSender */
-        uint256, /* nonce */
-        address asset,
-        uint256 amountLD,
-        bytes calldata message
-    )
-        external
-        payable
-    {
-        if (msg.sender != address(_stargateComposer)) {
-            revert NotStargateComposer();
-        }
-
-        (address fallbackAddress, bytes32 argOverride, bytes memory payload) =
-            abi.decode(message, (address, bytes32, bytes));
-
-        _sendCallback(asset, amountLD, fallbackAddress, argOverride, payload);
-    }
 
     /// @inheritdoc ILayerZeroComposer
     function lzCompose(
@@ -266,7 +133,7 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
         payable
     {
         if (msg.sender != _lzEndpointV2) {
-            revert NotLZEndpoint();
+            revert IStargateFacet.NotLZEndpoint();
         }
 
         uint256 amountLD = OFTComposeMsgCodec.amountLD({ _msg: message });
@@ -305,7 +172,7 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
         }
 
         if (!successfulCall) {
-            emit CallFailed(payload);
+            emit CallFailed({ errorMessage: payload });
 
             if (asset == address(0)) {
                 TransferHelper.safeTransferNative({ to: fallbackAddress, value: amountLD });
@@ -318,28 +185,8 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
     /// @dev Validate native balance.
     function _validateNativeBalance(uint256 value) internal view {
         if (address(this).balance < value) {
-            revert StargateFacet_InvalidNativeBalance();
+            revert IStargateFacet.StargateFacet_InvalidNativeBalance();
         }
-    }
-
-    /// @dev Quote fee for stargate V1.
-    function _quoteV1(
-        uint16 dstChainId,
-        address receiver,
-        bytes memory payload,
-        IStargateComposer.lzTxObj calldata lzTxParams
-    )
-        internal
-        view
-        returns (uint256 valueToSend)
-    {
-        (valueToSend,) = _stargateComposer.quoteLayerZeroFee({
-            _dstChainId: dstChainId,
-            functionType: 1,
-            toAddress: abi.encodePacked(receiver),
-            transferAndCallPayload: payload,
-            lzTxParams: lzTxParams
-        });
     }
 
     /// @dev Quote fee for stargate V2.

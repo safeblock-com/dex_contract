@@ -1,156 +1,76 @@
-# Multiswap router
+# Safeblock DEX Smart Contract
 
-### Smart contract that allows multiswaps in a path of pairs or partswap tokenIn to tokenOut in different pairs in V2 and V3 versions of uniswap logic
+### The smart contract enables exchanges within a single network through various DEXs or cross-network swaps from any token to any token.
 
-## Multiswap
+## EntryPoint
 
-The method takes the following calldata:
-```solidity
-struct MultiswapCalldata {
-    // initial exact value in
-    uint256 amountIn;
-    // minimal amountOut
-    uint256 minAmountOut;
-    // first token in swap
-    address tokenIn;
-    // array of bytes32 values (pairs) involved in the swap
-    // from left to right:
-    //     address of the pair - 20 bytes
-    //     fee in pair - 3 bytes (for V2 pairs)
-    //     the highest bit shows which version the pair belongs to
-    // example:
-    //     V3: 0x8000000000000000000000004f31Fa980a675570939B737Ebdde0471a4Be40Eb
-    //     V2: 0x00000000000000000000001e65E9CfDBC579856B6354d369AFBFbA2B2a3C7856
-    bytes32[] pairs;
-    // an optional address that slightly relaxes the protocol's fees in favor of that address 
-    // and the user who called the multiswap
-    address referralAddress;
-}
-``` 
+### Overview
 
-Note: depending on the number of pairs and tokens gas cost varies between 100k and 300k (up to 4 pairs on the route)
+The `EntryPoint` contract serves as a proxy to facilitate dynamic function execution. It achieves this by mapping function selectors to designated facet contracts (external modules). This design enables modular functionality, where each function can be delegated to a specific facet, making the system flexible and upgradable.
 
-Example call:
+### Key Functionalities
 
-```solidity
-MultiswapRouter.MultiswapCalldata memory data;
-data.amountIn = 1e18;
-data.tokenIn = WBNB;
-data.pairs = new bytes32[](3);
-// WBNB -> BUSD -> USDT -> CAKE
-data.pairs[0] = WBNB_BUSD_Cake;
-data.pairs[1] = BUSD_USDT_CakeV3_500;
-data.pairs[2] = USDT_USDC_CakeV3_500;
-data.referralAddress = address(0);
-data.minAmountOut = 200e18; // 200 Cakes
+1. **Storage of Selectors and Facets**:
+   - The contract uses the `SSTORE2` library to store a combined array of function selectors and facet addresses. This array is stored in a single, efficient storage slot to reduce gas costs.
+   - The selectors and addresses are organized so that each selector is mapped to a unique facet address.
 
-multiswapRouter.multiswap(data);
-```
+2. **Function Delegation**:
+   - `EntryPoint` uses a fallback function to delegate incoming function calls to the appropriate facet based on the function selector.
+   - The `_getAddress` function employs binary search to identify the facet for a given selector, optimizing lookup time.
+   - The contract also has multicall capabilities, which allow it to execute multiple functions in a single transaction, either with or without argument replacement.
 
-## Partswap
 
-The method takes the following calldata:
-```solidity
-struct PartswapCalldata {
-    // exact value in for part swap
-    uint256 fullAmount;
-    // minimal amountOut
-    uint256 minAmountOut;
-    // token in
-    address tokenIn;
-    // token out
-    address tokenOut;
-    // array of amounts for each swap, corresponding to the address for the swap from the pairs array
-    uint256[] amountsIn;
-    // array of bytes32 values (pairs) involved in the swap
-    // from left to right:
-    //     address of the pair - 20 bytes
-    //     fee in pair - 3 bytes (for V2 pairs)
-    //     the highest bit shows which version the pair belongs to
-    // example:
-    //     V3: 0x8000000000000000000000004f31Fa980a675570939B737Ebdde0471a4Be40Eb
-    //     V2: 0x00000000000000000000001e65E9CfDBC579856B6354d369AFBFbA2B2a3C7856
-    bytes32[] pairs;
-    // an optional address that slightly relaxes the protocol's fees in favor of that address
-    // and the user who called the partswap
-    address referralAddress;
-}
-``` 
+### Storage and Utilities
 
-Note: sum of all amounts in `amounts` array should be equal to `fullAmount`
+- **SSTORE2**: Efficient storage of large data (selectors and addresses).
+- **Binary Search**: Used for fast, efficient retrieval of facet addresses from stored selectors.
+- **Transient Storage**: Temporary storage for multicall sender address and callback address during execution.
 
-Protocol and referral fees are calculated from sum of swap amountsOut
+### Functions
 
-Example call:
+- **multicall**: Executes a batch of function calls. It supports both straightforward execution and argument replacement modes.
+- **_getAddress** and **_getAddresses**: Internal helper functions to retrieve facet addresses associated with specific selectors.
 
-```solidity
-MultiswapRouter.PartswapCalldata memory data;
-data.fullAmount = 2000000000;
-data.tokenIn = WBNB;
-data.tokenOut = BUSD;
-data.amountsIn = new uint256[](4);
-data.amountsIn[0] = 500000000;
-data.amountsIn[1] = 500000000;
-data.amountsIn[2] = 500000000;
-data.amountsIn[3] = 500000000;
-data.pairs = new bytes32[](4);
-data.pairs[0] = WBNB_BUSD_Cake;
-data.pairs[1] = WBNB_BUSD_Biswap;
-data.pairs[2] = WBNB_BUSD_CakeV3_500;
-data.pairs[3] = WBNB_BUSD_Bakery;
+### Usage
 
-multiswapRouter.partswap(data);
-```
+The `EntryPoint` contract enables modular upgrades by allowing the system's logic to be divided across multiple facets. Its proxy-like behavior makes it ideal for applications that require dynamic and flexible function execution.
 
-## Fees
+## Facets
 
-There are 2 types of commission charges in the protocol:
+The `MultiswapRouterFacet` contract is a multi-purpose router for handling token swaps across both Uniswap V3 and Uniswap V2 protocols. Its main purpose is to allow users to perform complex swap transactions, such as "multiswaps" (a series of sequential swaps across multiple pairs) and "partswaps" (swaps that split the input amount across different pairs). It supports native tokens (like ETH) by wrapping and unwrapping them as needed. The contract also includes configurable fees, which are transferred to a designated fee contract upon each transaction. 
 
-Regular protocol fee:
-    `exactOutputAmount = amountOut * protocolFee / 10000`
+The `TransferFacet` contract is a facet that handles token and native asset transfers. It includes functions to transfer ERC-20 tokens, transfer native assets (e.g., ETH), and unwrap wrapped native tokens (like WETH) into native tokens. The contract uses `TransferHelper` for secure transfers and supports transferring unwrapped native tokens directly to specified recipients. It also stores the address of the `WrappedNative` contract for the specific blockchain on which it is deployed.
 
-Commission using a referral address (if `referralAddress` in calldata != address(0)):
-```solidity
-example:
-    protocolPart = 200 bps
-    referralPart = 50 bps
-    referralFee = amountOut * referralPart / 10000
-    protocolFee = amountOut * protocolPart / 10000
-    exactOutputAmount = amountOut - referralFee - protocolFee
-```
+`LayerZeroFacet` enables cross-chain communication with the LayerZero protocol, handling:
 
-Protocol fees are saved in mapping:
-    `profit(address(this), tokenAddress)`
+1. **Peer Management**: Manages trusted addresses for specific chains.
+2. **Gas Limits**: Sets gas limits per chain, with a default fallback.
+3. **Cross-Chain Transfers**: Sends deposits with native token drops and calculates required fees.
 
-Fees for referral addresses are also saved in the mapping:
-    `profit(referralAddress, tokenAddress)`
+`StargateFacet` is a facet for cross-chain messaging and token bridging with the LayerZero protocol, providing:
 
-The referral address can at any time withdraw assets that are registered to its address:
-```solidity
-    multiswapRouter.collectReferralFees(tokenAddress, recipient, amountForWithdraw)
-or withdraw all:
-    multiswapRouter.collectReferralFees(tokenAddress, recipient)
-```
+1. **Cross-Chain Token Transfer**: Manages token transfers and associated fees across chains.
+2. **Fee Quotation**: Calculates fees for cross-chain transactions based on destination, amount, and gas limit requirements.
+3. **Message Composition and Callbacks**: Handles cross-chain callbacks and reverts transactions with a fallback mechanism in case of failure, ensuring the return of assets or funds.
+---
 
-The protocol commission can be withdrawn only by the MultiswapRouter contract owner:
-```solidity
-    multiswapRouter.collectProtocolFees(tokenAddress, recipient, amountForWithdraw)
-or withdraw all:
-    multiswapRouter.collectProtocolFees(tokenAddress, recipient)
-```
+### Deploy:
 
-## Deploy:
-
-put private key and rpc url to `.env` file
+Add the private key and RPC URL to the `.env` file.
 
 ```bash
-forge script script/DeployMultiswapRouter.s.sol:DeployMultiswapRouter -vvvv --rpc-url bsc --broadcast --verify    
+forge script script/DeployContract.s.sol -vvvv --rpc-url {network} --broadcast --verify    
 ```
 
-## Upgrade:
+After deployment, update the contract addresses in the `DeployEngine.sol` file in the `getContracts` method for {network}.
 
-put private key and rpc url to `.env` file
+### Upgrade:
+
+Add the private key and RPC URL to the `.env` file. 
+
+Ensure that the addresses marked `*Proxy` for the target network are correctly filled in the `DeployEngine.sol` file. Replace the facets that need updating with `address(0)`.
 
 ```bash
-forge script script/UpgradeMultiswapRouter.s.sol:UpgradeMultiswapRouter -vvvv --rpc-url bsc --broadcast --verify     
+forge script script/DeployContract.s.sol -vvvv --rpc-url {network} --broadcast --verify    
 ```
+

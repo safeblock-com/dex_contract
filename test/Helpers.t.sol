@@ -124,3 +124,19 @@ bytes32 constant BUSD_USDC_Bakery = 0x000000000000000000000bb856CDE265aaD310e623
 bytes32 constant BUSD_CAKE_Bakery = 0x000000000000000000000bb80972A91854eFe50841e2FC2F019cB86dF221C39f;
 bytes32 constant ETH_USDT_Bakery = 0x000000000000000000000bb8408D46D0F351f51ebc15e466aa897e5e0F5D2060;
 bytes32 constant USDT_USDC_Bakery = 0x000000000000000000000bb8087a49F79CAB8cc13F8A44f9d6E0B2487a9D28e3;
+
+interface ISolidlyPair {
+    function token0() external view returns (address);
+    function token1() external view returns (address);
+
+    function factory() external view returns (address);
+
+    function stable() external view returns (bool);
+
+    function getFee(address, bool) external returns (uint256);
+}
+
+// solidly pairs
+ISolidlyPair constant SOLIDLY_PAIR1 = ISolidlyPair(0x0df083de449F75691fc5A36477a6f3284C269108);
+ISolidlyPair constant SOLIDLY_PAIR2 = ISolidlyPair(0xB2791477DA69DDe9cd2986349F8855B8E2dA7245);
+ISolidlyPair constant SOLIDLY_PAIR3 = ISolidlyPair(0x0493Bf8b6DBB159Ce2Db2E0E8403E753Abd1235b);

@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "forge-std/Test.sol";
-
-import { Ownable, IOwnable } from "../../src/external/Ownable.sol";
 import { UUPSUpgradeable, ERC1967Utils } from "../../src/proxy/UUPSUpgradeable.sol";
-import { Proxy, InitialImplementation } from "../../src/proxy/Proxy.sol";
+
+import { BaseTest, Proxy, InitialImplementation, Ownable, IOwnable } from "../BaseTest.t.sol";
 
 contract Implementation is UUPSUpgradeable, Ownable {
     function initialize() external {
@@ -43,9 +41,7 @@ contract ImplementationV2 is UUPSUpgradeable, Ownable {
     }
 }
 
-contract UUPSUpgradeableTest is Test {
-    address owner = makeAddr("owner");
-
+contract UUPSUpgradeableTest is BaseTest {
     address impl;
     address implV2;
     address fakeImpl;
@@ -54,15 +50,20 @@ contract UUPSUpgradeableTest is Test {
     address proxy;
 
     function setUp() external {
+        _createUsers();
+
+        _resetPrank(owner);
+
         impl = address(new Implementation());
         implV2 = address(new ImplementationV2());
         fakeImpl = address(new FakeImplementation());
         notUUPSImplementation = address(new NotUUPSImplementation());
 
-        vm.startPrank(owner);
-        proxy = address(new Proxy(owner));
-        InitialImplementation(proxy).upgradeTo(impl, abi.encodeCall(Implementation.initialize, ()));
-        vm.stopPrank();
+        proxy = address(new Proxy({ initialOwner: owner }));
+        InitialImplementation(proxy).upgradeTo({
+            implementation: impl,
+            data: abi.encodeCall(Implementation.initialize, ())
+        });
     }
 
     function test_proxy_initialImplementation_shouldUpgradeImplementation(address _owner, address _notOwner) external {
@@ -76,19 +77,19 @@ contract UUPSUpgradeableTest is Test {
             slot := not(0)
         }
 
-        vm.prank(_owner);
-        InitialImplementation _proxy = InitialImplementation(address(new Proxy(_owner)));
+        _resetPrank(_owner);
+        InitialImplementation _proxy = InitialImplementation(address(new Proxy({ initialOwner: _owner })));
 
         assertEq(vm.load(address(_proxy), slot), __owner);
 
-        vm.prank(_notOwner);
+        _resetPrank(_notOwner);
         vm.expectRevert(abi.encodeWithSelector(InitialImplementation.NotInitialOwner.selector, _notOwner));
-        _proxy.upgradeTo(address(impl), bytes(""));
+        _proxy.upgradeTo({ implementation: address(impl), data: bytes("") });
 
-        vm.prank(_owner);
+        _resetPrank(_owner);
         vm.expectEmit();
-        emit Upgraded(impl);
-        _proxy.upgradeTo(address(impl), bytes(""));
+        emit Upgraded({ implementation: impl });
+        _proxy.upgradeTo({ implementation: address(impl), data: bytes("") });
 
         assertEq(vm.load(address(_proxy), slot), 0);
     }
@@ -96,7 +97,7 @@ contract UUPSUpgradeableTest is Test {
     function test_UUPSUpgradeable_proxiableUUID_shouldRevertIfCalledViaProxy(address caller) external {
         vm.assume(caller != impl);
 
-        vm.prank(caller);
+        _resetPrank(caller);
         vm.expectRevert(UUPSUpgradeable.UUPSUnauthorizedCallContext.selector);
         UUPSUpgradeable(proxy).proxiableUUID();
     }
@@ -108,29 +109,29 @@ contract UUPSUpgradeableTest is Test {
 
     function test_UUPSUpgradeable_upgradeTo_shouldRevertInOnlyProxyModifier() external {
         vm.expectRevert(UUPSUpgradeable.UUPSUnauthorizedCallContext.selector);
-        UUPSUpgradeable(impl).upgradeTo(implV2);
+        UUPSUpgradeable(impl).upgradeTo({ newImplementation: implV2 });
     }
 
     function test_UUPSUpgradeable_upgradeTo_shouldRevertInAuthorizeUpgradeFunction(address notOwner) external {
         vm.assume(notOwner != owner);
 
-        vm.prank(notOwner);
+        _resetPrank(notOwner);
         vm.expectRevert(abi.encodeWithSelector(IOwnable.Ownable_SenderIsNotOwner.selector, notOwner));
-        UUPSUpgradeable(proxy).upgradeTo(implV2);
+        UUPSUpgradeable(proxy).upgradeTo({ newImplementation: implV2 });
     }
 
     function test_UUPSUpgradeable_upgradeTo_shouldRevertInUpgradeToUUPSFunction() external {
         bytes32 slot = FakeImplementation(fakeImpl).proxiableUUID();
 
-        vm.prank(owner);
+        _resetPrank(owner);
         vm.expectRevert(abi.encodeWithSelector(UUPSUpgradeable.UUPSUnsupportedProxiableUUID.selector, slot));
-        UUPSUpgradeable(proxy).upgradeTo(fakeImpl);
+        UUPSUpgradeable(proxy).upgradeTo({ newImplementation: fakeImpl });
 
-        vm.prank(owner);
+        _resetPrank(owner);
         vm.expectRevert(
             abi.encodeWithSelector(ERC1967Utils.ERC1967_InvalidImplementation.selector, notUUPSImplementation)
         );
-        UUPSUpgradeable(proxy).upgradeTo(notUUPSImplementation);
+        UUPSUpgradeable(proxy).upgradeTo({ newImplementation: notUUPSImplementation });
     }
 
     event Upgraded(address indexed implementation);
@@ -139,23 +140,23 @@ contract UUPSUpgradeableTest is Test {
         assertEq(Implementation(proxy).getImplementation(), impl);
 
         vm.expectRevert();
-        ImplementationV2(proxy).setA(42);
+        ImplementationV2(proxy).setA({ _a: 42 });
 
-        vm.prank(owner);
+        _resetPrank(owner);
         vm.expectEmit();
-        emit Upgraded(implV2);
-        UUPSUpgradeable(proxy).upgradeTo(implV2);
+        emit Upgraded({ implementation: implV2 });
+        UUPSUpgradeable(proxy).upgradeTo({ newImplementation: implV2 });
 
         assertEq(Implementation(proxy).getImplementation(), implV2);
 
         assertEq(ImplementationV2(proxy).a(), 0);
-        ImplementationV2(proxy).setA(42);
+        ImplementationV2(proxy).setA({ _a: 42 });
         assertEq(ImplementationV2(proxy).a(), 42);
 
-        vm.prank(owner);
+        _resetPrank(owner);
         vm.expectEmit();
-        emit Upgraded(impl);
-        UUPSUpgradeable(proxy).upgradeTo(impl);
+        emit Upgraded({ implementation: impl });
+        UUPSUpgradeable(proxy).upgradeTo({ newImplementation: impl });
 
         assertEq(Implementation(proxy).getImplementation(), impl);
     }

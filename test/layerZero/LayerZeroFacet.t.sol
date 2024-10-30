@@ -1,53 +1,23 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-import "forge-std/Test.sol";
-import { IERC20 } from "forge-std/interfaces/IERC20.sol";
-
-import { Solarray } from "solarray/Solarray.sol";
-import { DeployEngine, Contracts, getContracts } from "../../script/DeployEngine.sol";
-
-import { Proxy, InitialImplementation } from "../../src/proxy/Proxy.sol";
-
-import { IEntryPoint } from "../../src/EntryPoint.sol";
-import { TransferFacet } from "../../src/facets/TransferFacet.sol";
-import { StargateFacet, IStargateFacet, IStargateComposer } from "../../src/facets/bridges/StargateFacet.sol";
-import { LayerZeroFacet, UlnConfig } from "../../src/facets/bridges/LayerZeroFacet.sol";
-import { TransferHelper } from "../../src/facets/libraries/TransferHelper.sol";
+import { BaseTest, IERC20, Solarray, IStargateFacet, LayerZeroFacet, ILayerZeroFacet } from "../BaseTest.t.sol";
+import { Origin } from "../../src/facets/bridges/stargate/ILayerZeroEndpointV2.sol";
 
 import "../Helpers.t.sol";
 
-contract LayerZeroFacetTest is Test {
-    IEntryPoint bridge;
-
-    address owner = makeAddr("owner");
-    address user = makeAddr("user");
-
-    address entryPointImplementation;
-    Contracts contracts;
-
+contract LayerZeroFacetTest is BaseTest {
     function setUp() external {
         vm.createSelectFork(vm.rpcUrl("bsc"));
 
-        contracts = getContracts(56);
-        (contracts,) = DeployEngine.deployImplemetations(contracts, true);
+        _createUsers();
 
-        deal(USDT, user, 1000e18);
+        _resetPrank(owner);
 
-        startHoax(owner);
+        deployForTest();
 
-        entryPointImplementation = DeployEngine.deployEntryPoint(contracts);
-
-        bridge = IEntryPoint(address(new Proxy(owner)));
-
-        InitialImplementation(address(bridge)).upgradeTo(
-            entryPointImplementation, abi.encodeCall(IEntryPoint.initialize, (owner, new bytes[](0)))
-        );
-
-        LayerZeroFacet(address(bridge)).setDefaultGasLimit(50_000);
-        LayerZeroFacet(address(bridge)).setDelegate(owner);
-
-        vm.stopPrank();
+        ILayerZeroFacet(address(entryPoint)).setDefaultGasLimit({ defaultGasLimit_: 50_000 });
+        ILayerZeroFacet(address(entryPoint)).setDelegate({ delegate: owner });
     }
 
     // =========================
@@ -55,69 +25,138 @@ contract LayerZeroFacetTest is Test {
     // =========================
 
     function test_layerZeroFacet_gettersAndSetters() external {
-        new LayerZeroFacet(contracts.endpointV2);
+        _resetPrank(owner);
 
-        assertEq(LayerZeroFacet(address(bridge)).eid(), 30_102);
+        new LayerZeroFacet({ endpointV2: contracts.endpointV2 });
 
-        assertEq(LayerZeroFacet(address(bridge)).defaultGasLimit(), 50_000);
+        assertEq(ILayerZeroFacet(address(entryPoint)).eid(), 30_102);
 
-        hoax(owner);
-        LayerZeroFacet(address(bridge)).setDefaultGasLimit(100_000);
-        assertEq(LayerZeroFacet(address(bridge)).defaultGasLimit(), 100_000);
+        assertEq(ILayerZeroFacet(address(entryPoint)).defaultGasLimit(), 50_000);
 
-        assertTrue(LayerZeroFacet(address(bridge)).isSupportedEid(30_101));
-        assertEq(LayerZeroFacet(address(bridge)).getPeer(30_101), bytes32(uint256(uint160(address(bridge)))));
+        ILayerZeroFacet(address(entryPoint)).setDefaultGasLimit({ defaultGasLimit_: 100_000 });
+        assertEq(ILayerZeroFacet(address(entryPoint)).defaultGasLimit(), 100_000);
 
-        hoax(owner);
-        LayerZeroFacet(address(bridge)).setPeers(
-            Solarray.uint32s(30_101), Solarray.bytes32s(bytes32(uint256(uint160(owner))))
+        assertTrue(ILayerZeroFacet(address(entryPoint)).isSupportedEid({ remoteEid: 30_101 }));
+        assertEq(
+            ILayerZeroFacet(address(entryPoint)).getPeer({ remoteEid: 30_101 }),
+            bytes32(uint256(uint160(address(entryPoint))))
         );
-        assertEq(LayerZeroFacet(address(bridge)).getPeer(30_101), bytes32(uint256(uint160(owner))));
 
-        assertEq(LayerZeroFacet(address(bridge)).getDelegate(), owner);
+        vm.expectRevert(ILayerZeroFacet.LayerZeroFacet_LengthMismatch.selector);
+        ILayerZeroFacet(address(entryPoint)).setPeers({
+            remoteEids: Solarray.uint32s(30_101, 1),
+            remoteAddresses: Solarray.bytes32s(bytes32(uint256(uint160(owner))))
+        });
 
-        hoax(owner);
-        LayerZeroFacet(address(bridge)).setDelegate(address(this));
-        assertEq(LayerZeroFacet(address(bridge)).getDelegate(), address(this));
+        ILayerZeroFacet(address(entryPoint)).setPeers({
+            remoteEids: Solarray.uint32s(30_101),
+            remoteAddresses: Solarray.bytes32s(bytes32(uint256(uint160(owner))))
+        });
+        assertEq(ILayerZeroFacet(address(entryPoint)).getPeer({ remoteEid: 30_101 }), bytes32(uint256(uint160(owner))));
 
-        assertEq(LayerZeroFacet(address(bridge)).getGasLimit(30_101), 100_000);
+        assertEq(ILayerZeroFacet(address(entryPoint)).getDelegate(), owner);
 
-        hoax(owner);
-        LayerZeroFacet(address(bridge)).setGasLimit(Solarray.uint32s(30_101), Solarray.uint128s(30_000));
-        assertEq(LayerZeroFacet(address(bridge)).getGasLimit(30_101), 30_000);
+        ILayerZeroFacet(address(entryPoint)).setDelegate({ delegate: address(this) });
+        assertEq(ILayerZeroFacet(address(entryPoint)).getDelegate(), address(this));
 
-        assertEq(LayerZeroFacet(address(bridge)).getNativeSendCap(30_101), 0.24e18);
+        assertEq(ILayerZeroFacet(address(entryPoint)).getGasLimit({ remoteEid: 30_101 }), 100_000);
 
-        assertTrue(LayerZeroFacet(address(bridge)).isSupportedEid(30_101));
+        vm.expectRevert(ILayerZeroFacet.LayerZeroFacet_LengthMismatch.selector);
+        ILayerZeroFacet(address(entryPoint)).setGasLimit({
+            remoteEids: Solarray.uint32s(30_101, 1),
+            gasLimits: Solarray.uint128s(30_000)
+        });
+
+        ILayerZeroFacet(address(entryPoint)).setGasLimit({
+            remoteEids: Solarray.uint32s(30_101),
+            gasLimits: Solarray.uint128s(30_000)
+        });
+        assertEq(ILayerZeroFacet(address(entryPoint)).getGasLimit({ remoteEid: 30_101 }), 30_000);
+
+        assertEq(ILayerZeroFacet(address(entryPoint)).getNativeSendCap({ remoteEid: 30_101 }), 0.24e18);
+
+        assertTrue(ILayerZeroFacet(address(entryPoint)).isSupportedEid({ remoteEid: 30_101 }));
+
+        assertFalse(
+            ILayerZeroFacet(address(entryPoint)).allowInitializePath({
+                origin: Origin({ srcEid: 0, sender: bytes32(0), nonce: 1 })
+            })
+        );
+
+        assertEq(ILayerZeroFacet(address(entryPoint)).nextNonce(0, bytes32(0)), 0);
     }
 
     // =========================
     // sendDeposit
     // =========================
 
-    uint32 dstEidV2 = 30_101;
+    uint32 remoteEidV2 = 30_101;
     address stargatePool = 0x138EB30f73BC423c6455C53df6D89CB01d9eBc63;
 
-    function test_layerZeroFacet_sendDeposit_shoudSendDeposit() external {
-        uint128 nativeTransferCap = LayerZeroFacet(address(bridge)).getNativeSendCap(dstEidV2);
+    function test_layerZeroFacet_sendDeposit_shoudRevertIfFeeNotMet() external {
+        uint128 nativeTransferCap = ILayerZeroFacet(address(entryPoint)).getNativeSendCap({ remoteEid: remoteEidV2 });
 
-        uint256 fee = LayerZeroFacet(address(bridge)).estimateFee(dstEidV2, nativeTransferCap, address(0));
+        uint256 fee = ILayerZeroFacet(address(entryPoint)).estimateFee({
+            remoteEid: remoteEidV2,
+            nativeAmount: nativeTransferCap,
+            to: address(0)
+        });
 
-        deal(USDT, user, 1000e18);
+        deal({ token: USDT, to: user, give: 1000e18 });
+        deal({ to: user, give: 1000e18 });
 
-        startHoax(user);
+        _resetPrank(user);
 
-        IERC20(USDT).approve(address(bridge), 1000e18);
+        IERC20(USDT).approve({ spender: address(entryPoint), amount: 1000e18 });
 
-        (uint256 _fee,) = StargateFacet(address(bridge)).quoteV2(stargatePool, dstEidV2, 1000e18, user, bytes(""), 0);
+        (uint256 _fee,) = IStargateFacet(address(entryPoint)).quoteV2({
+            poolAddress: stargatePool,
+            dstEid: remoteEidV2,
+            amountLD: 1000e18,
+            composer: user,
+            composeMsg: bytes(""),
+            composeGasLimit: 0
+        });
 
-        bridge.multicall{ value: fee + _fee }(
-            Solarray.bytess(
-                abi.encodeCall(StargateFacet.sendStargateV2, (stargatePool, dstEidV2, 1000e18, user, 0, bytes(""))),
-                abi.encodeCall(LayerZeroFacet.sendDeposit, (dstEidV2, nativeTransferCap, address(0)))
+        vm.expectRevert(ILayerZeroFacet.LayerZeroFacet_FeeNotMet.selector);
+        entryPoint.multicall{ value: (fee + _fee) >> 1 }({
+            data: Solarray.bytess(
+                abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool, remoteEidV2, 1000e18, user, 0, bytes(""))),
+                abi.encodeCall(ILayerZeroFacet.sendDeposit, (remoteEidV2, nativeTransferCap, user))
             )
-        );
+        });
+    }
 
-        vm.stopPrank();
+    function test_layerZeroFacet_sendDeposit_shoudSendDeposit() external {
+        uint128 nativeTransferCap = ILayerZeroFacet(address(entryPoint)).getNativeSendCap({ remoteEid: remoteEidV2 });
+
+        uint256 fee = ILayerZeroFacet(address(entryPoint)).estimateFee({
+            remoteEid: remoteEidV2,
+            nativeAmount: nativeTransferCap,
+            to: address(0)
+        });
+
+        deal({ token: USDT, to: user, give: 1000e18 });
+        deal({ to: user, give: 1000e18 });
+
+        _resetPrank(user);
+
+        IERC20(USDT).approve({ spender: address(entryPoint), amount: 1000e18 });
+
+        (uint256 _fee,) = IStargateFacet(address(entryPoint)).quoteV2({
+            poolAddress: stargatePool,
+            dstEid: remoteEidV2,
+            amountLD: 1000e18,
+            composer: user,
+            composeMsg: bytes(""),
+            composeGasLimit: 0
+        });
+
+        entryPoint.multicall{ value: fee + _fee }({
+            data: Solarray.bytess(
+                abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool, remoteEidV2, 1000e18, user, 0, bytes(""))),
+                abi.encodeCall(ILayerZeroFacet.sendDeposit, (remoteEidV2, nativeTransferCap, user))
+            )
+        });
     }
 }

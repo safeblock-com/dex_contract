@@ -4,8 +4,10 @@ pragma solidity 0.8.19;
 import { TransferHelper } from "./libraries/TransferHelper.sol";
 import { IWrappedNative } from "./interfaces/IWrappedNative.sol";
 
+import { ITransferFacet } from "./interfaces/ITransferFacet.sol";
+
 /// @title TransferFacet - Facet for token transfers
-contract TransferFacet {
+contract TransferFacet is ITransferFacet {
     // =========================
     // storage
     // =========================
@@ -26,7 +28,7 @@ contract TransferFacet {
     // functions
     // =========================
 
-    /// @notice Transfer ERC20 token to `to`
+    /// @inheritdoc ITransferFacet
     function transferToken(address token, uint256 amount, address to) external returns (uint256) {
         if (amount > 0) {
             TransferHelper.safeTransfer({ token: token, to: to, value: amount });
@@ -35,7 +37,7 @@ contract TransferFacet {
         return amount;
     }
 
-    /// @notice Transfer native token to `to`
+    /// @inheritdoc ITransferFacet
     function transferNative(address to, uint256 amount) external returns (uint256) {
         if (amount > 0) {
             TransferHelper.safeTransferNative({ to: to, value: amount });
@@ -44,7 +46,7 @@ contract TransferFacet {
         return amount;
     }
 
-    /// @notice Unwrap native token
+    /// @inheritdoc ITransferFacet
     function unwrapNative(uint256 amount) external returns (uint256) {
         if (amount > 0) {
             _wrappedNative.withdraw({ wad: amount });
@@ -53,7 +55,7 @@ contract TransferFacet {
         return amount;
     }
 
-    /// @notice Unwrap native token and transfer to `to`
+    /// @inheritdoc ITransferFacet
     function unwrapNativeAndTransferTo(address to, uint256 amount) external returns (uint256) {
         if (amount > 0) {
             _wrappedNative.withdraw({ wad: amount });

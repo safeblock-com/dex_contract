@@ -1,62 +1,31 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "forge-std/Test.sol";
-import { IERC20 } from "forge-std/interfaces/IERC20.sol";
-
-import { Solarray } from "solarray/Solarray.sol";
-import { DeployEngine, Contracts, getContracts } from "../../script/DeployEngine.sol";
-
-import { Proxy, InitialImplementation } from "../../src/proxy/Proxy.sol";
-
-import { IEntryPoint } from "../../src/EntryPoint.sol";
-import { MultiswapRouterFacet, IMultiswapRouterFacet } from "../../src/facets/MultiswapRouterFacet.sol";
-import { TransferFacet } from "../../src/facets/TransferFacet.sol";
-import { IOwnable } from "../../src/external/IOwnable.sol";
-import { TransferHelper } from "../../src/facets/libraries/TransferHelper.sol";
-
-import { Quoter } from "../../src/lens/Quoter.sol";
+import {
+    BaseTest,
+    IERC20,
+    Solarray,
+    IOwnable,
+    TransferHelper,
+    MultiswapRouterFacet,
+    IMultiswapRouterFacet,
+    TransferFacet,
+    ITransferFacet
+} from "../BaseTest.t.sol";
 
 import "../Helpers.t.sol";
 
-contract MultiswapTest is Test {
-    IEntryPoint router;
-    Quoter quoter;
-
-    // TODO add later
-    // FeeContract feeContract;
-
-    address owner = makeAddr("owner");
-    address user = makeAddr("user");
-
-    address entryPointImplementation;
-    Contracts contracts;
-
+contract MultiswapTest is BaseTest {
     function setUp() external {
         vm.createSelectFork(vm.rpcUrl("bsc"));
 
-        contracts = getContracts(56);
-        (contracts,) = DeployEngine.deployImplemetations(contracts, true);
+        _createUsers();
 
-        deal(USDT, user, 1000e18);
+        _resetPrank(owner);
 
-        startHoax(owner);
+        deployForTest();
 
-        quoter = new Quoter(contracts.wrappedNative);
-
-        entryPointImplementation = DeployEngine.deployEntryPoint(contracts);
-
-        router = IEntryPoint(address(new Proxy(owner)));
-
-        // TODO add later
-        // bytes[] memory initData =
-        // Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.setFeeContract, address(feeContract)));
-
-        InitialImplementation(address(router)).upgradeTo(
-            entryPointImplementation, abi.encodeCall(IEntryPoint.initialize, (owner, new bytes[](0)))
-        );
-
-        vm.stopPrank();
+        deal({ token: USDT, to: user, give: 1000e18 });
     }
 
     // =========================
@@ -64,11 +33,12 @@ contract MultiswapTest is Test {
     // =========================
 
     function test_multiswapRouterFacet_constructor_shouldInitializeInConstructor() external {
-        MultiswapRouterFacet _multiswapRouterFacet = new MultiswapRouterFacet(WBNB);
-        TransferFacet _transferFacet = new TransferFacet(WBNB);
+        MultiswapRouterFacet _multiswapRouterFacet =
+            new MultiswapRouterFacet({ wrappedNative_: contracts.wrappedNative });
+        TransferFacet _transferFacet = new TransferFacet({ wrappedNative: contracts.wrappedNative });
         _transferFacet;
 
-        assertEq(_multiswapRouterFacet.wrappedNative(), WBNB);
+        assertEq(_multiswapRouterFacet.wrappedNative(), contracts.wrappedNative);
     }
 
     // =========================
@@ -76,16 +46,16 @@ contract MultiswapTest is Test {
     // =========================
 
     function test_multiswapRouterFacet_setFeeContract_shouldSetFeeContract() external {
-        assertEq(IMultiswapRouterFacet(address(router)).feeContract(), address(0));
+        assertEq(IMultiswapRouterFacet(address(entryPoint)).feeContract(), address(feeContract));
 
-        hoax(user);
+        _resetPrank(user);
         vm.expectRevert(abi.encodeWithSelector(IOwnable.Ownable_SenderIsNotOwner.selector, user));
-        IMultiswapRouterFacet(address(router)).setFeeContract(user);
+        IMultiswapRouterFacet(address(entryPoint)).setFeeContract({ newFeeContract: user });
 
-        hoax(owner);
-        IMultiswapRouterFacet(address(router)).setFeeContract(owner);
+        _resetPrank(owner);
+        IMultiswapRouterFacet(address(entryPoint)).setFeeContract({ newFeeContract: owner });
 
-        assertEq(IMultiswapRouterFacet(address(router)).feeContract(), owner);
+        assertEq(IMultiswapRouterFacet(address(entryPoint)).feeContract(), owner);
     }
 
     // =========================
@@ -93,23 +63,21 @@ contract MultiswapTest is Test {
     // =========================
 
     function test_transferFacet_transferNative_shouldTransferNativeFromContract() external {
-        deal(address(router), 10e18);
+        deal({ to: address(entryPoint), give: 10e18 });
 
-        startHoax(user);
+        _resetPrank(user);
 
         uint256 balanceBefore = user.balance;
 
-        router.multicall(Solarray.bytess(abi.encodeCall(TransferFacet.transferNative, (user, 5e18))));
+        entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(TransferFacet.transferNative, (user, 5e18))) });
 
         uint256 balanceAfter = user.balance;
 
         assertEq(balanceAfter - balanceBefore, 5e18);
 
-        router.multicall(Solarray.bytess(abi.encodeCall(TransferFacet.transferNative, (user, 5e18))));
+        entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(TransferFacet.transferNative, (user, 5e18))) });
 
         assertEq(user.balance - balanceAfter, 5e18);
-
-        vm.stopPrank();
     }
 
     // =========================
@@ -119,46 +87,44 @@ contract MultiswapTest is Test {
     function test_multiswapRouterFacet_multiswap_shouldRevertIfMultiswapDataIsInvalid() external {
         IMultiswapRouterFacet.MultiswapCalldata memory mData;
 
-        startHoax(user);
+        _resetPrank(user);
 
         // pairs array is empty
         vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidPairsArray.selector);
-        router.multicall(Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData))));
+        entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData))) });
 
         // amountIn is 0
         vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidAmountIn.selector);
         mData.pairs = Solarray.bytes32s(BUSD_USDT_UniV3_3000);
-        router.multicall(Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData))));
+        entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData))) });
 
         // tokenIn is address(0) (native) and msg.value < amountIn
         vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidAmountIn.selector);
         mData.amountIn = 1;
         mData.pairs = Solarray.bytes32s(BUSD_USDT_UniV3_3000);
-        router.multicall(Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData))));
+        entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData))) });
 
         // not approved
         vm.expectRevert(TransferHelper.TransferHelper_TransferFromError.selector);
         mData.tokenIn = USDT;
         mData.amountIn = 100e18;
         mData.pairs = Solarray.bytes32s(WBNB_CAKE_CakeV3_500, BUSD_USDT_UniV3_3000);
-        router.multicall(Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData))));
+        entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData))) });
 
-        IERC20(USDT).approve(address(router), 100e18);
+        IERC20(USDT).approve({ spender: address(entryPoint), amount: 100e18 });
 
         // tokenIn is not in sent pair
         vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidTokenIn.selector);
         mData.tokenIn = USDT;
         mData.amountIn = 100e18;
         mData.pairs = Solarray.bytes32s(WBNB_CAKE_CakeV3_500, BUSD_USDT_UniV3_3000);
-        router.multicall(Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData))));
+        entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData))) });
 
         vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidTokenIn.selector);
         mData.tokenIn = USDT;
         mData.amountIn = 100e18;
         mData.pairs = Solarray.bytes32s(BUSD_USDT_UniV3_3000, WBNB_CAKE_CakeV3_500);
-        router.multicall(Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData))));
-
-        vm.stopPrank();
+        entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData))) });
     }
 
     function test_multiswapRouterFacet_multiswap_shouldSwapThroughAllUniswapV2Pairs() external {
@@ -169,24 +135,22 @@ contract MultiswapTest is Test {
         mData.pairs =
             Solarray.bytes32s(USDT_USDC_Cake, USDC_CAKE_Cake, BUSD_CAKE_Biswap, BUSD_ETH_Biswap, WBNB_ETH_Bakery);
 
-        uint256 quoterAmountOut = quoter.multiswap(mData);
+        uint256 quoterAmountOut = quoter.multiswap({ data: mData });
 
         mData.minAmountOut = quoterAmountOut * 0.98e18 / 1e18;
 
-        startHoax(user);
-        IERC20(USDT).approve(address(router), 100e18);
+        _resetPrank(user);
+        IERC20(USDT).approve({ spender: address(entryPoint), amount: 100e18 });
 
-        router.multicall(
-            0x0000000000000000000000000000000000000000000000000000000000000024,
-            Solarray.bytess(
+        entryPoint.multicall({
+            replace: 0x0000000000000000000000000000000000000000000000000000000000000024,
+            data: Solarray.bytess(
                 abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
                 abi.encodeCall(TransferFacet.transferToken, (WBNB, 0, user))
             )
-        );
+        });
 
-        assertEq(IERC20(WBNB).balanceOf(user), quoterAmountOut);
-
-        vm.stopPrank();
+        assertEq(IERC20(WBNB).balanceOf({ account: user }), quoterAmountOut);
     }
 
     function test_multiswapRouterFacet_multiswap_shouldSwapThroughAllUniswapV3Pairs() external {
@@ -198,24 +162,22 @@ contract MultiswapTest is Test {
             ETH_USDT_UniV3_500, WBNB_ETH_UniV3_500, WBNB_CAKE_UniV3_3000, WBNB_CAKE_CakeV3_500, WBNB_ETH_UniV3_3000
         );
 
-        uint256 quoterAmountOut = quoter.multiswap(mData);
+        uint256 quoterAmountOut = quoter.multiswap({ data: mData });
 
         mData.minAmountOut = quoterAmountOut * 0.98e18 / 1e18;
 
-        startHoax(user);
-        IERC20(USDT).approve(address(router), 100e18);
+        _resetPrank(user);
+        IERC20(USDT).approve({ spender: address(entryPoint), amount: 100e18 });
 
-        router.multicall(
-            0x0000000000000000000000000000000000000000000000000000000000000024,
-            Solarray.bytess(
+        entryPoint.multicall({
+            replace: 0x0000000000000000000000000000000000000000000000000000000000000024,
+            data: Solarray.bytess(
                 abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
                 abi.encodeCall(TransferFacet.transferToken, (ETH, 0, user))
             )
-        );
+        });
 
-        assertEq(IERC20(ETH).balanceOf(user), quoterAmountOut);
-
-        vm.stopPrank();
+        assertEq(IERC20(ETH).balanceOf({ account: user }), quoterAmountOut);
     }
 
     function test_multiswapRouterFacet_failedV3Swap() external {
@@ -227,21 +189,41 @@ contract MultiswapTest is Test {
         mData.tokenIn = USDC;
         mData.pairs = Solarray.bytes32s(USDC_CAKE_UniV3_500);
 
-        assertEq(quoter.multiswap(mData), 0);
+        assertEq(quoter.multiswap({ data: mData }), 0);
 
-        startHoax(user);
-        IERC20(USDC).approve(address(router), 100e18);
+        _resetPrank(user);
+        IERC20(USDC).approve({ spender: address(entryPoint), amount: 100e18 });
 
         vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_FailedV3Swap.selector);
-        router.multicall(
-            0x0000000000000000000000000000000000000000000000000000000000000024,
-            Solarray.bytess(
+        entryPoint.multicall({
+            replace: 0x0000000000000000000000000000000000000000000000000000000000000024,
+            data: Solarray.bytess(
                 abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
                 abi.encodeCall(TransferFacet.transferToken, (WBNB, 0, user))
             )
-        );
+        });
+    }
 
-        vm.stopPrank();
+    function test_multiswapRouterFacet_multiswap_failedV2Swap() external {
+        IMultiswapRouterFacet.MultiswapCalldata memory mData;
+
+        mData.amountIn = 100e18;
+        mData.tokenIn = USDT;
+        mData.pairs =
+        // wrong pair fee
+         Solarray.bytes32s(0x0000000000000000000009c016b9a82891338f9bA80E2D6970FddA79D1eb0daE);
+
+        _resetPrank(user);
+        IERC20(USDT).approve({ spender: address(entryPoint), amount: 100e18 });
+
+        vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_FailedV2Swap.selector);
+        entryPoint.multicall({
+            replace: 0x0000000000000000000000000000000000000000000000000000000000000024,
+            data: Solarray.bytess(
+                abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
+                abi.encodeCall(TransferFacet.transferToken, (WBNB, 0, user))
+            )
+        });
     }
 
     function test_multiswapRouterFacet_failedCallback() external {
@@ -259,85 +241,144 @@ contract MultiswapTest is Test {
         mData.pairs =
             Solarray.bytes32s(USDT_USDC_Cake, USDC_CAKE_Cake, BUSD_CAKE_Biswap, BUSD_ETH_Biswap, WBNB_ETH_Bakery);
 
-        uint256 quoterAmountOut = quoter.multiswap(mData);
+        uint256 quoterAmountOut = quoter.multiswap({ data: mData });
 
         mData.minAmountOut = quoterAmountOut + 1;
 
-        startHoax(user);
-        IERC20(USDT).approve(address(router), 100e18);
+        _resetPrank(user);
+        IERC20(USDT).approve({ spender: address(entryPoint), amount: 100e18 });
 
         vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidAmountOut.selector);
-        router.multicall(
-            0x0000000000000000000000000000000000000000000000000000000000000024,
-            Solarray.bytess(
+        entryPoint.multicall({
+            replace: 0x0000000000000000000000000000000000000000000000000000000000000024,
+            data: Solarray.bytess(
                 abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
                 abi.encodeCall(TransferFacet.transferToken, (WBNB, 0, user))
             )
-        );
+        });
+    }
 
-        vm.stopPrank();
+    function test_multiswapRouterFacet_multiswap_shouldTransferAmountInToV2PairWhenBalanceIsGteAmountIn() external {
+        deal(USDT, address(entryPoint), 100e18);
+
+        IMultiswapRouterFacet.MultiswapCalldata memory mData;
+
+        mData.amountIn = 100e18;
+        mData.tokenIn = USDT;
+        mData.pairs =
+            Solarray.bytes32s(USDT_USDC_Cake, USDC_CAKE_Cake, BUSD_CAKE_Biswap, BUSD_ETH_Biswap, WBNB_ETH_Bakery);
+
+        uint256 quoterAmountOut = quoter.multiswap({ data: mData });
+
+        mData.minAmountOut = quoterAmountOut;
+
+        _resetPrank(user);
+        IERC20(USDT).approve({ spender: address(entryPoint), amount: 100e18 });
+
+        entryPoint.multicall({
+            replace: 0x0000000000000000000000000000000000000000000000000000000000000024,
+            data: Solarray.bytess(
+                abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
+                abi.encodeCall(TransferFacet.transferToken, (WBNB, 0, user))
+            )
+        });
     }
 
     // =========================
     // multiswap with native
     // =========================
 
-    function test_multiswapRouterFacet_multiswapNative() external {
+    function test_multiswapRouterFacet_multiswap_multiswapNative() external {
         IMultiswapRouterFacet.MultiswapCalldata memory mData;
+
+        deal({ to: user, give: 10e18 });
 
         mData.amountIn = 10e18;
         mData.tokenIn = address(0);
         mData.pairs =
             Solarray.bytes32s(WBNB_ETH_Bakery, BUSD_ETH_Biswap, BUSD_CAKE_Biswap, USDC_CAKE_Cake, USDT_USDC_Cake);
 
-        uint256 quoterAmountOut = quoter.multiswap(mData);
+        uint256 quoterAmountOut = quoter.multiswap({ data: mData });
 
         mData.minAmountOut = quoterAmountOut * 0.98e18 / 1e18;
 
-        startHoax(user);
+        _resetPrank(user);
 
-        uint256 userBalanceBefore = IERC20(USDT).balanceOf(user);
+        uint256 userBalanceBefore = IERC20(USDT).balanceOf({ account: user });
 
-        router.multicall{ value: 10e18 }(
-            0x0000000000000000000000000000000000000000000000000000000000000024,
-            Solarray.bytess(
+        entryPoint.multicall{ value: 10e18 }({
+            replace: 0x0000000000000000000000000000000000000000000000000000000000000024,
+            data: Solarray.bytess(
                 abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
                 abi.encodeCall(TransferFacet.transferToken, (USDT, 0, user))
             )
-        );
+        });
 
-        assertEq(IERC20(USDT).balanceOf(user) - userBalanceBefore, quoterAmountOut);
-
-        vm.stopPrank();
+        assertEq(IERC20(USDT).balanceOf({ account: user }) - userBalanceBefore, quoterAmountOut);
     }
 
-    function test_multiswapRouterFacet_swapToNativeThroughV2V3Pairs() external {
+    function test_multiswapRouterFacet_multiswap_swapToNativeThroughV2V3Pairs() external {
         IMultiswapRouterFacet.MultiswapCalldata memory mData;
 
         mData.amountIn = 100e18;
         mData.tokenIn = USDT;
         mData.pairs = Solarray.bytes32s(USDT_USDC_Cake, BUSD_USDC_CakeV3_100, BUSD_CAKE_Cake, WBNB_CAKE_CakeV3_100);
 
-        uint256 quoterAmountOut = quoter.multiswap(mData);
+        uint256 quoterAmountOut = quoter.multiswap({ data: mData });
 
         mData.minAmountOut = quoterAmountOut * 0.98e18 / 1e18;
 
-        startHoax(user);
+        _resetPrank(user);
 
-        IERC20(USDT).approve(address(router), 100e18);
+        IERC20(USDT).approve({ spender: address(entryPoint), amount: 100e18 });
 
         uint256 userBalanceBefore = user.balance;
 
-        router.multicall(
-            0x0000000000000000000000000000000000000000000000000000000000000024,
-            Solarray.bytess(
+        entryPoint.multicall({
+            replace: 0x0000000000000000000000000000000000000000000000000000000000000024,
+            data: Solarray.bytess(
                 abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
                 abi.encodeCall(TransferFacet.unwrapNativeAndTransferTo, (user, 0))
             )
-        );
+        });
 
         assertEq(user.balance - userBalanceBefore, quoterAmountOut);
+    }
 
-        vm.stopPrank();
+    // =========================
+    // multiswap with fee
+    // =========================
+
+    function test_multiswapRouterFacet_multiswap_shouldCalculateFee() external {
+        _resetPrank(owner);
+        quoter.setFeeContract({ newFeeContract: address(feeContract) });
+        // 0.03%
+        feeContract.setProtocolFee({ newProtocolFee: 300 });
+
+        IMultiswapRouterFacet.MultiswapCalldata memory mData;
+
+        mData.amountIn = 100e18;
+        mData.tokenIn = USDT;
+        mData.pairs = Solarray.bytes32s(
+            ETH_USDT_UniV3_500, WBNB_ETH_UniV3_500, WBNB_CAKE_UniV3_3000, WBNB_CAKE_CakeV3_500, WBNB_ETH_UniV3_3000
+        );
+
+        uint256 quoterAmountOut = quoter.multiswap({ data: mData });
+
+        mData.minAmountOut = quoterAmountOut;
+
+        _resetPrank(user);
+        IERC20(USDT).approve({ spender: address(entryPoint), amount: 100e18 });
+
+        entryPoint.multicall({
+            replace: 0x0000000000000000000000000000000000000000000000000000000000000024,
+            data: Solarray.bytess(
+                abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
+                abi.encodeCall(TransferFacet.transferToken, (ETH, 0, user))
+            )
+        });
+
+        assertEq(IERC20(ETH).balanceOf({ account: user }), quoterAmountOut);
+        assertEq(feeContract.profit({ owner: address(feeContract), token: ETH }), quoterAmountOut * 300 / (1e6 - 300));
     }
 }

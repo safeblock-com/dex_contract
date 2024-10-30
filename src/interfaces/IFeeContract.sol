@@ -7,37 +7,42 @@ interface IFeeContract {
     // errors
     // =========================
 
+    /// @dev Throws if `fee` is invalid
     error FeeContract_InvalidFeeValue();
-    error FeeContract_InvalidSender(address sender);
 
-    struct ReferralFee {
-        uint256 protocolPart;
-        uint256 referralPart;
-    }
+    /// @dev Throws if `sender` is not the router
+    error FeeContract_InvalidSender(address sender);
 
     // =========================
     // getters
     // =========================
 
+    /// @notice Returns router address
+    function router() external view returns (address);
+
+    /// @notice Returns the balance of the `owner` for the `token`
     function profit(address owner, address token) external view returns (uint256 balance);
-    function fees() external view returns (uint256 protocolFee, ReferralFee memory referralFee);
+
+    /// @notice Returns the protocol fee
+    function fees() external view returns (uint256 protocolFee);
 
     // =========================
     // admin logic
     // =========================
 
-    function changeRouter(address newRouter) external;
-    function changeProtocolFee(uint256 newProtocolFee) external;
-    function changeReferralFee(ReferralFee memory newReferralFee) external;
-    function collectProtocolFees(address token, address recipient) external;
-    function collectProtocolFees(address token, address recipient, uint256 amount) external;
-    function writeFees(address referralAddress, address token, uint256 amount) external returns (uint256);
+    /// @notice Sets new router
+    function setRouter(address newRouter) external;
+
+    /// @notice Sets new protocol fee
+    function setProtocolFee(uint256 newProtocolFee) external;
 
     // =========================
     // fees logic
     // =========================
 
-    function collectReferralFees(address token, address recipient) external;
+    /// @notice Collects protocol fees
+    function collectProtocolFees(address token, address recipient, uint256 amount) external;
 
-    function collectReferralFees(address token, address recipient, uint256 amount) external;
+    /// @notice Writes fees for the token
+    function writeFees(address token, uint256 amount) external returns (uint256);
 }
