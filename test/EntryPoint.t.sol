@@ -99,7 +99,8 @@ contract EntryPointTest is BaseTest {
             new EntryPoint({
                 facetsAndSelectors: DeployEngine.getBytesArray({
                     selectors: selectors,
-                    facetAddresses: Solarray.addresses(facet1, facet1, facet1, facet2, facet2, facet2, facet2)
+                    addressIndexes: Solarray.uint256s(0, 0, 0, 1, 1, 1, 1),
+                    facetAddresses: Solarray.addresses(facet1, facet2)
                 })
             })
         );
@@ -142,7 +143,8 @@ contract EntryPointTest is BaseTest {
             new EntryPoint({
                 facetsAndSelectors: DeployEngine.getBytesArray({
                     selectors: selectors,
-                    facetAddresses: Solarray.addresses(facet1, facet1, facet2, facet2, facet2, facet2)
+                    addressIndexes: Solarray.uint256s(0, 0, 1, 1, 1, 1),
+                    facetAddresses: Solarray.addresses(facet1, facet2)
                 })
             })
         );
