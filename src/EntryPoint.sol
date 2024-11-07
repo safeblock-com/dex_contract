@@ -17,12 +17,14 @@ import { TransientStorageFacetLibrary } from "./libraries/TransientStorageFacetL
 /// @dev It maps function selectors to their corresponding facet contracts.
 contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint {
     //-----------------------------------------------------------------------//
-    // function selectors and facet addresses are stored as bytes data:      //
-    // selector . address                                                    //
+    // function selectors and address indexes are stored as bytes data:      //
+    // selector . addressIndex                                               //
     // sample:                                                               //
     // 0xaaaaaaaa <- selector                                                //
-    // 0xffffffffffffffffffffffffffffffffffffffff <- address                 //
-    // 0xaaaaaaaaffffffffffffffffffffffffffffffffffffffff <- one element     //
+    // 0xff <- addressIndex                                                  //
+    // 0xaaaaaaaaff <- one element                                           //
+    //                                                                       //
+    // facetAddressess are stored in the end of the bytes array              //
     //-----------------------------------------------------------------------//
 
     /// @dev Address where facet and selector bytes are stored using SSTORE2.
@@ -173,7 +175,20 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
             revert IEntryPoint.EntryPoint_FunctionDoesNotExist({ selector: selector });
         }
 
-        return BinarySearch.binarySearch({ selector: selector, facetsAndSelectors: facetsAndSelectors });
+        uint256 selectorsLength;
+        uint256 addressesOffset;
+        assembly ("memory-safe") {
+            let value := shr(224, mload(add(32, facetsAndSelectors)))
+            selectorsLength := shr(16, value)
+            addressesOffset := and(value, 0xffff)
+        }
+
+        return BinarySearch.binarySearch({
+            selector: selector,
+            facetsAndSelectors: facetsAndSelectors,
+            length: selectorsLength,
+            addressesOffset: addressesOffset
+        });
     }
 
     /// @dev Searches for the facet addresses associated with a function `selectors`.
@@ -192,10 +207,16 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
 
         uint256 cDataStart;
         uint256 offset;
+        uint256 selectorsLength;
+        uint256 addressesOffset;
         assembly ("memory-safe") {
             cDataStart := mul(isOverride, 32)
             offset := add(68, cDataStart)
             cDataStart := add(68, cDataStart)
+
+            let value := shr(224, mload(add(32, facetsAndSelectors)))
+            selectorsLength := shr(16, value)
+            addressesOffset := and(value, 0xffff)
         }
 
         bytes4 selector;
@@ -209,7 +230,12 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
                 offset := add(offset, 32)
             }
 
-            facets[i] = BinarySearch.binarySearch({ selector: selector, facetsAndSelectors: facetsAndSelectors });
+            facets[i] = BinarySearch.binarySearch({
+                selector: selector,
+                facetsAndSelectors: facetsAndSelectors,
+                length: selectorsLength,
+                addressesOffset: addressesOffset
+            });
 
             unchecked {
                 // increment loop counter
