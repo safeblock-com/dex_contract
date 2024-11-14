@@ -34,9 +34,9 @@ contract StargateFacetTest is BaseTest {
     // =========================
 
     function test_stargateFacet_constructor_shouldInitializeInConstructor() external {
-        StargateFacet _stargateFacet = new StargateFacet({ endpointV2: contracts.endpointV2 });
+        StargateFacet _stargateFacet = new StargateFacet({ endpointV2: contracts.layerZeroEndpointV2 });
 
-        assertEq(_stargateFacet.lzEndpoint(), contracts.endpointV2);
+        assertEq(_stargateFacet.lzEndpoint(), contracts.layerZeroEndpointV2);
     }
 
     // =========================

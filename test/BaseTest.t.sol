@@ -19,7 +19,7 @@ import { EntryPoint, IEntryPoint, Initializable } from "../src/EntryPoint.sol";
 import { FeeContract, IFeeContract } from "../src/FeeContract.sol";
 
 import { MultiswapRouterFacet, IMultiswapRouterFacet } from "../src/facets/MultiswapRouterFacet.sol";
-import { TransferFacet, ITransferFacet } from "../src/facets/TransferFacet.sol";
+import { TransferFacet, ITransferFacet, ISignatureTransfer } from "../src/facets/TransferFacet.sol";
 
 import {
     StargateFacet,
@@ -29,10 +29,17 @@ import {
     OFTComposeMsgCodec
 } from "../src/facets/bridges/StargateFacet.sol";
 import { LayerZeroFacet, ILayerZeroFacet } from "../src/facets/bridges/LayerZeroFacet.sol";
+import { SymbiosisFacet, ISymbiosis } from "../src/facets/bridges/SymbiosisFacet.sol";
+
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+
+import { console2 } from "forge-std/console2.sol";
 
 contract BaseTest is Test {
     address owner;
+    uint256 ownerPk;
     address user;
+    uint256 userPk;
 
     EntryPoint entryPoint;
     Quoter quoter;
@@ -40,8 +47,12 @@ contract BaseTest is Test {
 
     Contracts contracts;
 
+    ISignatureTransfer _permit2;
+
     function deployForTest() internal {
         contracts = getContracts({ chainId: block.chainid });
+
+        _permit2 = ISignatureTransfer(contracts.permit2);
 
         (contracts,) = DeployEngine.deployImplemetations({ contracts: contracts, isTest: true });
 
@@ -71,8 +82,8 @@ contract BaseTest is Test {
     // helper
 
     function _createUsers() internal {
-        owner = makeAddr({ name: "owner" });
-        user = makeAddr({ name: "user" });
+        (owner, ownerPk) = makeAddrAndKey({ name: "owner" });
+        (user, userPk) = makeAddrAndKey({ name: "user" });
     }
 
     function _resetPrank(address msgSender) internal {
@@ -95,5 +106,54 @@ contract BaseTest is Test {
 
     function _expectERC20TransferFromCall(address token, address from, address to, uint256 amount) internal {
         vm.expectCall(token, abi.encodeCall(IERC20.transferFrom, (from, to, amount)));
+    }
+
+    bytes32 public constant _TOKEN_PERMISSIONS_TYPEHASH = keccak256("TokenPermissions(address token,uint256 amount)");
+
+    bytes32 public constant _PERMIT_TRANSFER_FROM_TYPEHASH = keccak256(
+        "PermitTransferFrom(TokenPermissions permitted,address spender,uint256 nonce,uint256 deadline)TokenPermissions(address token,uint256 amount)"
+    );
+
+    function _permit2Sign(
+        uint256 pk,
+        ISignatureTransfer.PermitTransferFrom memory permit
+    )
+        internal
+        view
+        returns (bytes memory sig)
+    {
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            pk,
+            _hashTypedData(
+                keccak256(
+                    abi.encode(
+                        _PERMIT_TRANSFER_FROM_TYPEHASH,
+                        keccak256(abi.encode(_TOKEN_PERMISSIONS_TYPEHASH, permit.permitted)),
+                        address(entryPoint),
+                        permit.nonce,
+                        permit.deadline
+                    )
+                )
+            )
+        );
+
+        sig = new bytes(64);
+        assembly ("memory-safe") {
+            mstore(add(sig, 32), r)
+            mstore(add(sig, 64), or(shl(255, eq(v, 28)), s))
+        }
+    }
+
+    function _hashTypedData(bytes32 dataHash) internal view returns (bytes32) {
+        address permit2 = contracts.permit2;
+        bytes32 domainSeparator;
+        assembly ("memory-safe") {
+            // DOMAIN_SEPARATOR() selector
+            mstore(0, 0x3644e515)
+            pop(staticcall(gas(), permit2, 28, 4, 0, 32))
+            domainSeparator := mload(0)
+        }
+
+        return keccak256(abi.encodePacked("\x19\x01", domainSeparator, dataHash));
     }
 }

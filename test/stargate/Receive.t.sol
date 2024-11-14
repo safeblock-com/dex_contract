@@ -62,7 +62,7 @@ contract ReceiveStargateFacetTest is BaseTest {
                 _amountLD: 995.1e18,
                 _composeMsg: abi.encodePacked(hex"000000000000000000000000", entryPoint, composeMsg)
             }),
-            _executor: contracts.endpointV2,
+            _executor: contracts.layerZeroEndpointV2,
             _extraData: bytes("")
         });
     }
@@ -88,7 +88,7 @@ contract ReceiveStargateFacetTest is BaseTest {
         bytes memory composeMsg =
             abi.encode(USDT, user, 0x00000000000000000000000000000000000000000000000000000000000000e8, multicallData);
 
-        _resetPrank(contracts.endpointV2);
+        _resetPrank(contracts.layerZeroEndpointV2);
 
         ILayerZeroComposer(address(entryPoint)).lzCompose({
             _from: user,
@@ -99,7 +99,7 @@ contract ReceiveStargateFacetTest is BaseTest {
                 _amountLD: 995.1e18,
                 _composeMsg: abi.encodePacked(hex"000000000000000000000000", entryPoint, composeMsg)
             }),
-            _executor: contracts.endpointV2,
+            _executor: contracts.layerZeroEndpointV2,
             _extraData: bytes("")
         });
     }
@@ -119,7 +119,7 @@ contract ReceiveStargateFacetTest is BaseTest {
         bytes memory composeMsg =
             abi.encode(USDT, user, 0x00000000000000000000000000000000000000000000000000000000000000e8, multicallData);
 
-        _resetPrank(contracts.endpointV2);
+        _resetPrank(contracts.layerZeroEndpointV2);
 
         _expectERC20TransferCall(USDT, user, 995.1e18);
         vm.expectEmit();
@@ -133,7 +133,7 @@ contract ReceiveStargateFacetTest is BaseTest {
                 _amountLD: 995.1e18,
                 _composeMsg: abi.encodePacked(hex"000000000000000000000000", entryPoint, composeMsg)
             }),
-            _executor: contracts.endpointV2,
+            _executor: contracts.layerZeroEndpointV2,
             _extraData: bytes("")
         });
     }
@@ -151,7 +151,7 @@ contract ReceiveStargateFacetTest is BaseTest {
             address(0), user, 0x00000000000000000000000000000000000000000000000000000000000000e8, multicallData
         );
 
-        _resetPrank(contracts.endpointV2);
+        _resetPrank(contracts.layerZeroEndpointV2);
 
         vm.expectEmit();
         emit CallFailed({ errorMessage: abi.encodeWithSelector(TransferHelper.TransferHelper_TransferError.selector) });
@@ -164,7 +164,7 @@ contract ReceiveStargateFacetTest is BaseTest {
                 _amountLD: 0.001e18,
                 _composeMsg: abi.encodePacked(hex"000000000000000000000000", entryPoint, composeMsg)
             }),
-            _executor: contracts.endpointV2,
+            _executor: contracts.layerZeroEndpointV2,
             _extraData: bytes("")
         });
 

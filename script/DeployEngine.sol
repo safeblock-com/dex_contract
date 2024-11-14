@@ -5,6 +5,7 @@ import { TransferFacet } from "../src/facets/TransferFacet.sol";
 import { MultiswapRouterFacet } from "../src/facets/MultiswapRouterFacet.sol";
 import { StargateFacet } from "../src/facets/bridges/StargateFacet.sol";
 import { LayerZeroFacet } from "../src/facets/bridges/LayerZeroFacet.sol";
+import { SymbiosisFacet } from "../src/facets/bridges/SymbiosisFacet.sol";
 
 import { EntryPoint } from "../src/EntryPoint.sol";
 
@@ -13,6 +14,7 @@ struct Contracts {
     address multiswapRouterFacet;
     address stargateFacet;
     address layerZeroFacet;
+    address symbiosisFacet;
     //
     address quoter;
     address quoterProxy;
@@ -21,7 +23,9 @@ struct Contracts {
     address feeContractProxy;
     //
     address wrappedNative;
-    address endpointV2;
+    address layerZeroEndpointV2;
+    address symbiosisPortal;
+    address permit2;
 }
 
 function getContracts(uint256 chainId) pure returns (Contracts memory) {
@@ -32,6 +36,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             multiswapRouterFacet: address(0),
             stargateFacet: address(0),
             layerZeroFacet: address(0),
+            symbiosisFacet: address(0),
             //
             quoter: address(0),
             quoterProxy: address(0),
@@ -40,7 +45,9 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContractProxy: address(0),
             //
             wrappedNative: 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2,
-            endpointV2: 0x1a44076050125825900e736c501f859c50fE728c
+            layerZeroEndpointV2: 0x1a44076050125825900e736c501f859c50fE728c,
+            symbiosisPortal: 0xb8f275fBf7A959F4BCE59999A2EF122A099e81A8,
+            permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3
         });
     }
 
@@ -51,6 +58,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             multiswapRouterFacet: 0x65DfbA5338137e0De3c7e9C11D9BFEd0B02c33b8,
             stargateFacet: 0xdd4ec4bFecAb02CbE60CdBA8De49821a1105c24f,
             layerZeroFacet: 0xC2F6a6c1712899fCA57df645cfA0E9d04e0B5A38,
+            symbiosisFacet: address(0),
             //
             quoter: 0x2ef78f53965cB6b6BE3DF79e143D07790c3E84b3,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
@@ -59,7 +67,9 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
             //
             wrappedNative: 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c,
-            endpointV2: 0x1a44076050125825900e736c501f859c50fE728c
+            layerZeroEndpointV2: 0x1a44076050125825900e736c501f859c50fE728c,
+            symbiosisPortal: 0x5Aa5f7f84eD0E5db0a4a85C3947eA16B53352FD4,
+            permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3
         });
     }
 
@@ -70,6 +80,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             multiswapRouterFacet: 0x995f1B46F71Bc83a90653286e85185D27956687e,
             stargateFacet: 0x40EC78B5A9170b66Aa12B17627A97429f596a185,
             layerZeroFacet: 0x10255Eb3cd67406b07D6C82E69460848BCa83022,
+            symbiosisFacet: address(0),
             //
             quoter: 0x33E3337E3d68aB3b56C86613CCF34CB0d006Ab04,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
@@ -78,7 +89,9 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
             //
             wrappedNative: 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270,
-            endpointV2: 0x1a44076050125825900e736c501f859c50fE728c
+            layerZeroEndpointV2: 0x1a44076050125825900e736c501f859c50fE728c,
+            symbiosisPortal: 0xb8f275fBf7A959F4BCE59999A2EF122A099e81A8,
+            permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3
         });
     }
 
@@ -89,6 +102,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             multiswapRouterFacet: 0x649BC4A713de188d4e68977ad61f9A5AD795D276,
             stargateFacet: 0x40EC78B5A9170b66Aa12B17627A97429f596a185,
             layerZeroFacet: 0xC0D032E84682c43e101E1e6578E0dEded5d224eD,
+            symbiosisFacet: address(0),
             //
             quoter: 0x33E3337E3d68aB3b56C86613CCF34CB0d006Ab04,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
@@ -97,7 +111,9 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
             //
             wrappedNative: 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7,
-            endpointV2: 0x1a44076050125825900e736c501f859c50fE728c
+            layerZeroEndpointV2: 0x1a44076050125825900e736c501f859c50fE728c,
+            symbiosisPortal: 0xE75C7E85FE6ADd07077467064aD15847E6ba9877,
+            permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3
         });
     }
 
@@ -108,6 +124,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             multiswapRouterFacet: 0x995f1B46F71Bc83a90653286e85185D27956687e,
             stargateFacet: 0x6bF6c75738dC7114E162fB4df10ABADCF1b5bDb0,
             layerZeroFacet: 0x10255Eb3cd67406b07D6C82E69460848BCa83022,
+            symbiosisFacet: address(0),
             //
             quoter: 0x033D438b5a95216740F14e80b6Ce045C0E65d610,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
@@ -116,7 +133,9 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
             //
             wrappedNative: 0x4200000000000000000000000000000000000006,
-            endpointV2: 0x1a44076050125825900e736c501f859c50fE728c
+            layerZeroEndpointV2: 0x1a44076050125825900e736c501f859c50fE728c,
+            symbiosisPortal: 0x292fC50e4eB66C3f6514b9E402dBc25961824D62,
+            permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3
         });
     }
 
@@ -127,6 +146,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             multiswapRouterFacet: 0x995f1B46F71Bc83a90653286e85185D27956687e,
             stargateFacet: 0x6bF6c75738dC7114E162fB4df10ABADCF1b5bDb0,
             layerZeroFacet: 0x10255Eb3cd67406b07D6C82E69460848BCa83022,
+            symbiosisFacet: address(0),
             //
             quoter: 0x033D438b5a95216740F14e80b6Ce045C0E65d610,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
@@ -135,7 +155,9 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
             //
             wrappedNative: 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1,
-            endpointV2: 0x1a44076050125825900e736c501f859c50fE728c
+            layerZeroEndpointV2: 0x1a44076050125825900e736c501f859c50fE728c,
+            symbiosisPortal: 0x01A3c8E513B758EBB011F7AFaf6C37616c9C24d9,
+            permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3
         });
     }
 
@@ -146,7 +168,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
 library DeployEngine {
     function deployEntryPoint(Contracts memory contracts) internal returns (address) {
         bytes4[] memory selectors = new bytes4[](250);
-        address[] memory facetAddresses = new address[](250);
+        address[] memory facetAddresses = new address[](25);
         uint256[] memory addressIndexes = new uint256[](250);
 
         uint256 i;
@@ -155,11 +177,13 @@ library DeployEngine {
 
         if (contracts.transferFacet != address(0)) {
             // transfer Facet
+            selectors[i++] = TransferFacet.getNonceForPermit2.selector;
+            selectors[i++] = TransferFacet.transferFromPermit2.selector;
             selectors[i++] = TransferFacet.transferToken.selector;
             selectors[i++] = TransferFacet.transferNative.selector;
             selectors[i++] = TransferFacet.unwrapNative.selector;
             selectors[i++] = TransferFacet.unwrapNativeAndTransferTo.selector;
-            for (uint256 k; k < 4; ++k) {
+            for (uint256 k; k < 6; ++k) {
                 addressIndexes[j++] = addressIndex;
             }
             facetAddresses[addressIndex] = contracts.transferFacet;
@@ -214,7 +238,19 @@ library DeployEngine {
             for (uint256 k; k < 18; ++k) {
                 addressIndexes[j++] = addressIndex;
             }
+
             facetAddresses[addressIndex] = contracts.layerZeroFacet;
+
+            ++addressIndex;
+        }
+
+        if (contracts.symbiosisFacet != address(0)) {
+            selectors[i++] = SymbiosisFacet.portal.selector;
+            selectors[i++] = SymbiosisFacet.send.selector;
+            for (uint256 k; k < 2; ++k) {
+                addressIndexes[j++] = addressIndex;
+            }
+            facetAddresses[addressIndex] = contracts.symbiosisFacet;
             ++addressIndex;
         }
 
@@ -252,19 +288,26 @@ library DeployEngine {
         if (contracts.transferFacet == address(0) || isTest) {
             upgrade = true;
 
-            contracts.transferFacet = address(new TransferFacet({ wrappedNative: contracts.wrappedNative }));
+            contracts.transferFacet =
+                address(new TransferFacet({ wrappedNative: contracts.wrappedNative, permit2: contracts.permit2 }));
         }
 
         if (contracts.stargateFacet == address(0) || isTest) {
             upgrade = true;
 
-            contracts.stargateFacet = address(new StargateFacet({ endpointV2: contracts.endpointV2 }));
+            contracts.stargateFacet = address(new StargateFacet({ endpointV2: contracts.layerZeroEndpointV2 }));
         }
 
         if (contracts.layerZeroFacet == address(0) || isTest) {
             upgrade = true;
 
-            contracts.layerZeroFacet = address(new LayerZeroFacet({ endpointV2: contracts.endpointV2 }));
+            contracts.layerZeroFacet = address(new LayerZeroFacet({ endpointV2: contracts.layerZeroEndpointV2 }));
+        }
+
+        if (contracts.symbiosisFacet == address(0) || isTest) {
+            upgrade = true;
+
+            contracts.symbiosisFacet = address(new SymbiosisFacet({ portal_: contracts.symbiosisPortal }));
         }
 
         return (contracts, upgrade);

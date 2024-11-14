@@ -27,7 +27,7 @@ contract LayerZeroFacetTest is BaseTest {
     function test_layerZeroFacet_gettersAndSetters() external {
         _resetPrank(owner);
 
-        new LayerZeroFacet({ endpointV2: contracts.endpointV2 });
+        new LayerZeroFacet({ endpointV2: contracts.layerZeroEndpointV2 });
 
         assertEq(ILayerZeroFacet(address(entryPoint)).eid(), 30_102);
 
