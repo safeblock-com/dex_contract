@@ -104,7 +104,7 @@ library TransferHelper {
     /// @param data Calldata for the low-level call.
     /// @return True if the call succeeded, false otherwise.
     function _makeCall(address token, bytes memory data) private returns (bool) {
-        (bool success, bytes memory returndata) = token.call(data);
-        return success && (returndata.length == 0 || abi.decode(returndata, (bool)));
+        (bool success, bytes memory returnData) = token.call(data);
+        return success && (returnData.length == 0 || abi.decode(returnData, (bool)));
     }
 }

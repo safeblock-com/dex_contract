@@ -22,7 +22,7 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
     using OptionsBuilder for bytes;
     using TransferHelper for address;
 
-    /// @dev Address of the layerzero endpoint
+    /// @dev Address of the layerZero endpoint
     address private immutable _lzEndpointV2;
 
     // =========================

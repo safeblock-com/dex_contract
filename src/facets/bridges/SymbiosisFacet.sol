@@ -5,75 +5,42 @@ import { TransferHelper } from "../libraries/TransferHelper.sol";
 
 import { TransientStorageFacetLibrary } from "../../libraries/TransientStorageFacetLibrary.sol";
 
-interface ISymbiosis {
-    struct MetaSynthesizeTransaction {
-        uint256 stableBridgingFee;
-        uint256 amount;
-        address rtoken;
-        address chain2address;
-        address receiveSide;
-        address oppositeBridge;
-        address syntCaller;
-        uint256 chainID;
-        address[] swapTokens;
-        address secondDexRouter;
-        bytes secondSwapCalldata;
-        address finalReceiveSide;
-        bytes finalCalldata;
-        uint256 finalOffset;
-        address revertableAddress;
-        bytes32 clientID;
-    }
+import { ISymbiosis } from "./interfaces/ISymbiosis.sol";
+import { ISymbiosisFacet } from "./interfaces/ISymbiosisFacet.sol";
 
-    function metaSynthesize(MetaSynthesizeTransaction memory _metaSynthesizeTransaction) external returns (bytes32);
-
-    function multicall(
-        uint256 amountIn,
-        bytes[] memory callData,
-        address[] memory receiveSides,
-        address[] memory path,
-        uint256[] memory offset,
-        address to
-    )
-        external;
-
-    function swap(
-        uint256 tokenIdIn,
-        uint256 tokenIdOut,
-        uint256 amountIn,
-        uint256 amountOutMin,
-        address transferFrom,
-        uint256 deadline
-    )
-        external;
-}
-
-contract SymbiosisFacet {
+/// @title SymbiosisFacet
+contract SymbiosisFacet is ISymbiosisFacet {
     using TransferHelper for address;
 
+    // =========================
+    // immutable storage
+    // =========================
+
     ISymbiosis internal immutable _portal;
+
+    // =========================
+    // constructor
+    // =========================
 
     constructor(address portal_) {
         _portal = ISymbiosis(portal_);
     }
 
+    // =========================
+    // getters
+    // =========================
+
+    /// @inheritdoc ISymbiosisFacet
     function portal() external view returns (address) {
         return address(_portal);
     }
 
-    struct SymbiosisTransaction {
-        uint256 stableBridgingFee;
-        uint256 amount;
-        address rtoken;
-        address chain2address;
-        address[] swapTokens;
-        bytes secondSwapCalldata;
-        address finalReceiveSide;
-        bytes finalCalldata;
-        uint256 finalOffset;
-    }
+    // =========================
+    // main function
+    // =========================
 
-    function send(SymbiosisTransaction calldata symbiosisTransaction) external {
+    /// @inheritdoc ISymbiosisFacet
+    function sendSymbiosis(ISymbiosisFacet.SymbiosisTransaction calldata symbiosisTransaction) external {
         address sender = TransientStorageFacetLibrary.getSenderAddress();
         if (symbiosisTransaction.rtoken.safeGetBalance({ account: address(this) }) < symbiosisTransaction.amount) {
             symbiosisTransaction.rtoken.safeTransferFrom({
@@ -100,7 +67,7 @@ contract SymbiosisFacet {
                 secondSwapCalldata: symbiosisTransaction.secondSwapCalldata,
                 finalReceiveSide: symbiosisTransaction.finalReceiveSide,
                 finalCalldata: symbiosisTransaction.finalCalldata,
-                finalOffset: symbiosisTransaction.finalOffset, // calculate final offset for multicall with transfer token or multiswap
+                finalOffset: symbiosisTransaction.finalOffset,
                 revertableAddress: symbiosisTransaction.chain2address,
                 clientID: bytes32("SafeBlock")
             })

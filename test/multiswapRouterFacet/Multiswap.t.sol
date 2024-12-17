@@ -11,14 +11,13 @@ import {
     TransferFacet,
     ITransferFacet,
     ISignatureTransfer,
-    SafeTransferLib,
     console2
 } from "../BaseTest.t.sol";
 
 import "../Helpers.t.sol";
 
 contract MultiswapTest is BaseTest {
-    using SafeTransferLib for address;
+    using TransferHelper for address;
 
     function setUp() external {
         vm.createSelectFork(vm.rpcUrl("bsc"));
@@ -33,7 +32,7 @@ contract MultiswapTest is BaseTest {
 
         _resetPrank(user);
 
-        USDT.safeApprove({ to: contracts.permit2, amount: 1000e18 });
+        USDT.safeApprove({ spender: contracts.permit2, value: 1000e18 });
     }
 
     // =========================
@@ -191,7 +190,7 @@ contract MultiswapTest is BaseTest {
         mData.pairs = Solarray.bytes32s(WBNB_CAKE_CakeV3_500, BUSD_USDT_UniV3_3000);
         entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData))) });
 
-        USDT.safeApprove({ to: address(entryPoint), amount: 100e18 });
+        USDT.safeApprove({ spender: address(entryPoint), value: 100e18 });
 
         // tokenIn is not in sent pair
         vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidTokenIn.selector);
@@ -239,7 +238,7 @@ contract MultiswapTest is BaseTest {
             )
         });
 
-        assertEq(WBNB.balanceOf({ account: user }), quoterAmountOut);
+        assertEq(WBNB.safeGetBalance({ account: user }), quoterAmountOut);
     }
 
     function test_multiswapRouterFacet_multiswap_shouldSwapThroughAllUniswapV3Pairs() external {
@@ -275,7 +274,7 @@ contract MultiswapTest is BaseTest {
             )
         });
 
-        assertEq(ETH.balanceOf({ account: user }), quoterAmountOut);
+        assertEq(ETH.safeGetBalance({ account: user }), quoterAmountOut);
     }
 
     function test_multiswapRouterFacet_failedV3Swap() external {
@@ -290,7 +289,7 @@ contract MultiswapTest is BaseTest {
         assertEq(quoter.multiswap({ data: mData }), 0);
 
         _resetPrank(user);
-        USDC.safeApprove({ to: address(entryPoint), amount: 100e18 });
+        USDC.safeApprove({ spender: address(entryPoint), value: 100e18 });
 
         vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_FailedV3Swap.selector);
         entryPoint.multicall({
@@ -429,7 +428,7 @@ contract MultiswapTest is BaseTest {
 
         _resetPrank(user);
 
-        uint256 userBalanceBefore = USDT.balanceOf({ account: user });
+        uint256 userBalanceBefore = USDT.safeGetBalance({ account: user });
 
         entryPoint.multicall{ value: 10e18 }({
             replace: 0x0000000000000000000000000000000000000000000000000000000000000024,
@@ -439,7 +438,7 @@ contract MultiswapTest is BaseTest {
             )
         });
 
-        assertEq(USDT.balanceOf({ account: user }) - userBalanceBefore, quoterAmountOut);
+        assertEq(USDT.safeGetBalance({ account: user }) - userBalanceBefore, quoterAmountOut);
     }
 
     function test_multiswapRouterFacet_multiswap_swapToNativeThroughV2V3Pairs() external {
@@ -520,7 +519,7 @@ contract MultiswapTest is BaseTest {
             )
         });
 
-        assertEq(ETH.balanceOf({ account: user }), quoterAmountOut);
+        assertEq(ETH.safeGetBalance({ account: user }), quoterAmountOut);
         assertEq(feeContract.profit({ owner: address(feeContract), token: ETH }), quoterAmountOut * 300 / (1e6 - 300));
     }
 }
