@@ -16,6 +16,9 @@ polygon = "${POLYGON_RPC_URL}"
 arbitrum = "${ARBITRUM_RPC_URL}"
 optimism = "${OPTIMISM_RPC_URL}"
 avalanche = "${AVALANCHE_C_CHAIN_RPC_URL}"
+base = "${BASE_RPC_URL}"
+tron = "${TRON_RPC_URL}"
+trontest = "${TRON_TESTNET_RPC_URL}"
 
 [etherscan]
 mainnet = { key = "${ETH_API_KEY}", chainid = 1 }
@@ -23,6 +26,7 @@ bsc = { key = "${BSC_API_KEY}", chainid = 56 }
 polygon = { key = "${POLYGON_API_KEY}", chainid = 137 }
 arbitrum = { key = "${ARBITRUM_API_KEY}", chainid = 42161 }
 optimism = { key = "${OPTIMISM_API_KEY}", chainid = 10 }
+base = { key = "${BASE_API_KEY}", chainid = 8453 }
 
 [fmt]
 bracket_spacing = true

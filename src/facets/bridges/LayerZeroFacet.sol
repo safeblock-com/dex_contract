@@ -306,7 +306,7 @@ contract LayerZeroFacet is Ownable, ILayerZeroFacet {
         return fee.nativeFee;
     }
 
-    /// @dev Hepler method for get peer for passed remoteEid.
+    /// @dev Helper method for get peer for passed remoteEid.
     function _getPeer(uint32 remoteEid) internal view returns (bytes32 trustedRemote) {
         trustedRemote = _getLocalStorage().peers[remoteEid];
         if (trustedRemote == 0) {
@@ -316,7 +316,7 @@ contract LayerZeroFacet is Ownable, ILayerZeroFacet {
         }
     }
 
-    /// @dev Hepler method for get gasLimit for passed remoteEid.
+    /// @dev Helper method for get gasLimit for passed remoteEid.
     function _getGasLimit(uint32 remoteEid) internal view returns (uint128 gasLimit) {
         LayerZeroFacetStorage storage s = _getLocalStorage();
 

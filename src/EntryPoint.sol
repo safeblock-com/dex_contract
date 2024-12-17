@@ -24,7 +24,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
     // 0xff <- addressIndex                                                  //
     // 0xaaaaaaaaff <- one element                                           //
     //                                                                       //
-    // facetAddressess are stored in the end of the bytes array              //
+    // facetAddresses are stored in the end of the bytes array              //
     //-----------------------------------------------------------------------//
 
     /// @dev Address where facet and selector bytes are stored using SSTORE2.
