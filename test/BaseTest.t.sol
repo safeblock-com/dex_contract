@@ -31,6 +31,8 @@ import {
 import { LayerZeroFacet, ILayerZeroFacet } from "../src/facets/bridges/LayerZeroFacet.sol";
 import { SymbiosisFacet, ISymbiosisFacet, ISymbiosis } from "../src/facets/bridges/SymbiosisFacet.sol";
 
+import { TransientStorageFacetLibrary } from "../src/libraries/TransientStorageFacetLibrary.sol";
+
 import { console2 } from "forge-std/console2.sol";
 
 contract BaseTest is Test {

@@ -36,7 +36,7 @@ library TransferHelper {
     /// @param from Address of the sender.
     /// @param to Address of the recipient.
     /// @param value Amount to transfer.
-    function safeTransferFrom(address token, address from, address to, uint256 value) internal {
+    function safeTransferFrom(address token, address from, uint256 value, address to) internal {
         if (!_makeCall(token, abi.encodeCall(IERC20.transferFrom, (from, to, value)))) {
             revert TransferHelper_TransferFromError();
         }

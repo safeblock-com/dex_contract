@@ -23,6 +23,19 @@ interface ISymbiosis {
 
     function metaSynthesize(MetaSynthesizeTransaction memory _metaSynthesizeTransaction) external returns (bytes32);
 
+    function metaUnsynthesize(
+        uint256 _stableBridgingFee,
+        bytes32 _crossChainID,
+        bytes32 _externalID,
+        address _to,
+        uint256 _amount,
+        address _rToken,
+        address _finalReceiveSide,
+        bytes memory _finalCalldata,
+        uint256 _finalOffset
+    )
+        external;
+
     function multicall(
         uint256 amountIn,
         bytes[] memory callData,

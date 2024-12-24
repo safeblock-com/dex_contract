@@ -33,14 +33,8 @@ interface ITransferFacet {
         returns (uint256);
 
     /// @notice Transfer ERC20 token to `to`
-    function transferToken(address token, uint256 amount, address to) external returns (uint256);
-
-    /// @notice Transfer native token to `to`
-    function transferNative(address to, uint256 amount) external returns (uint256);
-
-    /// @notice Unwrap native token
-    function unwrapNative(uint256 amount) external returns (uint256);
+    function transferToken(address to) external returns (uint256);
 
     /// @notice Unwrap native token and transfer to `to`
-    function unwrapNativeAndTransferTo(address to, uint256 amount) external returns (uint256);
+    function unwrapNativeAndTransferTo(address to) external returns (uint256);
 }

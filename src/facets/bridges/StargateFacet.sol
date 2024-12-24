@@ -20,7 +20,6 @@ import { IStargateFacet } from "./interfaces/IStargateFacet.sol";
 /// @notice A stargate facet for cross-chain messaging and token bridging
 contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
     using OptionsBuilder for bytes;
-    using TransferHelper for address;
 
     /// @dev Address of the layerZero endpoint
     address private immutable _lzEndpointV2;
@@ -79,7 +78,6 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
         bytes memory composeMsg
     )
         external
-        payable
         returns (uint256)
     {
         (address token, uint256 valueToSend, SendParam memory sendParam, MessagingFee memory messagingFee) =
@@ -90,17 +88,17 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
         address sender = TransientStorageFacetLibrary.getSenderAddress();
 
         uint256 balanceBefore;
-
         if (token > address(0)) {
-            balanceBefore = token.safeGetBalance({ account: address(this) });
-
-            if (balanceBefore < amountLD) {
-                token.safeTransferFrom({ from: sender, to: address(this), value: amountLD });
-                balanceBefore = token.safeGetBalance({ account: address(this) });
+            (address _token, uint256 amount) = TransientStorageFacetLibrary.getTokenAndAmount();
+            if (_token == address(0) && amount == 0) {
+                if (sender != address(this)) {
+                    TransferHelper.safeTransferFrom({ token: token, from: sender, to: address(this), value: amountLD });
+                }
             }
-
-            token.safeApprove({ spender: poolAddress, value: amountLD });
+            balanceBefore = TransferHelper.safeGetBalance({ token: token, account: address(this) });
         }
+
+        TransferHelper.safeApprove({ token: token, spender: poolAddress, value: amountLD });
 
         IStargate(poolAddress).sendToken{ value: valueToSend }({
             sendParam: sendParam,
@@ -112,7 +110,11 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
             return 0;
         } else {
             unchecked {
-                return amountLD - (balanceBefore - token.safeGetBalance({ account: address(this) }));
+                uint256 balanceAfterTransfer =
+                    amountLD - (balanceBefore - TransferHelper.safeGetBalance({ token: token, account: address(this) }));
+
+                TransientStorageFacetLibrary.setTokenAndAmount({ token: token, amount: balanceAfterTransfer });
+                return balanceAfterTransfer;
             }
         }
     }
@@ -133,7 +135,7 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
         payable
     {
         if (msg.sender != _lzEndpointV2) {
-            revert IStargateFacet.NotLZEndpoint();
+            revert IStargateFacet.StargateFacet_NotLZEndpoint();
         }
 
         uint256 amountLD = OFTComposeMsgCodec.amountLD({ _msg: message });
@@ -159,6 +161,8 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
     )
         internal
     {
+        TransientStorageFacetLibrary.setTokenAndAmount({ token: asset, amount: amountLD });
+
         bool successfulCall;
         assembly ("memory-safe") {
             if argOverride { mstore(add(payload, add(32, argOverride)), amountLD) }
@@ -172,7 +176,7 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
         }
 
         if (!successfulCall) {
-            emit CallFailed({ errorMessage: payload });
+            emit IStargateFacet.CallFailed({ errorMessage: payload });
 
             if (asset == address(0)) {
                 TransferHelper.safeTransferNative({ to: fallbackAddress, value: amountLD });
