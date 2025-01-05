@@ -7,11 +7,10 @@ import { Proxy, InitialImplementation } from "../src/proxy/Proxy.sol";
 import { EntryPoint, IEntryPoint } from "../src/EntryPoint.sol";
 
 import { DeployEngine } from "../script/DeployEngine.sol";
-import { Solarray } from "solarray/Solarray.sol";
 
 import { Initializable } from "../src/proxy/Initializable.sol";
 
-import { BaseTest } from "./BaseTest.t.sol";
+import { BaseTest, Solarray } from "./BaseTest.t.sol";
 
 contract Facet1 {
     struct FacetStorage {
@@ -296,5 +295,52 @@ contract EntryPointTest is BaseTest {
             )
         );
         InitialImplementation(address(entryPoint)).upgradeTo({ implementation: address(0), data: bytes("") });
+    }
+
+    // =========================
+    // diamond getters
+    // =========================
+
+    function test_entryPoint_facets_diamondGetters() external view {
+        assertEq(entryPoint.facetAddress({ functionSelector: Facet1.setValue1.selector }), address(facet1));
+        assertEq(entryPoint.facetAddress({ functionSelector: Facet2.setValue2.selector }), address(facet2));
+
+        address[] memory _facets = entryPoint.facetAddresses();
+
+        assertEq(_facets.length, 2);
+        assertEq(_facets[0], address(facet1));
+        assertEq(_facets[1], address(facet2));
+
+        bytes4[] memory facetFunctionSelectors = entryPoint.facetFunctionSelectors({ facet: _facets[0] });
+        bytes4[] memory facet1FunctionSelectorsExpected =
+            Solarray.bytes4s(Facet1.setValue1.selector, Facet1.getValue1.selector, Facet1.revertMethod.selector);
+
+        for (uint256 i; i < facetFunctionSelectors.length; ++i) {
+            _assertEqual(facetFunctionSelectors[i], facet1FunctionSelectorsExpected);
+        }
+
+        facetFunctionSelectors = entryPoint.facetFunctionSelectors({ facet: _facets[1] });
+        bytes4[] memory facet2FunctionSelectorsExpected = Solarray.bytes4s(
+            Facet2.setValue2.selector, Facet2.getValue2.selector, Facet2.setValue3.selector, Facet2.getValue3.selector
+        );
+
+        for (uint256 i; i < facetFunctionSelectors.length; ++i) {
+            _assertEqual(facetFunctionSelectors[i], facet2FunctionSelectorsExpected);
+        }
+
+        IEntryPoint.Facet[] memory facets = entryPoint.facets();
+
+        assertEq(facets.length, 2);
+        assertEq(facets[0].facet, address(facet1));
+        assertEq(facets[0].functionSelectors.length, 3);
+        for (uint256 i; i < facets[0].functionSelectors.length; ++i) {
+            _assertEqual(facets[0].functionSelectors[i], facet1FunctionSelectorsExpected);
+        }
+
+        assertEq(facets[1].facet, address(facet2));
+        assertEq(facets[1].functionSelectors.length, 4);
+        for (uint256 i; i < facets[1].functionSelectors.length; ++i) {
+            _assertEqual(facets[1].functionSelectors[i], facet2FunctionSelectorsExpected);
+        }
     }
 }

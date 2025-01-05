@@ -99,18 +99,68 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
     receive() external payable { }
 
     // =======================
+    // diamond getters
+    // =======================
+
+    /// @inheritdoc IEntryPoint
+    function facets() external view returns (IEntryPoint.Facet[] memory _facets) {
+        bytes memory facetsAndSelectors = SSTORE2.read(_facetsAndSelectorsAddress);
+        address[] memory _facetsRaw = _getAddresses(facetsAndSelectors);
+
+        _facets = new IEntryPoint.Facet[](_facetsRaw.length);
+
+        for (uint256 i; i < _facetsRaw.length;) {
+            _facets[i].facet = _facetsRaw[i];
+            _facets[i].functionSelectors = _getFacetFunctionSelectors(facetsAndSelectors, i);
+
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /// @inheritdoc IEntryPoint
+    function facetFunctionSelectors(address facet) external view returns (bytes4[] memory _facetFunctionSelectors) {
+        bytes memory facetsAndSelectors = SSTORE2.read(_facetsAndSelectorsAddress);
+        address[] memory _facets = _getAddresses(facetsAndSelectors);
+
+        uint256 facetIndex = type(uint64).max;
+        for (uint256 i; i < _facets.length;) {
+            if (_facets[i] == facet) {
+                facetIndex = i;
+                break;
+            }
+            unchecked {
+                ++i;
+            }
+        }
+
+        _facetFunctionSelectors = _getFacetFunctionSelectors(facetsAndSelectors, facetIndex);
+    }
+
+    /// @inheritdoc IEntryPoint
+    function facetAddresses() external view returns (address[] memory _facets) {
+        _facets = _getAddresses(SSTORE2.read(_facetsAndSelectorsAddress));
+    }
+
+    /// @inheritdoc IEntryPoint
+    function facetAddress(bytes4 functionSelector) external view returns (address _facet) {
+        _facet = _getAddress(functionSelector);
+    }
+
+    // =======================
     // internal function
     // =======================
 
     function _multicall(bool isOverride, bytes32 replace, bytes[] calldata data) internal {
-        address[] memory facets = _getAddresses(isOverride, data);
+        address[] memory _facets = _getAddresses(isOverride, data);
 
         TransientStorageFacetLibrary.setSenderAddress({ senderAddress: msg.sender });
 
         assembly ("memory-safe") {
             for {
                 let length := data.length
-                let memoryOffset := add(facets, 32)
+                let memoryOffset := add(_facets, 32)
                 let ptr := mload(64)
 
                 let cDataStart := mul(isOverride, 32)
@@ -194,10 +244,10 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
     /// @dev Searches for the facet addresses associated with a function `selectors`.
     /// @dev Uses binary search to find the facet addresses in facetsAndSelectors bytes.
     /// @param datas The calldata to be searched.
-    /// @return facets The addresses of the facet contracts.
-    function _getAddresses(bool isOverride, bytes[] calldata datas) internal view returns (address[] memory facets) {
+    /// @return _facets The addresses of the facet contracts.
+    function _getAddresses(bool isOverride, bytes[] calldata datas) internal view returns (address[] memory _facets) {
         uint256 length = datas.length;
-        facets = new address[](length);
+        _facets = new address[](length);
 
         bytes memory facetsAndSelectors = SSTORE2.read(_facetsAndSelectorsAddress);
 
@@ -230,7 +280,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
                 offset := add(offset, 32)
             }
 
-            facets[i] = BinarySearch.binarySearch({
+            _facets[i] = BinarySearch.binarySearch({
                 selector: selector,
                 facetsAndSelectors: facetsAndSelectors,
                 length: selectorsLength,
@@ -246,6 +296,66 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
         assembly ("memory-safe") {
             // re-use unnecessary memory
             mstore(64, facetsAndSelectors)
+        }
+    }
+
+    /// @dev Returns the addresses of the facets.
+    function _getAddresses(bytes memory facetsAndSelectors) internal pure returns (address[] memory _facets) {
+        assembly ("memory-safe") {
+            let counter
+            for {
+                _facets := mload(64)
+                let addressesOffset :=
+                    add(
+                        add(facetsAndSelectors, 36), // 32 for length + 4 for metadata
+                        and(shr(224, mload(add(32, facetsAndSelectors))), 0xffff)
+                    )
+                let offset := add(_facets, 32)
+            } 1 {
+                offset := add(offset, 32)
+                addressesOffset := add(addressesOffset, 20)
+            } {
+                let value := shr(96, mload(addressesOffset))
+                if iszero(value) { break }
+                mstore(offset, value)
+                counter := add(counter, 1)
+            }
+
+            mstore(_facets, counter)
+            mstore(64, add(mload(64), add(32, mul(counter, 32))))
+        }
+    }
+
+    /// @dev Returns the selectors of the facet with the given index.
+    function _getFacetFunctionSelectors(
+        bytes memory facetsAndSelectors,
+        uint256 facetIndex
+    )
+        internal
+        pure
+        returns (bytes4[] memory _facetFunctionSelectors)
+    {
+        assembly ("memory-safe") {
+            let counter
+            for {
+                _facetFunctionSelectors := mload(64)
+                let offset := add(_facetFunctionSelectors, 32)
+                let selectorsOffset := add(facetsAndSelectors, 36) // 32 for length + 4 for metadata
+                let selectorsLength := shr(240, mload(add(32, facetsAndSelectors)))
+            } selectorsLength {
+                selectorsLength := sub(selectorsLength, 1)
+                selectorsOffset := add(selectorsOffset, 5)
+            } {
+                let selector := mload(selectorsOffset)
+                if eq(and(shr(216, selector), 0xff), facetIndex) {
+                    mstore(offset, and(selector, 0xffffffff00000000000000000000000000000000000000000000000000000000))
+                    counter := add(counter, 1)
+                    offset := add(offset, 32)
+                }
+            }
+
+            mstore(_facetFunctionSelectors, counter)
+            mstore(64, add(mload(64), add(32, mul(counter, 32))))
         }
     }
 

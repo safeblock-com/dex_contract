@@ -80,7 +80,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContract: 0xA41be65A7C167D401F8bD980ebb019AF5a7bfe26,
             feeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
             //
-            prodEntryPoint: 0xA7c61a0aae5e3CC3484c13B86dD39ABa80E70940,
+            prodEntryPoint: 0x71e1e613f57102A7c921a829848C3823030ed500,
             prodProxy: address(0),
             prodFeeContractProxy: address(0),
             //
@@ -108,7 +108,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContract: 0x911eEd36e5fB42d0202FAA2b0A848d35777eB05F,
             feeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
             //
-            prodEntryPoint: 0xF9B37dFa8479C657FddD9fB50dDb75404622EBCe,
+            prodEntryPoint: 0x82eefc5d2053CC3C33d76F58979cAcd08944C2CC,
             prodProxy: address(0),
             prodFeeContractProxy: address(0),
             //
@@ -136,7 +136,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContract: 0x861fF1De5877d91ebE37cE8fB95274524f5f8E21,
             feeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
             //
-            prodEntryPoint: 0xf2A3Ca6cBFcF49389973FFB533180Ad82e31A180,
+            prodEntryPoint: 0xFc204864E7E3a1a99504b39e18f5C7C57Eb4fEF7,
             prodProxy: address(0),
             prodFeeContractProxy: address(0),
             //
@@ -164,7 +164,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContract: 0x911eEd36e5fB42d0202FAA2b0A848d35777eB05F,
             feeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
             //
-            prodEntryPoint: 0x605750a4e1d8971d64a7c4FD5f8DF238e06dFFc6,
+            prodEntryPoint: 0x2322D126382844B64E2FbDB1f69fe91A70Db463c,
             prodProxy: address(0),
             prodFeeContractProxy: address(0),
             //
@@ -192,7 +192,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContract: 0x911eEd36e5fB42d0202FAA2b0A848d35777eB05F,
             feeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
             //
-            prodEntryPoint: 0x605750a4e1d8971d64a7c4FD5f8DF238e06dFFc6,
+            prodEntryPoint: 0x2322D126382844B64E2FbDB1f69fe91A70Db463c,
             prodProxy: address(0),
             prodFeeContractProxy: address(0),
             //
@@ -220,7 +220,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContract: 0x76126f040aF711bE697675137557524Ed79A280B,
             feeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
             //
-            prodEntryPoint: 0x10255Eb3cd67406b07D6C82E69460848BCa83022,
+            prodEntryPoint: 0xC0D032E84682c43e101E1e6578E0dEded5d224eD,
             prodProxy: address(0),
             prodFeeContractProxy: address(0),
             //
