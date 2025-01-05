@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import { BaseTest, TransferHelper } from "./BaseTest.t.sol";
 
-contract MockTranferHelper {
+contract MockTransferHelper {
     using TransferHelper for address;
 
     function transferFrom(address token, address from, address to, uint256 value) external {
@@ -137,11 +137,11 @@ contract FakeERC20 {
 }
 
 contract TransferHelperTest is BaseTest {
-    MockTranferHelper mock;
+    MockTransferHelper mock;
     FakeERC20 fakeToken;
 
     function setUp() external {
-        mock = new MockTranferHelper();
+        mock = new MockTransferHelper();
         fakeToken = new FakeERC20();
     }
 

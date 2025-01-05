@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "forge-std/Test.sol";
 import { IERC20 } from "forge-std/interfaces/IERC20.sol";
 
-import { Solarray } from "solarray/Solarray.sol";
+import { Solarray } from "./Solarray.sol";
 
 import { DeployEngine, Contracts, getContracts } from "../script/DeployEngine.sol";
 
@@ -155,5 +155,18 @@ contract BaseTest is Test {
         }
 
         return keccak256(abi.encodePacked("\x19\x01", domainSeparator, dataHash));
+    }
+
+    function _assertEqual(bytes4 selector, bytes4[] memory selectors) internal pure {
+        bool contains;
+
+        for (uint256 i; i < selectors.length; ++i) {
+            if (selectors[i] == selector) {
+                contains = true;
+                break;
+            }
+        }
+
+        assertTrue(contains);
     }
 }
