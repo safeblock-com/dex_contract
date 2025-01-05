@@ -41,8 +41,9 @@ abstract contract BaseOwnableFacet {
     function _checkOwner() internal view {
         address owner = _owner;
         if (owner != msg.sender) {
-            if (owner != TransientStorageFacetLibrary.getSenderAddress()) {
-                revert IOwnable.Ownable_SenderIsNotOwner({ sender: msg.sender });
+            address sender = TransientStorageFacetLibrary.getSenderAddress();
+            if (owner != sender) {
+                revert IOwnable.Ownable_SenderIsNotOwner({ sender: sender });
             }
         }
     }

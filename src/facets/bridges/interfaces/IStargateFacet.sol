@@ -18,7 +18,7 @@ interface IStargateFacet {
     error StargateFacet_InvalidNativeBalance();
 
     /// @dev Thrown if msg.sender is not the layerZero endpoint
-    error NotLZEndpoint();
+    error StargateFacet_NotLZEndpoint();
 
     // =========================
     // getters
@@ -58,6 +58,5 @@ interface IStargateFacet {
         bytes memory composeMsg
     )
         external
-        payable
         returns (uint256);
 }

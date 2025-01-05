@@ -9,6 +9,7 @@ import {
     ITransferFacet,
     StargateFacet,
     IStargateFacet,
+    TransferHelper,
     TransferHelper
 } from "../BaseTest.t.sol";
 
@@ -40,29 +41,6 @@ contract StargateFacetTest is BaseTest {
     }
 
     // =========================
-    // unwrapNative
-    // =========================
-
-    function test_transferFacet_unwrapNative_shouldUnwrapNativeToken() external {
-        deal({ token: WBNB, to: address(entryPoint), give: 10e18 });
-
-        _resetPrank(user);
-
-        assertEq(IERC20(WBNB).balanceOf({ account: address(entryPoint) }), 10e18);
-        assertEq(address(entryPoint).balance, 0);
-
-        entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(ITransferFacet.unwrapNative, (5e18))) });
-
-        assertEq(IERC20(WBNB).balanceOf({ account: address(entryPoint) }), 5e18);
-        assertEq(address(entryPoint).balance, 5e18);
-
-        entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(ITransferFacet.unwrapNative, (5e18))) });
-
-        assertEq(IERC20(WBNB).balanceOf({ account: address(entryPoint) }), 0);
-        assertEq(address(entryPoint).balance, 10e18);
-    }
-
-    // =========================
     // sendStargateV2
     // =========================
 
@@ -86,10 +64,9 @@ contract StargateFacetTest is BaseTest {
         assertApproxEqAbs(amountOut, 1000e18, 1000e18 * 0.997e18 / 1e18);
 
         entryPoint.multicall{ value: fee }({
-            replace: 0x0000000000000000000000000000000000000000000000000000000000000024,
             data: Solarray.bytess(
                 abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool, dstEidV2, 1000e18, user, 0, bytes(""))),
-                abi.encodeCall(ITransferFacet.transferToken, (USDT, 0, user))
+                abi.encodeCall(ITransferFacet.transferToken, (user))
             )
         });
     }
@@ -173,14 +150,52 @@ contract StargateFacetTest is BaseTest {
         });
 
         entryPoint.multicall{ value: fee }({
-            replace: 0x0000000000000000000000000000000000000000000000000000000000240044,
+            replace: 0x0000000000000000000000000000000000000000000000000000000000000044,
             data: Solarray.bytess(
                 abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
                 abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool, dstEidV2, 0, user, 0, bytes(""))),
-                abi.encodeCall(ITransferFacet.transferToken, (USDT, 0, user))
+                abi.encodeCall(ITransferFacet.transferToken, (user))
             )
         });
 
         assertEq(IERC20(USDT).balanceOf({ account: address(entryPoint) }), 0);
+    }
+
+    // =========================
+    // no transfer revert
+    // =========================
+
+    function test_stargateFacet_sendStargateV2_noTransferRevert() external {
+        IMultiswapRouterFacet.MultiswapCalldata memory mData;
+
+        mData.amountIn = 10e18;
+        mData.tokenIn = WBNB;
+        mData.pairs =
+            Solarray.bytes32s(WBNB_ETH_Bakery, BUSD_ETH_Biswap, BUSD_CAKE_Biswap, USDC_CAKE_Cake, USDT_USDC_Cake);
+
+        _resetPrank(user);
+
+        deal({ token: WBNB, to: address(entryPoint), give: 1000e18 });
+
+        uint256 quoteMultiswap = quoter.multiswap({ data: mData });
+
+        (uint256 fee,) = IStargateFacet(address(entryPoint)).quoteV2({
+            poolAddress: stargatePool,
+            dstEid: dstEidV2,
+            amountLD: quoteMultiswap,
+            composer: user,
+            composeMsg: bytes(""),
+            composeGasLimit: 0
+        });
+
+        vm.expectRevert(TransferHelper.TransferHelper_TransferFromError.selector);
+        entryPoint.multicall{ value: fee }({
+            replace: 0x0000000000000000000000000000000000000000000000000000000000000044,
+            data: Solarray.bytess(
+                abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
+                abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool, dstEidV2, 0, user, 0, bytes(""))),
+                abi.encodeCall(ITransferFacet.transferToken, (user))
+            )
+        });
     }
 }
