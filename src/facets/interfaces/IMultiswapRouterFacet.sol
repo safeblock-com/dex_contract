@@ -23,8 +23,8 @@ interface IMultiswapRouterFacet {
     /// @notice Throws if `pairs` array is empty
     error MultiswapRouterFacet_InvalidPairsArray();
 
-    /// @notice Throws if `partswapCalldata` is invalid
-    error MultiswapRouterFacet_InvalidPartswapCalldata();
+    /// @notice Throws if `multiswap2Calldata` is invalid
+    error MultiswapRouterFacet_InvalidMultiswap2Calldata();
 
     /// @notice Throws if swap through UniswapV3 fails
     error MultiswapRouterFacet_FailedV3Swap();
@@ -86,7 +86,7 @@ interface IMultiswapRouterFacet {
     /// @notice Swaps through the data.pairs array
     function multiswap(MultiswapCalldata calldata data) external returns (uint256);
 
-    struct PartswapCalldata {
+    struct Multiswap2Calldata {
         // exact value in for part swap
         uint256 fullAmount;
         // minimal amountOut
@@ -95,18 +95,18 @@ interface IMultiswapRouterFacet {
         address tokenIn;
         // token out
         address tokenOut;
-        // array of amounts for each swap, corresponding to the address for the swap from the pairs array
-        uint256[] amountsIn;
-        // array of bytes32 values (pairs) involved in the swap
+        // array of percentages of fullAmount for each swap, corresponding to the path for the swap from the pairs array
+        uint256[] amountInPercentages;
+        // array of bytes32[] values (pairs) involved in the swap
         // from left to right:
         //     address of the pair - 20 bytes
         //     fee in pair - 3 bytes (for V2 pairs)
         //     the highest bit shows which version the pair belongs to
-        bytes32[] pairs;
+        bytes32[][] pairs;
     }
 
-    /// @notice Swaps tokenIn through each pair separately
-    /// @dev each pair in the pairs array must have tokenIn and have the same tokenOut,
+    /// @notice Swaps tokenIn through each path separately
+    /// @dev each path in the pairs array must have tokenIn and have the same tokenOut,
     /// the result of swap is the sum after each swap
-    function partswap(PartswapCalldata calldata data) external returns (uint256);
+    function multiswap2(Multiswap2Calldata calldata data) external returns (uint256);
 }

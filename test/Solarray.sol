@@ -16871,4 +16871,201 @@ library Solarray {
         arr[9] = j;
         return arr;
     }
+
+    function bytes32Arrays(bytes32[] memory a) internal pure returns (bytes32[][] memory) {
+        bytes32[][] memory arr = new bytes32[][](1);
+        arr[0] = a;
+        return arr;
+    }
+
+    function bytes32Arrays(bytes32[] memory a, bytes32[] memory b) internal pure returns (bytes32[][] memory) {
+        bytes32[][] memory arr = new bytes32[][](2);
+        arr[0] = a;
+        arr[1] = b;
+        return arr;
+    }
+
+    function bytes32Arrays(
+        bytes32[] memory a,
+        bytes32[] memory b,
+        bytes32[] memory c
+    )
+        internal
+        pure
+        returns (bytes32[][] memory)
+    {
+        bytes32[][] memory arr = new bytes32[][](3);
+        arr[0] = a;
+        arr[1] = b;
+        arr[2] = c;
+        return arr;
+    }
+
+    function bytes32Arrays(
+        bytes32[] memory a,
+        bytes32[] memory b,
+        bytes32[] memory c,
+        bytes32[] memory d
+    )
+        internal
+        pure
+        returns (bytes32[][] memory)
+    {
+        bytes32[][] memory arr = new bytes32[][](4);
+        arr[0] = a;
+        arr[1] = b;
+        arr[2] = c;
+        arr[3] = d;
+        return arr;
+    }
+
+    function bytes32Arrays(
+        bytes32[] memory a,
+        bytes32[] memory b,
+        bytes32[] memory c,
+        bytes32[] memory d,
+        bytes32[] memory e
+    )
+        internal
+        pure
+        returns (bytes32[][] memory)
+    {
+        bytes32[][] memory arr = new bytes32[][](5);
+        arr[0] = a;
+        arr[1] = b;
+        arr[2] = c;
+        arr[3] = d;
+        arr[4] = e;
+        return arr;
+    }
+
+    function bytes32Arrays(
+        bytes32[] memory a,
+        bytes32[] memory b,
+        bytes32[] memory c,
+        bytes32[] memory d,
+        bytes32[] memory e,
+        bytes32[] memory f
+    )
+        internal
+        pure
+        returns (bytes32[][] memory)
+    {
+        bytes32[][] memory arr = new bytes32[][](6);
+        arr[0] = a;
+        arr[1] = b;
+        arr[2] = c;
+        arr[3] = d;
+        arr[4] = e;
+        arr[5] = f;
+        return arr;
+    }
+
+    function bytes32Arrays(
+        bytes32[] memory a,
+        bytes32[] memory b,
+        bytes32[] memory c,
+        bytes32[] memory d,
+        bytes32[] memory e,
+        bytes32[] memory f,
+        bytes32[] memory g
+    )
+        internal
+        pure
+        returns (bytes32[][] memory)
+    {
+        bytes32[][] memory arr = new bytes32[][](7);
+        arr[0] = a;
+        arr[1] = b;
+        arr[2] = c;
+        arr[3] = d;
+        arr[4] = e;
+        arr[5] = f;
+        arr[6] = g;
+        return arr;
+    }
+
+    function bytes32Arrays(
+        bytes32[] memory a,
+        bytes32[] memory b,
+        bytes32[] memory c,
+        bytes32[] memory d,
+        bytes32[] memory e,
+        bytes32[] memory f,
+        bytes32[] memory g,
+        bytes32[] memory h
+    )
+        internal
+        pure
+        returns (bytes32[][] memory)
+    {
+        bytes32[][] memory arr = new bytes32[][](8);
+        arr[0] = a;
+        arr[1] = b;
+        arr[2] = c;
+        arr[3] = d;
+        arr[4] = e;
+        arr[5] = f;
+        arr[6] = g;
+        arr[7] = h;
+        return arr;
+    }
+
+    function bytes32Arrays(
+        bytes32[] memory a,
+        bytes32[] memory b,
+        bytes32[] memory c,
+        bytes32[] memory d,
+        bytes32[] memory e,
+        bytes32[] memory f,
+        bytes32[] memory g,
+        bytes32[] memory h,
+        bytes32[] memory i
+    )
+        internal
+        pure
+        returns (bytes32[][] memory)
+    {
+        bytes32[][] memory arr = new bytes32[][](9);
+        arr[0] = a;
+        arr[1] = b;
+        arr[2] = c;
+        arr[3] = d;
+        arr[4] = e;
+        arr[5] = f;
+        arr[6] = g;
+        arr[7] = h;
+        arr[8] = i;
+        return arr;
+    }
+
+    function bytes32Arrays(
+        bytes32[] memory a,
+        bytes32[] memory b,
+        bytes32[] memory c,
+        bytes32[] memory d,
+        bytes32[] memory e,
+        bytes32[] memory f,
+        bytes32[] memory g,
+        bytes32[] memory h,
+        bytes32[] memory i,
+        bytes32[] memory j
+    )
+        internal
+        pure
+        returns (bytes32[][] memory)
+    {
+        bytes32[][] memory arr = new bytes32[][](10);
+        arr[0] = a;
+        arr[1] = b;
+        arr[2] = c;
+        arr[3] = d;
+        arr[4] = e;
+        arr[5] = f;
+        arr[6] = g;
+        arr[7] = h;
+        arr[8] = i;
+        arr[9] = j;
+        return arr;
+    }
 }
