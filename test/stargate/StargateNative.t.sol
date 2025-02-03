@@ -34,7 +34,7 @@ contract StargateFacetTest is BaseTest {
     address stargatePool = 0x77b2043768d28E9C9aB44E1aBfC95944bcE57931;
     uint16 dstEidV2 = 30_110;
 
-    function test_stargateFacet_sendStargateNative_shouldSendStargateWithNativePool() external {
+    function test_stargateFacet_sendStargateNative_shouldSendStargateWithNativePool() external checkTokenStorage {
         _resetPrank(user);
 
         (uint256 fee,) = IStargateFacet(address(entryPoint)).quoteV2({
