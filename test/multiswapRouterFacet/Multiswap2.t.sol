@@ -32,7 +32,7 @@ contract Multiswap2Test is BaseTest {
     // multiswap2
     // =========================
 
-    function test_multiswapRouterFacet_multiswap2_shouldRevertIfMultiswap2DataIsInvalid() external {
+    function test_multiswapRouterFacet_multiswap2_shouldRevertIfMultiswap2DataIsInvalid() external checkTokenStorage {
         IMultiswapRouterFacet.Multiswap2Calldata memory m2Data;
 
         _resetPrank(user);
@@ -63,7 +63,7 @@ contract Multiswap2Test is BaseTest {
         entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data))) });
     }
 
-    function test_multiswapRouterFacet_multiswap2_shouldSwapThroughAllUniswapV2Pairs() external {
+    function test_multiswapRouterFacet_multiswap2_shouldSwapThroughAllUniswapV2Pairs() external checkTokenStorage {
         IMultiswapRouterFacet.Multiswap2Calldata memory m2Data;
 
         m2Data.tokenIn = USDT;
@@ -91,7 +91,7 @@ contract Multiswap2Test is BaseTest {
         assertEq(IERC20(USDC).balanceOf({ account: user }), quoterAmountOut);
     }
 
-    function test_multiswapRouterFacet_multiswap2_shouldSwapThroughAllUniswapV3Pairs() external {
+    function test_multiswapRouterFacet_multiswap2_shouldSwapThroughAllUniswapV3Pairs() external checkTokenStorage {
         IMultiswapRouterFacet.Multiswap2Calldata memory m2Data;
 
         m2Data.tokenIn = USDT;
@@ -121,7 +121,7 @@ contract Multiswap2Test is BaseTest {
         assertEq(IERC20(WBNB).balanceOf({ account: user }), quoterAmountOut);
     }
 
-    function test_multiswapRouterFacet_multiswap2_shouldRevertIfAmountOutLtMinAmountOut() external {
+    function test_multiswapRouterFacet_multiswap2_shouldRevertIfAmountOutLtMinAmountOut() external checkTokenStorage {
         IMultiswapRouterFacet.Multiswap2Calldata memory m2Data;
 
         m2Data.tokenIn = USDT;
@@ -154,7 +154,7 @@ contract Multiswap2Test is BaseTest {
     // partswap with native
     // =========================
 
-    function test_multiswapRouterFacet_multiswap2_partswapNativeThroughV2V3Pairs() external {
+    function test_multiswapRouterFacet_multiswap2_partswapNativeThroughV2V3Pairs() external checkTokenStorage {
         IMultiswapRouterFacet.Multiswap2Calldata memory m2Data;
 
         deal({ to: user, give: 10e18 });
@@ -187,7 +187,7 @@ contract Multiswap2Test is BaseTest {
         assertEq(IERC20(ETH).balanceOf({ account: user }), quoterAmountOut);
     }
 
-    function test_multiswapRouterFacet_multiswap2_swapToNativeThroughV2V3Pairs() external {
+    function test_multiswapRouterFacet_multiswap2_swapToNativeThroughV2V3Pairs() external checkTokenStorage {
         IMultiswapRouterFacet.Multiswap2Calldata memory m2Data;
 
         m2Data.fullAmount = 100e18;
@@ -225,7 +225,7 @@ contract Multiswap2Test is BaseTest {
     // multiswap2 with fee
     // =========================
 
-    function test_multiswapRouterFacet_multiswap2_shouldCalculateFee() external {
+    function test_multiswapRouterFacet_multiswap2_shouldCalculateFee() external checkTokenStorage {
         IMultiswapRouterFacet.Multiswap2Calldata memory m2Data;
 
         m2Data.fullAmount = 100e18;
@@ -270,7 +270,7 @@ contract Multiswap2Test is BaseTest {
     // no transfer revert
     // =========================
 
-    function test_multiswapRouterFacet_multiswap2_noTransferRevert() external {
+    function test_multiswapRouterFacet_multiswap2_noTransferRevert() external checkTokenStorage {
         IMultiswapRouterFacet.Multiswap2Calldata memory m2Data;
 
         deal({ token: USDT, to: address(entryPoint), give: 100e18 });

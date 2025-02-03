@@ -34,7 +34,7 @@ contract StargateFacetTest is BaseTest {
     // constructor
     // =========================
 
-    function test_stargateFacet_constructor_shouldInitializeInConstructor() external {
+    function test_stargateFacet_constructor_shouldInitializeInConstructor() external checkTokenStorage {
         StargateFacet _stargateFacet = new StargateFacet({ endpointV2: contracts.layerZeroEndpointV2 });
 
         assertEq(_stargateFacet.lzEndpoint(), contracts.layerZeroEndpointV2);
@@ -47,7 +47,7 @@ contract StargateFacetTest is BaseTest {
     uint32 dstEidV2 = 30_101;
     address stargatePool = 0x138EB30f73BC423c6455C53df6D89CB01d9eBc63;
 
-    function test_stargateFacet_sendStargateV2_shouldSendStargateV2() external {
+    function test_stargateFacet_sendStargateV2_shouldSendStargateV2() external checkTokenStorage {
         _resetPrank(user);
 
         IERC20(USDT).approve({ spender: address(entryPoint), amount: 1000e18 });
@@ -71,7 +71,7 @@ contract StargateFacetTest is BaseTest {
         });
     }
 
-    function test_stargateFacet_sendStargateV2_shouldRevertIfNativeBalanceNotEnough() external {
+    function test_stargateFacet_sendStargateV2_shouldRevertIfNativeBalanceNotEnough() external checkTokenStorage {
         _resetPrank(user);
 
         IERC20(USDT).approve({ spender: address(entryPoint), amount: 1000e18 });
@@ -93,7 +93,7 @@ contract StargateFacetTest is BaseTest {
         });
     }
 
-    function test_stargateFacet_sendStargateV2_shouldRevertIfTransferFromError() external {
+    function test_stargateFacet_sendStargateV2_shouldRevertIfTransferFromError() external checkTokenStorage {
         _resetPrank(user);
 
         (uint256 fee,) = IStargateFacet(address(entryPoint)).quoteV2({
@@ -126,7 +126,7 @@ contract StargateFacetTest is BaseTest {
     // sendStargate with multiswap
     // =========================
 
-    function test_stargateFacet_sendStargateWithMultiswap_shouldSendStargateV2WithMultiswap() external {
+    function test_stargateFacet_sendStargateWithMultiswap_shouldSendStargateV2WithMultiswap() external checkTokenStorage {
         IMultiswapRouterFacet.MultiswapCalldata memory mData;
 
         mData.amountIn = 10e18;
@@ -165,7 +165,7 @@ contract StargateFacetTest is BaseTest {
     // no transfer revert
     // =========================
 
-    function test_stargateFacet_sendStargateV2_noTransferRevert() external {
+    function test_stargateFacet_sendStargateV2_noTransferRevert() external checkTokenStorage {
         IMultiswapRouterFacet.MultiswapCalldata memory mData;
 
         mData.amountIn = 10e18;

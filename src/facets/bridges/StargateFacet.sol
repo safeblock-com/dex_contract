@@ -91,9 +91,7 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
         if (token > address(0)) {
             (address _token, uint256 amount) = TransientStorageFacetLibrary.getTokenAndAmount();
             if (_token == address(0) && amount == 0) {
-                if (sender != address(this)) {
-                    TransferHelper.safeTransferFrom({ token: token, from: sender, to: address(this), value: amountLD });
-                }
+                TransferHelper.safeTransferFrom({ token: token, from: sender, to: address(this), value: amountLD });
             }
             balanceBefore = TransferHelper.safeGetBalance({ token: token, account: address(this) });
         }
@@ -176,6 +174,8 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
         }
 
         if (!successfulCall) {
+            TransientStorageFacetLibrary.setTokenAndAmount({ token: address(0), amount: 0 });
+
             emit IStargateFacet.CallFailed({ errorMessage: payload });
 
             if (asset == address(0)) {

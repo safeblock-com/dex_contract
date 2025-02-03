@@ -169,4 +169,23 @@ contract BaseTest is Test {
 
         assertTrue(contains);
     }
+
+    modifier checkTokenStorage() {
+        _;
+
+        // CALLBACK
+        assertEq(
+            vm.load(address(entryPoint), 0x1248b983d56fa782b7a88ee11066fc0746058888ea550df970b9eea952d65dd1), bytes32(0)
+        );
+
+        // TOKEN and AMOUNT
+        assertEq(
+            vm.load(address(entryPoint), 0xc0abc52de3d4e570867f700eb5dfe2c039750b7f48720ee0d6152f3aa8676374), bytes32(0)
+        );
+
+        // SENDER 
+                assertEq(
+            vm.load(address(entryPoint), 0x289cc669fe96ce33e95427b15b06e5cf0e5e79eb9894ad468d456975ce05c198), bytes32(0)
+        );
+    }
 }
