@@ -11,6 +11,7 @@ import { IEntryPoint } from "./interfaces/IEntryPoint.sol";
 import { Ownable2Step } from "./external/Ownable2Step.sol";
 
 import { TransientStorageFacetLibrary } from "./libraries/TransientStorageFacetLibrary.sol";
+import { FeeLibrary } from "./libraries/FeeLibrary.sol";
 
 /// @title EntryPoint
 /// @notice This contract serves as a proxy for dynamic function execution.
@@ -55,6 +56,20 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
         if (initialCalls.length > 0) {
             _multicall(true, bytes32(0), initialCalls);
         }
+    }
+
+    // =========================
+    // admin methods
+    // =========================
+
+    /// @inheritdoc IEntryPoint
+    function setFeeContractAddress(address feeContractAddress) external onlyOwner {
+        FeeLibrary.setFeeContractAddress(feeContractAddress);
+    }
+
+    /// @inheritdoc IEntryPoint
+    function getFeeContractAddress() external view returns (address feeContractAddress) {
+        feeContractAddress = FeeLibrary.getFeeContractAddress();
     }
 
     // =========================

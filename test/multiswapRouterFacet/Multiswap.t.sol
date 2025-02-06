@@ -52,27 +52,6 @@ contract MultiswapTest is BaseTest {
     }
 
     // =========================
-    // setFeeContract
-    // =========================
-
-    function test_multiswapRouterFacet_setFeeContract_shouldSetFeeContract() external {
-        assertEq(IMultiswapRouterFacet(address(entryPoint)).feeContract(), address(feeContract));
-
-        _resetPrank(user);
-        vm.expectRevert(TransientStorageFacetLibrary.TransientStorageFacetLibrary_InvalidSenderAddress.selector);
-        IMultiswapRouterFacet(address(entryPoint)).setFeeContract({ newFeeContract: user });
-
-        _resetPrank(owner);
-        IMultiswapRouterFacet(address(entryPoint)).setFeeContract({ newFeeContract: owner });
-
-        assertEq(IMultiswapRouterFacet(address(entryPoint)).feeContract(), owner);
-
-        _resetPrank(user);
-        vm.expectRevert(abi.encodeWithSelector(IOwnable.Ownable_SenderIsNotOwner.selector, user));
-        entryPoint.multicall(Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.setFeeContract, (user))));
-    }
-
-    // =========================
     // transferFromPermit2
     // =========================
 
@@ -492,6 +471,7 @@ contract MultiswapTest is BaseTest {
             })
         );
 
+        _expectERC20TransferCall(ETH, address(feeContract), quoterAmountOut * 300 / (1e6 - 300));
         entryPoint.multicall({
             replace: 0x0000000000000000000000000000000000000000000000000000000000000024,
             data: Solarray.bytess(

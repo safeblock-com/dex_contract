@@ -12,6 +12,7 @@ import { IMultiswapRouterFacet } from "./interfaces/IMultiswapRouterFacet.sol";
 import { IWrappedNative } from "./interfaces/IWrappedNative.sol";
 
 import { TransientStorageFacetLibrary } from "../libraries/TransientStorageFacetLibrary.sol";
+import { FeeLibrary } from "../libraries/FeeLibrary.sol";
 
 import { IFeeContract } from "../interfaces/IFeeContract.sol";
 
@@ -49,7 +50,6 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
     struct MultiswapRouterFacetStorage {
         /// @dev cache for swapV3Callback
         address poolAddressCache;
-        IFeeContract feeContract;
     }
 
     /// @dev Storage position for the multiswap router facet, to avoid collisions in storage.
@@ -85,20 +85,6 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
     /// @inheritdoc IMultiswapRouterFacet
     function wrappedNative() external view returns (address) {
         return address(_wrappedNative);
-    }
-
-    /// @inheritdoc IMultiswapRouterFacet
-    function feeContract() external view returns (address) {
-        return address(_getLocalStorage().feeContract);
-    }
-
-    // =========================
-    // admin logic
-    // =========================
-
-    /// @inheritdoc IMultiswapRouterFacet
-    function setFeeContract(address newFeeContract) external onlyOwner {
-        _getLocalStorage().feeContract = IFeeContract(newFeeContract);
     }
 
     // =========================
@@ -544,18 +530,7 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
     {
         _checkOutputAmount(amountOut, minAmountOut);
 
-        IFeeContract _feeContract = _getLocalStorage().feeContract;
-        if (address(_feeContract) != address(0)) {
-            uint256 fee = _feeContract.writeFees({ token: tokenOut, amount: amountOut });
-
-            if (fee > 0) {
-                TransferHelper.safeTransfer({ token: tokenOut, to: address(_feeContract), value: fee });
-
-                unchecked {
-                    amountOut -= fee;
-                }
-            }
-        }
+        amountOut = FeeLibrary.payFee({ token: tokenOut, amount: amountOut });
 
         TransientStorageFacetLibrary.setTokenAndAmount({ token: tokenOut, amount: amountOut });
         return amountOut;

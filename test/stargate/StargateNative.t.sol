@@ -25,11 +25,15 @@ contract StargateFacetTest is BaseTest {
         deployForTest();
 
         deal({ to: user, give: 1000e18 });
+
+        feeContract.setProtocolFee({ newProtocolFee: 300 });
     }
 
     // =========================
     // sendStargate with native
     // =========================
+
+    event TransferNative(address to) anonymous;
 
     address stargatePool = 0x77b2043768d28E9C9aB44E1aBfC95944bcE57931;
     uint16 dstEidV2 = 30_110;
@@ -48,6 +52,8 @@ contract StargateFacetTest is BaseTest {
 
         assertGt(fee, 0.111111111111111111e18);
 
+        vm.expectEmitAnonymous();
+        emit TransferNative({ to: address(feeContract) });
         entryPoint.multicall{ value: fee }({
             replace: 0x0000000000000000000000000000000000000000000000000000000000000000,
             data: Solarray.bytess(

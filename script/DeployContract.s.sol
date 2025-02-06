@@ -79,13 +79,13 @@ contract Deploy is Script {
                     data: abi.encodeCall(FeeContract.initialize, (deployer, contracts.proxy))
                 });
             } else {
-                FeeContract(contracts.feeContractProxy).upgradeTo({ newImplementation: contracts.feeContract });
+                FeeContract(payable(contracts.feeContractProxy)).upgradeTo({ newImplementation: contracts.feeContract });
             }
         }
 
-        if (FeeContract(contracts.feeContractProxy).fees() == 0) {
+        if (FeeContract(payable(contracts.feeContractProxy)).fees() == 0) {
             // 0.03%
-            FeeContract(contracts.feeContractProxy).setProtocolFee({ newProtocolFee: 300 });
+            FeeContract(payable(contracts.feeContractProxy)).setProtocolFee({ newProtocolFee: 300 });
         }
 
         LayerZeroFacet _layerZeroFacet = LayerZeroFacet(contracts.proxy);
@@ -97,8 +97,8 @@ contract Deploy is Script {
             _layerZeroFacet.setDefaultGasLimit({ newDefaultGasLimit: 50_000 });
         }
 
-        if (MultiswapRouterFacet(contracts.proxy).feeContract() == address(0)) {
-            MultiswapRouterFacet(contracts.proxy).setFeeContract({ newFeeContract: contracts.feeContractProxy });
+        if (EntryPoint(payable(contracts.proxy)).getFeeContractAddress() == address(0)) {
+            EntryPoint(payable(contracts.proxy)).setFeeContractAddress({ feeContractAddress: contracts.feeContractProxy });
         }
 
         if (Quoter(contracts.quoterProxy).getFeeContract() == address(0)) {
@@ -158,9 +158,9 @@ contract Deploy is Script {
             });
         }
 
-        if (FeeContract(contracts.prodFeeContractProxy).fees() == 0) {
+        if (FeeContract(payable(contracts.prodFeeContractProxy)).fees() == 0) {
             // 0.03%
-            FeeContract(contracts.prodFeeContractProxy).setProtocolFee({ newProtocolFee: 300 });
+            FeeContract(payable(contracts.prodFeeContractProxy)).setProtocolFee({ newProtocolFee: 300 });
         }
 
         LayerZeroFacet _layerZeroFacet = LayerZeroFacet(contracts.prodProxy);
@@ -172,8 +172,10 @@ contract Deploy is Script {
             _layerZeroFacet.setDefaultGasLimit({ newDefaultGasLimit: 50_000 });
         }
 
-        if (MultiswapRouterFacet(contracts.prodProxy).feeContract() == address(0)) {
-            MultiswapRouterFacet(contracts.prodProxy).setFeeContract({ newFeeContract: contracts.prodFeeContractProxy });
+        if (EntryPoint(payable(contracts.prodProxy)).getFeeContractAddress() == address(0)) {
+            EntryPoint(payable(contracts.prodProxy)).setFeeContractAddress({
+                feeContractAddress: contracts.prodFeeContractProxy
+            });
         }
 
         IOwnable2Step(contracts.prodProxy).transferOwnership({ newOwner: contracts.multisig });
