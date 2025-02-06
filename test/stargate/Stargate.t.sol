@@ -28,6 +28,8 @@ contract StargateFacetTest is BaseTest {
         deal({ token: USDT, to: user, give: 1000e18 });
         deal({ token: WBNB, to: user, give: 1000e18 });
         deal({ to: user, give: 1000e18 });
+
+        feeContract.setProtocolFee({ newProtocolFee: 300 });
     }
 
     // =========================
@@ -63,6 +65,7 @@ contract StargateFacetTest is BaseTest {
 
         assertApproxEqAbs(amountOut, 1000e18, 1000e18 * 0.997e18 / 1e18);
 
+        _expectERC20TransferCall(USDT, address(feeContract), 1000e18 * 300 / 1_000_000);
         entryPoint.multicall{ value: fee }({
             data: Solarray.bytess(
                 abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool, dstEidV2, 1000e18, user, 0, bytes(""))),
@@ -126,7 +129,10 @@ contract StargateFacetTest is BaseTest {
     // sendStargate with multiswap
     // =========================
 
-    function test_stargateFacet_sendStargateWithMultiswap_shouldSendStargateV2WithMultiswap() external checkTokenStorage {
+    function test_stargateFacet_sendStargateWithMultiswap_shouldSendStargateV2WithMultiswap()
+        external
+        checkTokenStorage
+    {
         IMultiswapRouterFacet.MultiswapCalldata memory mData;
 
         mData.amountIn = 10e18;
@@ -149,6 +155,7 @@ contract StargateFacetTest is BaseTest {
             composeGasLimit: 0
         });
 
+        _expectERC20TransferCall(USDT, address(feeContract), quoteMultiswap * 300 / 1_000_000);
         entryPoint.multicall{ value: fee }({
             replace: 0x0000000000000000000000000000000000000000000000000000000000000044,
             data: Solarray.bytess(

@@ -13,6 +13,7 @@ import { OptionsBuilder } from "./libraries/OptionsBuilder.sol";
 import { OFTComposeMsgCodec } from "./libraries/OFTComposeMsgCodec.sol";
 
 import { TransientStorageFacetLibrary } from "../../libraries/TransientStorageFacetLibrary.sol";
+import { FeeLibrary } from "../../libraries/FeeLibrary.sol";
 
 import { IStargateFacet } from "./interfaces/IStargateFacet.sol";
 
@@ -59,7 +60,9 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
         returns (uint256 valueToSend, uint256 dstAmount)
     {
         SendParam memory sendParam;
-        (, valueToSend, sendParam,) = _quoteV2(poolAddress, dstEid, amountLD, receiver, composeMsg, composeGasLimit);
+        (valueToSend, sendParam,) = _quoteV2(
+            poolAddress, IStargate(poolAddress).token(), dstEid, amountLD, receiver, composeMsg, composeGasLimit
+        );
 
         dstAmount = sendParam.minAmountLD;
     }
@@ -80,21 +83,27 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
         external
         returns (uint256)
     {
-        (address token, uint256 valueToSend, SendParam memory sendParam, MessagingFee memory messagingFee) =
-            _quoteV2(poolAddress, dstEid, amountLD, receiver, composeMsg, composeGasLimit);
-
-        _validateNativeBalance(valueToSend);
-
+        address token = IStargate(poolAddress).token();
         address sender = TransientStorageFacetLibrary.getSenderAddress();
 
-        uint256 balanceBefore;
         if (token > address(0)) {
             (address _token, uint256 amount) = TransientStorageFacetLibrary.getTokenAndAmount();
             if (_token == address(0) && amount == 0) {
                 TransferHelper.safeTransferFrom({ token: token, from: sender, to: address(this), value: amountLD });
             }
+        }
+
+        amountLD = FeeLibrary.payFee({ token: token, amount: amountLD });
+
+        uint256 balanceBefore;
+        if (token > address(0)) {
             balanceBefore = TransferHelper.safeGetBalance({ token: token, account: address(this) });
         }
+
+        (uint256 valueToSend, SendParam memory sendParam, MessagingFee memory messagingFee) =
+            _quoteV2(poolAddress, token, dstEid, amountLD, receiver, composeMsg, composeGasLimit);
+
+        _validateNativeBalance(valueToSend);
 
         TransferHelper.safeApprove({ token: token, spender: poolAddress, value: amountLD });
 
@@ -104,9 +113,7 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
             refundAddress: sender
         });
 
-        if (token == address(0)) {
-            return 0;
-        } else {
+        if (token > address(0)) {
             unchecked {
                 uint256 balanceAfterTransfer =
                     amountLD - (balanceBefore - TransferHelper.safeGetBalance({ token: token, account: address(this) }));
@@ -114,6 +121,8 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
                 TransientStorageFacetLibrary.setTokenAndAmount({ token: token, amount: balanceAfterTransfer });
                 return balanceAfterTransfer;
             }
+        } else {
+            return 0;
         }
     }
 
@@ -174,6 +183,8 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
         }
 
         if (!successfulCall) {
+            amountLD = FeeLibrary.payFee({ token: asset, amount: amountLD });
+
             TransientStorageFacetLibrary.setTokenAndAmount({ token: address(0), amount: 0 });
 
             emit IStargateFacet.CallFailed({ errorMessage: payload });
@@ -196,6 +207,7 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
     /// @dev Quote fee for stargate V2.
     function _quoteV2(
         address poolAddress,
+        address token,
         uint32 dstEid,
         uint256 amountLD,
         address receiver,
@@ -204,7 +216,7 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
     )
         internal
         view
-        returns (address token, uint256 valueToSend, SendParam memory sendParam, MessagingFee memory messagingFee)
+        returns (uint256 valueToSend, SendParam memory sendParam, MessagingFee memory messagingFee)
     {
         bytes memory extraOptions = composeMsg.length > 0
             ? OptionsBuilder.newOptions().addExecutorLzComposeOption({
@@ -232,7 +244,6 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
         messagingFee = _stargatePool.quoteSend({ _sendParam: sendParam, _payInLzToken: false });
         valueToSend = messagingFee.nativeFee;
 
-        token = _stargatePool.token();
         if (token == address(0)) {
             unchecked {
                 valueToSend += sendParam.amountLD;

@@ -63,7 +63,7 @@ contract BaseTest is Test {
         });
 
         entryPoint = EntryPoint(payable(address(new Proxy({ initialOwner: owner }))));
-        feeContract = FeeContract(address(new Proxy({ initialOwner: owner })));
+        feeContract = FeeContract(payable(address(new Proxy({ initialOwner: owner }))));
 
         InitialImplementation(address(feeContract)).upgradeTo({
             implementation: address(new FeeContract()),
@@ -72,11 +72,9 @@ contract BaseTest is Test {
 
         InitialImplementation(address(entryPoint)).upgradeTo({
             implementation: DeployEngine.deployEntryPoint({ contracts: contracts }),
-            data: abi.encodeCall(
-                IEntryPoint.initialize,
-                (owner, Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.setFeeContract, address(feeContract))))
-            )
+            data: abi.encodeCall(IEntryPoint.initialize, (owner, new bytes[](0)))
         });
+        entryPoint.setFeeContractAddress({ feeContractAddress: address(feeContract) });
     }
 
     // helper
@@ -183,8 +181,8 @@ contract BaseTest is Test {
             vm.load(address(entryPoint), 0xc0abc52de3d4e570867f700eb5dfe2c039750b7f48720ee0d6152f3aa8676374), bytes32(0)
         );
 
-        // SENDER 
-                assertEq(
+        // SENDER
+        assertEq(
             vm.load(address(entryPoint), 0x289cc669fe96ce33e95427b15b06e5cf0e5e79eb9894ad468d456975ce05c198), bytes32(0)
         );
     }

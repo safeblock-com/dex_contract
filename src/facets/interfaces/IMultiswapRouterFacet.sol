@@ -54,16 +54,6 @@ interface IMultiswapRouterFacet {
     /// @notice Returns the address of the `wrappedNative`
     function wrappedNative() external view returns (address);
 
-    /// @notice Returns the address of the fee contract
-    function feeContract() external view returns (address);
-
-    // =========================
-    // admin logic
-    // =========================
-
-    /// @notice Changes the fee contract
-    function setFeeContract(address newFeeContract) external;
-
     // =========================
     // main logic
     // =========================

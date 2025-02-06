@@ -226,6 +226,11 @@ contract Multiswap2Test is BaseTest {
     // =========================
 
     function test_multiswapRouterFacet_multiswap2_shouldCalculateFee() external checkTokenStorage {
+        _resetPrank(owner);
+        quoter.setFeeContract({ newFeeContract: address(feeContract) });
+        // 0.03%
+        feeContract.setProtocolFee({ newProtocolFee: 300 });
+
         IMultiswapRouterFacet.Multiswap2Calldata memory m2Data;
 
         m2Data.fullAmount = 100e18;
@@ -243,16 +248,13 @@ contract Multiswap2Test is BaseTest {
 
         m2Data.minAmountOut = quoterAmountOut;
 
-        _resetPrank(owner);
-        // 0.03%
-        feeContract.setProtocolFee({ newProtocolFee: 300 });
-
         _resetPrank(user);
 
         IERC20(USDT).approve({ spender: address(entryPoint), amount: 100e18 });
 
         uint256 userBalanceBefore = user.balance;
 
+        _expectERC20TransferCall(WBNB, address(feeContract), quoterAmountOut * 300 / (1e6 - 300));
         entryPoint.multicall({
             data: Solarray.bytess(
                 abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data)),
@@ -260,10 +262,8 @@ contract Multiswap2Test is BaseTest {
             )
         });
 
-        uint256 fee = quoterAmountOut * 300 / 1e6;
-
-        assertApproxEqAbs(user.balance - userBalanceBefore, quoterAmountOut - fee, 0.0001e18);
-        // assertEq(feeContract.profit({ owner: address(feeContract), token: WBNB }), fee);
+        assertEq(user.balance - userBalanceBefore, quoterAmountOut);
+        assertEq(feeContract.profit({ owner: address(feeContract), token: WBNB }), quoterAmountOut * 300 / (1e6 - 300));
     }
 
     // =========================

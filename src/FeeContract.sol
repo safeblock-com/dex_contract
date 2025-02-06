@@ -107,6 +107,9 @@ contract FeeContract is Ownable2Step, UUPSUpgradeable, Initializable, IFeeContra
         }
     }
 
+    /// @notice Function to receive Native currency.
+    receive() external payable { }
+
     // =========================
     // internal methods
     // =========================

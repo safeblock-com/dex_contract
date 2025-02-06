@@ -34,6 +34,16 @@ interface IEntryPoint {
     function multicall(bytes32 replace, bytes[] calldata data) external payable;
 
     // =========================
+    // admin methods
+    // =========================
+
+    /// @notice Sets the address of the fee contract.
+    function setFeeContractAddress(address feeContractAddress) external;
+
+    /// @notice Returns the address of the fee contract
+    function getFeeContractAddress() external view returns (address feeContractAddress);
+
+    // =========================
     // diamond getters
     // =========================
 

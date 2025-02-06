@@ -87,9 +87,16 @@ library TransferHelper {
     /// @param to Address of the recipient.
     /// @param value Amount to transfer.
     function safeTransferNative(address to, uint256 value) internal {
-        (bool success,) = to.call{ value: value }("");
-        if (!success) {
-            revert TransferHelper_TransferNativeError();
+        assembly ("memory-safe") {
+            if iszero(call(gas(), to, value, 0, 0, 0, 0)) {
+                // revert TransferHelper_TransferNativeError();
+                mstore(0, 0xb1a0fdf8)
+                revert(28, 4)
+            }
+
+            // send anonymous event with the `to` address
+            mstore(0, to)
+            log0(0, 32)
         }
     }
 

@@ -4,6 +4,7 @@ pragma solidity 0.8.19;
 import { TransferHelper } from "../libraries/TransferHelper.sol";
 
 import { TransientStorageFacetLibrary } from "../../libraries/TransientStorageFacetLibrary.sol";
+import { FeeLibrary } from "../../libraries/FeeLibrary.sol";
 
 import { ISymbiosis } from "./interfaces/ISymbiosis.sol";
 import { ISymbiosisFacet } from "./interfaces/ISymbiosisFacet.sol";
@@ -52,12 +53,14 @@ contract SymbiosisFacet is ISymbiosisFacet {
             });
         }
 
-        symbiosisTransaction.rtoken.safeApprove({ spender: address(_portal), value: symbiosisTransaction.amount });
+        amount = FeeLibrary.payFee({ token: symbiosisTransaction.rtoken, amount: symbiosisTransaction.amount });
+
+        symbiosisTransaction.rtoken.safeApprove({ spender: address(_portal), value: amount });
 
         _portal.metaSynthesize({
             _metaSynthesizeTransaction: ISymbiosis.MetaSynthesizeTransaction({
                 stableBridgingFee: symbiosisTransaction.stableBridgingFee,
-                amount: symbiosisTransaction.amount,
+                amount: amount,
                 rtoken: symbiosisTransaction.rtoken,
                 chain2address: symbiosisTransaction.chain2address,
                 receiveSide: 0xb8f275fBf7A959F4BCE59999A2EF122A099e81A8, // Synthesis on BOBA BNB
