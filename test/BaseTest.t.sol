@@ -33,7 +33,6 @@ import { SymbiosisFacet, ISymbiosisFacet, ISymbiosis } from "../src/facets/bridg
 
 import { TransientStorageFacetLibrary } from "../src/libraries/TransientStorageFacetLibrary.sol";
 
-
 contract BaseTest is Test {
     address owner;
     uint256 ownerPk;
