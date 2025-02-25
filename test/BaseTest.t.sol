@@ -33,7 +33,6 @@ import { SymbiosisFacet, ISymbiosisFacet, ISymbiosis } from "../src/facets/bridg
 
 import { TransientStorageFacetLibrary } from "../src/libraries/TransientStorageFacetLibrary.sol";
 
-import { console2 } from "forge-std/console2.sol";
 
 contract BaseTest is Test {
     address owner;
