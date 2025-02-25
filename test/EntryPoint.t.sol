@@ -76,7 +76,7 @@ contract EntryPointTest is BaseTest {
     address facet2;
 
     function setUp() external {
-        vm.createSelectFork(vm.rpcUrl("bsc"));
+        vm.createSelectFork(vm.rpcUrl("bsc_public"));
 
         _createUsers();
 

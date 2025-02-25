@@ -10,14 +10,16 @@ import {
     MultiswapRouterFacet,
     IMultiswapRouterFacet,
     TransferFacet,
-    ITransferFacet
+    ITransferFacet,
+    IRouter,
+    console
 } from "../BaseTest.t.sol";
 
 import "../Helpers.t.sol";
 
 contract Multiswap2Test is BaseTest {
     function setUp() external {
-        vm.createSelectFork(vm.rpcUrl("bsc"));
+        vm.createSelectFork(vm.rpcUrl("bsc_public"));
 
         _createUsers();
 
@@ -292,5 +294,95 @@ contract Multiswap2Test is BaseTest {
                 abi.encodeCall(TransferFacet.transferToken, (user))
             )
         });
+    }
+
+    struct Amounts {
+        uint256 amount1;
+        uint256 amount2;
+        uint256 amount3;
+        uint256 amount4;
+    }
+
+    function test_multiswapRouterFacet_multiswap2_test() external checkTokenStorage {
+        Amounts memory amounts;
+
+        IMultiswapRouterFacet.Multiswap2Calldata memory m2Data;
+
+        m2Data.fullAmount = 100e18;
+        m2Data.amountInPercentages = Solarray.uint256s(1e18);
+        m2Data.tokenIn = USDT;
+        m2Data.tokenOut = WBNB;
+
+        m2Data.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(WBNB_USDT_UniV3_500));
+
+        m2Data.fullAmount = quoter.multiswap2Reverse({ data: m2Data });
+        uint256 quoterAmountIn = m2Data.fullAmount;
+        amounts.amount1 = m2Data.fullAmount;
+
+        console.log("quoter1", quoter.multiswap2({ data: m2Data }));
+
+        m2Data.fullAmount = 100e18;
+        m2Data.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(WBNB_USDT_CakeV3_100));
+
+        m2Data.fullAmount = quoter.multiswap2Reverse({ data: m2Data });
+        quoterAmountIn += m2Data.fullAmount;
+        amounts.amount2 = m2Data.fullAmount;
+
+        console.log("quoter2", quoter.multiswap2({ data: m2Data }));
+
+        m2Data.fullAmount = 100e18;
+        m2Data.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(WBNB_USDT_Biswap));
+
+        m2Data.fullAmount = quoter.multiswap2Reverse({ data: m2Data });
+        quoterAmountIn += m2Data.fullAmount;
+        amounts.amount3 = m2Data.fullAmount;
+
+        console.log("quoter3", quoter.multiswap2({ data: m2Data }));
+
+        m2Data.fullAmount = 100e18;
+        m2Data.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(WBNB_USDT_Cake));
+
+        m2Data.fullAmount = quoter.multiswap2Reverse({ data: m2Data });
+        quoterAmountIn += m2Data.fullAmount;
+        amounts.amount4 = m2Data.fullAmount;
+
+        console.log("quoter4", quoter.multiswap2({ data: m2Data }));
+
+        console.log("quoterAmountIn", quoterAmountIn);
+
+        amounts.amount1 = amounts.amount1 * 1e18 / quoterAmountIn;
+        amounts.amount2 = amounts.amount2 * 1e18 / quoterAmountIn;
+        amounts.amount3 = amounts.amount3 * 1e18 / quoterAmountIn;
+        amounts.amount4 = 1e18 - amounts.amount1 - amounts.amount2 - amounts.amount3;
+
+        m2Data.amountInPercentages =
+            Solarray.uint256s(amounts.amount1, amounts.amount2, amounts.amount3, amounts.amount4);
+        m2Data.pairs = Solarray.bytes32Arrays(
+            Solarray.bytes32s(WBNB_USDT_UniV3_500),
+            Solarray.bytes32s(WBNB_USDT_CakeV3_100),
+            Solarray.bytes32s(WBNB_USDT_Biswap),
+            Solarray.bytes32s(WBNB_USDT_Cake)
+        );
+
+        m2Data.fullAmount = quoterAmountIn;
+
+        console.log("fullAmountOut", quoter.multiswap2({ data: m2Data }));
+
+        // m2Data.minAmountOut = quoterAmountIn * 1.02e18 / 1e18;
+
+        // _resetPrank(user);
+
+        // IERC20(USDT).approve({ spender: address(entryPoint), amount: 100e18 });
+
+        // uint256 userBalanceBefore = user.balance;
+
+        // entryPoint.multicall({
+        // data: Solarray.bytess(
+        // abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data)),
+        // abi.encodeCall(TransferFacet.unwrapNativeAndTransferTo, (user))
+        // )
+        // });
+
+        // assertEq(user.balance - userBalanceBefore, quoterAmountOut);
     }
 }

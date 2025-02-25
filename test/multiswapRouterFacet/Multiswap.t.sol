@@ -22,7 +22,7 @@ contract MultiswapTest is BaseTest {
     using TransferHelper for address;
 
     function setUp() external {
-        vm.createSelectFork(vm.rpcUrl("bsc"));
+        vm.createSelectFork(vm.rpcUrl("bsc_public"));
 
         _createUsers();
 

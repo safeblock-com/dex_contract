@@ -7,7 +7,7 @@ import "../Helpers.t.sol";
 
 contract MultiswapSolidlyTest is BaseTest {
     function setUp() external {
-        vm.createSelectFork(vm.rpcUrl("optimism"));
+        vm.createSelectFork(vm.rpcUrl("optimism_public"));
 
         _createUsers();
 
