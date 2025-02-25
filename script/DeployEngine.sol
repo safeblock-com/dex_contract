@@ -40,19 +40,19 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // ethereum
     if (chainId == 1) {
         return Contracts({
-            multiswapRouterFacet: address(0),
-            transferFacet: address(0),
-            stargateFacet: address(0),
-            layerZeroFacet: address(0),
-            symbiosisFacet: address(0),
+            multiswapRouterFacet: 0x96Fda36A350e40F89Bcdeb5149eFE4C77316F961,
+            transferFacet: 0xbe35b0b10037e11a6D0A71c326FcF929935A4230,
+            stargateFacet: 0x76126f040aF711bE697675137557524Ed79A280B,
+            layerZeroFacet: 0xA2a3F952427c22e208a8298fd2346B8e664964b1,
+            symbiosisFacet: 0xe9BEbFC505a738A58319F509EfB51A8ac6c8008f,
             //
-            quoter: address(0),
-            quoterProxy: address(0),
-            proxy: address(0),
-            feeContract: address(0),
-            feeContractProxy: address(0),
+            quoter: 0x3E1D733045E7abdC0bd28A272b45cC8896528bB2,
+            quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
+            proxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
+            feeContract: 0x15ad2B8844a7f42A94F37AdFc90BeeBd5D1c99AA,
+            feeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
             //
-            prodEntryPoint: address(0),
+            prodEntryPoint: 0xF307b0a60330512D51e4C8e4ddAA3E26D8f08569,
             prodProxy: address(0),
             prodFeeContractProxy: address(0),
             //
