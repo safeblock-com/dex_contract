@@ -81,16 +81,19 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
         bytes memory composeMsg
     )
         external
-        returns (uint256)
     {
         address token = IStargate(poolAddress).token();
         address sender = TransientStorageFacetLibrary.getSenderAddress();
 
         if (token > address(0)) {
-            (address _token, uint256 amount) = TransientStorageFacetLibrary.getTokenAndAmount();
-            if (_token == address(0) && amount == 0) {
+            uint256 amount = TransientStorageFacetLibrary.getAmountForToken({ token: token });
+            if (amount == 0) {
                 TransferHelper.safeTransferFrom({ token: token, from: sender, to: address(this), value: amountLD });
+            } else {
+                amountLD = amount;
             }
+        } else {
+            revert IStargateFacet.StargateFacet_UnsupportedAsset();
         }
 
         amountLD = FeeLibrary.payFee({ token: token, amount: amountLD });
@@ -113,16 +116,11 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
             refundAddress: sender
         });
 
-        if (token > address(0)) {
-            unchecked {
-                uint256 balanceAfterTransfer =
-                    amountLD - (balanceBefore - TransferHelper.safeGetBalance({ token: token, account: address(this) }));
+        unchecked {
+            uint256 balanceAfter =
+                amountLD - (balanceBefore - TransferHelper.safeGetBalance({ token: token, account: address(this) }));
 
-                TransientStorageFacetLibrary.setTokenAndAmount({ token: token, amount: balanceAfterTransfer });
-                return balanceAfterTransfer;
-            }
-        } else {
-            return 0;
+            TransientStorageFacetLibrary.setAmountForToken({ token: token, amount: balanceAfter, record: true });
         }
     }
 
@@ -148,10 +146,10 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
         uint256 amountLD = OFTComposeMsgCodec.amountLD({ _msg: message });
         bytes memory composeMessage = OFTComposeMsgCodec.composeMsg({ _msg: message });
 
-        (address asset, address fallbackAddress, bytes32 argOverride, bytes memory payload) =
-            abi.decode(composeMessage, (address, address, bytes32, bytes));
+        (address asset, address fallbackAddress, bytes memory payload) =
+            abi.decode(composeMessage, (address, address, bytes));
 
-        _sendCallback(asset, amountLD, fallbackAddress, argOverride, payload);
+        _sendCallback(asset, amountLD, fallbackAddress, payload);
     }
 
     // =========================
@@ -159,41 +157,33 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
     // =========================
 
     /// @dev Send callback to this address for execute cross chain message.
-    function _sendCallback(
-        address asset,
-        uint256 amountLD,
-        address fallbackAddress,
-        bytes32 argOverride,
-        bytes memory payload
-    )
-        internal
-    {
-        TransientStorageFacetLibrary.setTokenAndAmount({ token: asset, amount: amountLD });
+    function _sendCallback(address asset, uint256 amountLD, address fallbackAddress, bytes memory payload) internal {
+        if (asset > address(0)) {
+            TransientStorageFacetLibrary.setAmountForToken({ token: asset, amount: amountLD, record: false });
 
-        bool successfulCall;
-        assembly ("memory-safe") {
-            if argOverride { mstore(add(payload, add(32, argOverride)), amountLD) }
+            bool successfulCall;
+            assembly ("memory-safe") {
+                successfulCall := call(gas(), address(), 0, add(payload, 32), mload(payload), 0, 0)
 
-            successfulCall := call(gas(), address(), 0, add(payload, 32), mload(payload), 0, 0)
-
-            if iszero(successfulCall) {
-                returndatacopy(add(payload, 32), 0, returndatasize())
-                mstore(payload, returndatasize())
+                if iszero(successfulCall) {
+                    returndatacopy(add(payload, 32), 0, returndatasize())
+                    mstore(payload, returndatasize())
+                }
             }
-        }
 
-        if (!successfulCall) {
-            amountLD = FeeLibrary.payFee({ token: asset, amount: amountLD });
+            if (!successfulCall) {
+                // zero the temporary value in storage
+                amountLD = FeeLibrary.payFee({
+                    token: asset,
+                    amount: TransientStorageFacetLibrary.getAmountForToken({ token: asset })
+                });
 
-            TransientStorageFacetLibrary.setTokenAndAmount({ token: address(0), amount: 0 });
+                emit IStargateFacet.CallFailed({ errorMessage: payload });
 
-            emit IStargateFacet.CallFailed({ errorMessage: payload });
-
-            if (asset == address(0)) {
-                TransferHelper.safeTransferNative({ to: fallbackAddress, value: amountLD });
-            } else {
                 TransferHelper.safeTransfer({ token: asset, to: fallbackAddress, value: amountLD });
             }
+        } else {
+            TransferHelper.safeTransferNative({ to: fallbackAddress, value: amountLD });
         }
     }
 

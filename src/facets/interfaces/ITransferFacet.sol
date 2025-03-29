@@ -29,12 +29,11 @@ interface ITransferFacet {
         uint256 deadline,
         bytes calldata signature
     )
-        external
-        returns (uint256);
+        external;
 
-    /// @notice Transfer ERC20 token to `to`
-    function transferToken(address to) external returns (uint256);
+    /// @notice Transfer ERC20 `tokens` to `to`
+    function transferToken(address to, address[] calldata tokens) external;
 
     /// @notice Unwrap native token and transfer to `to`
-    function unwrapNativeAndTransferTo(address to) external returns (uint256);
+    function unwrapNativeAndTransferTo(address to) external;
 }

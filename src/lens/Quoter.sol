@@ -6,15 +6,19 @@ import { UUPSUpgradeable } from "../proxy/UUPSUpgradeable.sol";
 
 import { Ownable2Step } from "../external/Ownable2Step.sol";
 
-import { IUniswapV3Pool } from "../interfaces/IUniswapV3Pool.sol";
+import { IUniswapPool } from "../interfaces/IUniswapPool.sol";
 
 import { HelperLib } from "./libraries/HelperLib.sol";
-import { HelperV3Lib } from "./libraries/HelperV3Lib.sol";
+import { HelperV3Lib, TickMath } from "./libraries/HelperV3Lib.sol";
 
 import { IMultiswapRouterFacet } from "../facets/interfaces/IMultiswapRouterFacet.sol";
 import { IRouter } from "../facets/interfaces/IRouter.sol";
 
-import { IFeeContract } from "../interfaces/IFeeContract.sol";
+import { IEntryPoint } from "../interfaces/IEntryPoint.sol";
+
+import { TransferHelper } from "../facets/libraries/TransferHelper.sol";
+
+import { E18, UNISWAP_V3_MASK, ADDRESS_MASK, FEE_MASK } from "../libraries/Constants.sol";
 
 /// @title Multiswap-Partswap Quoter contract
 contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
@@ -22,22 +26,10 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
     // storage
     // =========================
 
-    uint256 internal constant E18 = 1e18;
-
     /// @dev address of the WrappedNative contract for current chain
     address private immutable _wrappedNative;
 
-    /// @dev mask for UniswapV3 pair designation
-    /// if `mask & pair == true`, the swap is performed using the UniswapV3 logic
-    bytes32 private constant UNISWAP_V3_MASK = 0x8000000000000000000000000000000000000000000000000000000000000000;
-
-    /// address mask: `mask & pair == address(pair)`
-    address private constant ADDRESS_MASK = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;
-
-    /// fee mask: `mask & (pair >> 160) == fee in pair`
-    uint24 private constant FEE_MASK = 0xffffff;
-
-    IFeeContract private _feeContract;
+    IEntryPoint private _router;
 
     // =========================
     // constructor
@@ -51,12 +43,12 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
         _transferOwnership(newOwner);
     }
 
-    function getFeeContract() external view returns (address) {
-        return address(_feeContract);
+    function getRouter() external view returns (address) {
+        return address(_router);
     }
 
-    function setFeeContract(address newFeeContract) external onlyOwner {
-        _feeContract = IFeeContract(newFeeContract);
+    function setRouter(address router) external onlyOwner {
+        _router = IEntryPoint(router);
     }
 
     // =========================
@@ -79,45 +71,47 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
         view
         returns (uint256 amountOut)
     {
-        amountOut = _multiswapReverse(data.tokenIn == address(0), data);
+        amountOut = _multiswapReverse(data.pairs, data.amountIn, data.tokenIn);
     }
 
     //// @inheritdoc IMultiswapRouterFacet
     function multiswap2(IMultiswapRouterFacet.Multiswap2Calldata calldata data)
         external
         view
-        returns (uint256 amountOut)
+        returns (uint256[] memory amountsOut)
     {
-        address tokenIn = data.tokenIn;
-        address tokenOut = data.tokenOut;
-        uint256 fullAmount = data.fullAmount;
-        tokenIn = tokenIn == address(0) ? _wrappedNative : tokenIn;
+        amountsOut = new uint256[](data.tokensOut.length);
 
         // cache length of pairs to stack for gas savings
         uint256 length = data.pairs.length;
         // if length of array is zero -> revert
         if (length == 0) {
-            return 0;
+            return amountsOut;
         }
         if (length != data.amountInPercentages.length) {
-            return 0;
+            return amountsOut;
         }
+
+        address[] calldata tokensOut = data.tokensOut;
+
+        uint256 fullAmount = _subFee(data.fullAmount);
+        address tokenIn = data.tokenIn == address(0) ? _wrappedNative : data.tokenIn;
 
         {
             uint256 amountInPercentagesCheck;
             for (uint256 i; i < length;) {
                 unchecked {
                     amountInPercentagesCheck += data.amountInPercentages[i];
-
                     ++i;
                 }
             }
 
             // sum of amounts array must be equal to 100% (1e18)
             if (amountInPercentagesCheck != E18) {
-                return 0;
+                return amountsOut;
             }
         }
+
         {
             uint256 lastIndex;
             unchecked {
@@ -138,18 +132,26 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
 
                 (uint256 _amountOut, address _tokenOut) = _multiswap(data.pairs[i], amountIn, tokenIn);
 
-                if (_tokenOut != tokenOut) {
-                    return 0;
-                }
+                bool added;
+                for (uint256 j = tokensOut.length; j > 0;) {
+                    unchecked {
+                        --j;
 
+                        if (tokensOut[j] == _tokenOut) {
+                            amountsOut[j] += _amountOut;
+                            added = true;
+                            break;
+                        }
+                    }
+                }
+                if (!added) {
+                    return new uint256[](tokensOut.length);
+                }
                 unchecked {
-                    amountOut += _amountOut;
                     ++i;
                 }
             }
         }
-
-        amountOut = _subFee(amountOut);
     }
 
     // =========================
@@ -173,26 +175,16 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
             return (0, address(0));
         }
 
-        IUniswapV3Pool pool;
+        IUniswapPool pool;
         uint256 fee;
         uint256 isSolidly;
         bool uni3;
-        bytes32 pair;
 
         for (uint256 i; i < length;) {
-            pair = pairs[i];
+            (uni3, pool, isSolidly, fee) = _getPoolInfo(pairs[i]);
 
-            assembly ("memory-safe") {
-                pool := and(pair, ADDRESS_MASK)
-                fee := and(shr(160, pair), FEE_MASK)
-                uni3 := and(pair, UNISWAP_V3_MASK)
-                isSolidly := and(shr(184, pair), 0xff)
-
-                i := add(i, 1)
-
-                if iszero(uni3) {
-                    amountIn := sub(amountIn, div(mul(amountIn, and(shr(184, pair), FEE_MASK)), 1000000))
-                }
+            unchecked {
+                ++i;
             }
 
             (amountIn, tokenIn) = _quoteExactInput(uni3, tokenIn, pool, isSolidly, amountIn, fee);
@@ -206,68 +198,41 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
     }
 
     function _multiswapReverse(
-        bool isNative,
-        IMultiswapRouterFacet.MultiswapCalldata calldata data
+        bytes32[] calldata pairs,
+        uint256 amountOut,
+        address tokenOut
     )
         internal
         view
         returns (uint256)
     {
         // cache length of pairs to stack for gas savings
-        uint256 length = data.pairs.length;
-        // if length of array is zero -> revert
+        uint256 length = pairs.length;
+        // if length of array is zero -> return invalid value
         if (length == 0) {
-            return 0;
+            return type(uint256).max;
         }
 
-        address tokenOut;
-        uint256 amountOut = data.amountIn;
+        if (address(_router) > address(0)) {
+            (, uint256 protocolFee) = _router.getFeeContractAddressAndFee();
 
-        {
-            IFeeContract feeContract = _feeContract;
-
-            if (address(feeContract) > address(0)) {
-                uint256 protocolFee = feeContract.fees();
-
-                if (protocolFee > 0) {
-                    unchecked {
-                        amountOut = amountOut * 1e6 / (1e6 - protocolFee);
-                    }
+            if (protocolFee > 0) {
+                unchecked {
+                    amountOut = amountOut * 1e6 / (1e6 - protocolFee);
                 }
             }
         }
 
-        if (isNative) {
-            tokenOut = _wrappedNative;
-        } else {
-            tokenOut = data.tokenIn;
-        }
-
-        IUniswapV3Pool pool;
+        IUniswapPool pool;
         uint256 fee;
         bool uni3;
-        bytes32 pair;
 
-        uint256 index;
-        unchecked {
-            index = length - 1;
-        }
-
-        for (uint256 i; i < length;) {
-            pair = data.pairs[index];
-
-            assembly ("memory-safe") {
-                pool := and(pair, ADDRESS_MASK)
-                fee := and(shr(160, pair), FEE_MASK)
-                uni3 := and(pair, UNISWAP_V3_MASK)
-
-                i := add(i, 1)
-                index := sub(index, 1)
-
-                if iszero(uni3) {
-                    amountOut := add(amountOut, div(mul(amountOut, and(shr(184, pair), FEE_MASK)), 1000000))
-                }
+        for (; length > 0;) {
+            unchecked {
+                --length;
             }
+
+            (uni3, pool,, fee) = _getPoolInfo(pairs[length]);
 
             (amountOut, tokenOut) = _quoteExactOutput(tokenOut, pool, amountOut, fee, uni3);
 
@@ -282,7 +247,7 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
     function _quoteExactInput(
         bool uni3,
         address tokenIn,
-        IUniswapV3Pool pool,
+        IUniswapPool pool,
         uint256 isSolidly,
         uint256 amountIn,
         uint256 fee
@@ -311,7 +276,14 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
                     amount := amountIn
                 }
 
-                (, amountOut) = HelperV3Lib.quoteV3({ pool: pool, zeroForOne: zeroForOne, amountSpecified: amount });
+                unchecked {
+                    (, amountOut) = HelperV3Lib.quoteV3({
+                        pool: pool,
+                        zeroForOne: zeroForOne,
+                        amountSpecified: amount,
+                        sqrtPriceLimitX96: zeroForOne ? TickMath.MIN_SQRT_RATIO + 1 : TickMath.MAX_SQRT_RATIO - 1
+                    });
+                }
             } else {
                 try pool.getReserves() returns (uint112 reserve0, uint112 reserve1, uint32) {
                     (uint256 reserveInput, uint256 reserveOutput) =
@@ -336,7 +308,7 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
 
     function _quoteExactOutput(
         address tokenOut,
-        IUniswapV3Pool pool,
+        IUniswapPool pool,
         uint256 amountOut,
         uint256 fee,
         bool uni3
@@ -364,8 +336,14 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
                 assembly ("memory-safe") {
                     amount := amountOut
                 }
-
-                (amountIn,) = HelperV3Lib.quoteV3({ pool: pool, zeroForOne: zeroForOne, amountSpecified: -amount });
+                unchecked {
+                    (amountIn,) = HelperV3Lib.quoteV3({
+                        pool: pool,
+                        zeroForOne: zeroForOne,
+                        amountSpecified: -amount,
+                        sqrtPriceLimitX96: zeroForOne ? TickMath.MIN_SQRT_RATIO + 1 : TickMath.MAX_SQRT_RATIO - 1
+                    });
+                }
             } else {
                 try pool.getReserves() returns (uint112 reserve0, uint112 reserve1, uint32) {
                     (uint256 reserveInput, uint256 reserveOutput) =
@@ -384,15 +362,26 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
         }
     }
 
-    function _subFee(uint256 amount) internal view returns (uint256) {
-        IFeeContract feeContract = _feeContract;
+    function _getPoolInfo(bytes32 bytes32Pool)
+        private
+        pure
+        returns (bool uni3, IUniswapPool pool, uint256 isSolidly, uint256 fee)
+    {
+        assembly ("memory-safe") {
+            pool := and(bytes32Pool, ADDRESS_MASK)
+            fee := and(shr(160, bytes32Pool), FEE_MASK)
+            uni3 := and(bytes32Pool, UNISWAP_V3_MASK)
+            isSolidly := and(shr(208, bytes32Pool), 0xff)
+        }
+    }
 
-        if (address(feeContract) > address(0) && amount != type(uint256).max) {
-            uint256 fee = feeContract.fees();
+    function _subFee(uint256 amount) private view returns (uint256) {
+        if (address(_router) > address(0)) {
+            (, uint256 protocolFee) = _router.getFeeContractAddressAndFee();
 
-            if (fee > 0) {
+            if (protocolFee > 0 && amount != 0) {
                 unchecked {
-                    return amount - amount * fee / 1e6;
+                    return amount - amount * protocolFee / 1e6;
                 }
             }
         }

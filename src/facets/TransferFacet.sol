@@ -122,7 +122,6 @@ contract TransferFacet is ITransferFacet {
         bytes calldata signature
     )
         external
-        returns (uint256)
     {
         uint256 balanceBefore = TransferHelper.safeGetBalance({ token: token, account: address(this) });
 
@@ -148,31 +147,34 @@ contract TransferFacet is ITransferFacet {
 
             balanceAfter = balanceAfter - balanceBefore;
 
-            TransientStorageFacetLibrary.setTokenAndAmount({ token: token, amount: balanceAfter });
-
-            return balanceAfter;
+            TransientStorageFacetLibrary.setAmountForToken({ token: token, amount: balanceAfter, record: true });
         }
     }
 
     /// @inheritdoc ITransferFacet
-    function transferToken(address to) external returns (uint256) {
-        (address token, uint256 amount) = TransientStorageFacetLibrary.getTokenAndAmount();
-        if (amount > 0) {
-            TransferHelper.safeTransfer({ token: token, to: to, value: amount });
-        }
+    function transferToken(address to, address[] calldata tokens) external {
+        uint256 length = tokens.length;
 
-        return amount;
+        while (length > 0) {
+            unchecked {
+                --length;
+            }
+            address token = tokens[length];
+            uint256 amount = TransientStorageFacetLibrary.getAmountForToken({ token: token });
+
+            if (amount > 0) {
+                TransferHelper.safeTransfer({ token: token, to: to, value: amount });
+            }
+        }
     }
 
     /// @inheritdoc ITransferFacet
-    function unwrapNativeAndTransferTo(address to) external returns (uint256) {
-        (, uint256 amount) = TransientStorageFacetLibrary.getTokenAndAmount();
+    function unwrapNativeAndTransferTo(address to) external {
+        uint256 amount = TransientStorageFacetLibrary.getAmountForToken({ token: address(_wrappedNative) });
         if (amount > 0) {
             _wrappedNative.withdraw({ wad: amount });
 
             TransferHelper.safeTransferNative({ to: to, value: amount });
         }
-
-        return amount;
     }
 }

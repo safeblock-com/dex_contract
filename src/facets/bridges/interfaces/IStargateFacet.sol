@@ -20,6 +20,9 @@ interface IStargateFacet {
     /// @dev Thrown if msg.sender is not the layerZero endpoint
     error StargateFacet_NotLZEndpoint();
 
+    /// @dev Thrown if asset is not address(0)
+    error StargateFacet_UnsupportedAsset();
+
     // =========================
     // getters
     // =========================
@@ -57,6 +60,5 @@ interface IStargateFacet {
         uint128 composeGasLimit,
         bytes memory composeMsg
     )
-        external
-        returns (uint256);
+        external;
 }

@@ -49,10 +49,12 @@ contract MultiswapSolidlyTest is BaseTest {
         _resetPrank(user);
         IERC20(tokenIn).approve({ spender: address(entryPoint), amount: 100e18 });
 
+        address[] memory tokensOut = Solarray.addresses(SOLIDLY_PAIR3.token1());
+
         entryPoint.multicall({
             data: Solarray.bytess(
                 abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
-                abi.encodeCall(TransferFacet.transferToken, (user))
+                abi.encodeCall(TransferFacet.transferToken, (user, tokensOut))
             )
         });
 
@@ -81,10 +83,12 @@ contract MultiswapSolidlyTest is BaseTest {
 
         IERC20(tokenIn).approve({ spender: address(entryPoint), amount: 100e18 });
 
+        tokensOut = Solarray.addresses(SOLIDLY_PAIR2.token1());
+
         entryPoint.multicall({
             data: Solarray.bytess(
                 abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
-                abi.encodeCall(TransferFacet.transferToken, (user))
+                abi.encodeCall(TransferFacet.transferToken, (user, tokensOut))
             )
         });
 
@@ -113,10 +117,12 @@ contract MultiswapSolidlyTest is BaseTest {
 
         IERC20(tokenIn).approve({ spender: address(entryPoint), amount: 100e18 });
 
+        tokensOut = Solarray.addresses(SOLIDLY_PAIR1.token1());
+
         entryPoint.multicall({
             data: Solarray.bytess(
                 abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
-                abi.encodeCall(TransferFacet.transferToken, (user))
+                abi.encodeCall(TransferFacet.transferToken, (user, tokensOut))
             )
         });
     }

@@ -22,23 +22,26 @@ contract Deploy is Script {
     bytes32 constant quoterSalt = keccak256("quoter-salt-1");
     bytes32 constant feeContractSalt = keccak256("fee-contract-salt-1");
 
-    bytes32 constant prodSalt = keccak256("prod-entry-point-salt-1");
-    bytes32 constant prodFeeContractSalt = keccak256("prod-fee-contract-salt-1");
+    bytes32 constant devSalt = keccak256("entry-point-salt-2");
+    bytes32 constant devFeeContractSalt = keccak256("fee-contract-salt-2");
 
     // ===================
 
-    function run() external {
-        address deployer = vm.rememberKey(vm.envUint("PRIVATE_KEY"));
+    Contracts contracts;
+    address deployer;
+
+    function run(bool prod) external {
+        deployer = vm.rememberKey(vm.envUint("PRIVATE_KEY"));
 
         vm.startBroadcast(deployer);
 
-        Contracts memory contracts = getContracts({ chainId: block.chainid });
+        contracts = getContracts({ chainId: block.chainid });
 
         if (contracts.quoter == address(0)) {
             contracts.quoter = address(new Quoter({ wrappedNative_: contracts.wrappedNative }));
 
             if (contracts.quoterProxy == address(0)) {
-                contracts.quoterProxy = address(new Proxy{ salt: quoterSalt }({ initialOwner: deployer }));
+                contracts.quoterProxy = _deployProxy(abi.encode(deployer), quoterSalt);
 
                 InitialImplementation(contracts.quoterProxy).upgradeTo({
                     implementation: contracts.quoter,
@@ -49,13 +52,25 @@ contract Deploy is Script {
             }
         }
 
+        if (prod) {
+            _runProd();
+            _setup(contracts.prodProxy, contracts.prodFeeContractProxy);
+        } else {
+            _runDev();
+            _setup(contracts.proxy, contracts.feeContractProxy);
+        }
+
+        vm.stopBroadcast();
+    }
+
+    function _runDev() internal {
         bool upgrade;
         (contracts, upgrade) = DeployEngine.deployImplementations({ contracts: contracts, isTest: false });
         if (upgrade) {
             address entryPoint = DeployEngine.deployEntryPoint({ contracts: contracts });
 
             if (contracts.proxy == address(0)) {
-                contracts.proxy = address(new Proxy{ salt: salt }({ initialOwner: deployer }));
+                contracts.proxy = _deployProxy(abi.encode(deployer), devSalt);
 
                 bytes[] memory initCalls = new bytes[](0);
 
@@ -72,7 +87,7 @@ contract Deploy is Script {
             contracts.feeContract = address(new FeeContract());
 
             if (contracts.feeContractProxy == address(0)) {
-                contracts.feeContractProxy = address(new Proxy{ salt: feeContractSalt }({ initialOwner: deployer }));
+                contracts.feeContractProxy = _deployProxy(abi.encode(deployer), devFeeContractSalt);
 
                 InitialImplementation(contracts.feeContractProxy).upgradeTo({
                     implementation: contracts.feeContract,
@@ -82,13 +97,45 @@ contract Deploy is Script {
                 FeeContract(payable(contracts.feeContractProxy)).upgradeTo({ newImplementation: contracts.feeContract });
             }
         }
+    }
 
-        if (FeeContract(payable(contracts.feeContractProxy)).fees() == 0) {
-            // 0.03%
-            FeeContract(payable(contracts.feeContractProxy)).setProtocolFee({ newProtocolFee: 300 });
+    function _runProd() internal {
+        if (contracts.prodProxy == address(0)) {
+            contracts.prodProxy = _deployProxy(abi.encode(deployer), salt);
+
+            bytes[] memory initCalls = new bytes[](0);
+
+            InitialImplementation(contracts.prodProxy).upgradeTo({
+                implementation: contracts.prodEntryPoint,
+                data: abi.encodeCall(EntryPoint.initialize, (deployer, initCalls))
+            });
+        } else if (_getProxyImplementation(contracts.prodProxy) != contracts.prodEntryPoint) {
+            EntryPoint(payable(contracts.prodProxy)).upgradeTo({ newImplementation: contracts.prodEntryPoint });
         }
 
-        LayerZeroFacet _layerZeroFacet = LayerZeroFacet(contracts.proxy);
+        if (contracts.prodFeeContractProxy == address(0)) {
+            contracts.prodFeeContractProxy = _deployProxy(abi.encode(deployer), feeContractSalt);
+
+            InitialImplementation(contracts.prodFeeContractProxy).upgradeTo({
+                implementation: contracts.feeContract,
+                data: abi.encodeCall(FeeContract.initialize, (deployer, contracts.prodProxy))
+            });
+        } else if (_getProxyImplementation(contracts.prodFeeContractProxy) != contracts.feeContract) {
+            FeeContract(payable(contracts.prodFeeContractProxy)).upgradeTo({ newImplementation: contracts.feeContract });
+        }
+
+        console2.log("dexContract", contracts.prodProxy);
+        console2.log("feeContract", contracts.prodFeeContractProxy);
+    }
+
+    function _setup(address proxy, address feeContractProxy) internal {
+        (address feeContract, uint256 fee) = EntryPoint(payable(proxy)).getFeeContractAddressAndFee();
+        if (fee != 300 || feeContract == address(0)) {
+            // 0.03%
+            EntryPoint(payable(proxy)).setFeeContractAddressAndFee({ feeContractAddress: feeContractProxy, fee: 300 });
+        }
+
+        LayerZeroFacet _layerZeroFacet = LayerZeroFacet(proxy);
 
         if (_layerZeroFacet.getDelegate() == address(0)) {
             _layerZeroFacet.setDelegate({ delegate: deployer });
@@ -97,93 +144,30 @@ contract Deploy is Script {
             _layerZeroFacet.setDefaultGasLimit({ newDefaultGasLimit: 50_000 });
         }
 
-        if (EntryPoint(payable(contracts.proxy)).getFeeContractAddress() == address(0)) {
-            EntryPoint(payable(contracts.proxy)).setFeeContractAddress({ feeContractAddress: contracts.feeContractProxy });
-        }
-
-        if (Quoter(contracts.quoterProxy).getFeeContract() == address(0)) {
-            Quoter(contracts.quoterProxy).setFeeContract({ newFeeContract: contracts.feeContractProxy });
-        }
-
-        vm.stopBroadcast();
-    }
-
-    function runProd() external {
-        address deployer = vm.rememberKey(vm.envUint("PRIVATE_KEY"));
-
-        vm.startBroadcast(deployer);
-
-        Contracts memory contracts = getContracts({ chainId: block.chainid });
-
-        if (contracts.quoter == address(0)) {
-            contracts.quoter = address(new Quoter({ wrappedNative_: contracts.wrappedNative }));
-
-            if (contracts.quoterProxy == address(0)) {
-                contracts.quoterProxy = address(new Proxy{ salt: quoterSalt }({ initialOwner: deployer }));
-
-                InitialImplementation(contracts.quoterProxy).upgradeTo({
-                    implementation: contracts.quoter,
-                    data: abi.encodeCall(Quoter.initialize, (deployer))
-                });
+        if (Quoter(contracts.quoterProxy).getRouter() != contracts.proxy) {
+            if (contracts.proxy > address(0)) {
+                Quoter(contracts.quoterProxy).setRouter({ router: contracts.proxy });
             }
         }
+    }
 
-        address entryPoint = contracts.prodEntryPoint;
-        if (contracts.prodEntryPoint == address(0)) {
-            (contracts,) = DeployEngine.deployImplementations({ contracts: contracts, isTest: false });
-            entryPoint = DeployEngine.deployEntryPoint({ contracts: contracts });
+    function _getProxyImplementation(address proxy) internal view returns (address impl) {
+        bytes32 _impl = vm.load(address(proxy), 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc);
+        assembly ("memory-safe") {
+            impl := _impl
         }
+    }
 
-        if (contracts.prodProxy == address(0)) {
-            contracts.prodProxy = address(new Proxy{ salt: prodSalt }({ initialOwner: deployer }));
+    function _deployProxy(bytes memory constructorArgs, bytes32 _salt) internal returns (address addr) {
+        bytes memory bytecode = abi.encodePacked(
+            hex"608060405234801561001057600080fd5b5060405161064f38038061064f83398101604081905261002f916101c7565b8060001955610074604051610043906101ba565b604051809103906000f08015801561005f573d6000803e3d6000fd5b5060408051602081019091526000815261007a565b50610226565b6100838261015d565b6040516001600160a01b038316907fbc7cd75a20ee27fd9adebab32041f755214dbc6bffa90cc0225b39da2e5c2d3b90600090a280511561015157600080836001600160a01b0316836040516100d991906101f7565b600060405180830381855af49150503d8060008114610114576040519150601f19603f3d011682016040523d82523d6000602084013e610119565b606091505b50915091508161014b5780511561013257805181602001fd5b60405163e02784b560e01b815260040160405180910390fd5b50505050565b610159610199565b5050565b803b61017557634a4a0aa2600052806020526024601cfd5b7f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc55565b34156101b85760405163811fbc6360e01b815260040160405180910390fd5b565b61038d806102c283390190565b6000602082840312156101d957600080fd5b81516001600160a01b03811681146101f057600080fd5b9392505050565b6000825160005b8181101561021857602081860181015185830152016101fe565b506000920191825250919050565b608e806102346000396000f3fe608060405236600a57005b600060337f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc5490565b90503660008037600080366000845af43d6000803e8080156053573d6000f35b3d6000fdfea2646970667358221220064f3bd5e34592ee91aec04ca124290ae532ff39ff36a49f24abd002edead1fa64736f6c63430008130033608060405234801561001057600080fd5b5061036d806100206000396000f3fe608060405234801561001057600080fd5b506004361061002b5760003560e01c80636fbc15e914610030575b600080fd5b61004361003e36600461022b565b610045565b005b600019805433146100625763483ffb99600052336020526024601cfd5b600090556100708282610074565b5050565b61007d82610186565b60405173ffffffffffffffffffffffffffffffffffffffff8316907fbc7cd75a20ee27fd9adebab32041f755214dbc6bffa90cc0225b39da2e5c2d3b90600090a280511561017e576000808373ffffffffffffffffffffffffffffffffffffffff16836040516100ed9190610308565b600060405180830381855af49150503d8060008114610128576040519150601f19603f3d011682016040523d82523d6000602084013e61012d565b606091505b5091509150816101785780511561014657805181602001fd5b6040517fe02784b500000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b50505050565b6100706101c2565b803b61019e57634a4a0aa2600052806020526024601cfd5b7f360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc55565b34156101fa576040517f811fbc6300000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b6000806040838503121561023e57600080fd5b823573ffffffffffffffffffffffffffffffffffffffff8116811461026257600080fd5b9150602083013567ffffffffffffffff8082111561027f57600080fd5b818501915085601f83011261029357600080fd5b8135818111156102a5576102a56101fc565b604051601f8201601f19908116603f011681019083821181831017156102cd576102cd6101fc565b816040528281528860208487010111156102e657600080fd5b8260208601602083013760006020848301015280955050505050509250929050565b6000825160005b81811015610329576020818601810151858301520161030f565b50600092019182525091905056fea26469706673582212207bb2ef0dbbfd01c62a9ac79533e04113da096669f1ddc680bf4a347f593ca36464736f6c63430008130033",
+            constructorArgs
+        );
 
-            bytes[] memory initCalls = new bytes[](0);
+        assembly ("memory-safe") {
+            addr := create2(0, add(bytecode, 0x20), mload(bytecode), _salt)
 
-            InitialImplementation(contracts.prodProxy).upgradeTo({
-                implementation: entryPoint,
-                data: abi.encodeCall(EntryPoint.initialize, (deployer, initCalls))
-            });
+            if iszero(addr) { revert(0, 0) }
         }
-
-        if (contracts.feeContract == address(0)) {
-            contracts.feeContract = address(new FeeContract());
-        }
-
-        if (contracts.prodFeeContractProxy == address(0)) {
-            contracts.prodFeeContractProxy = address(new Proxy{ salt: prodFeeContractSalt }({ initialOwner: deployer }));
-
-            InitialImplementation(contracts.prodFeeContractProxy).upgradeTo({
-                implementation: contracts.feeContract,
-                data: abi.encodeCall(FeeContract.initialize, (deployer, contracts.prodProxy))
-            });
-        }
-
-        if (FeeContract(payable(contracts.prodFeeContractProxy)).fees() == 0) {
-            // 0.03%
-            FeeContract(payable(contracts.prodFeeContractProxy)).setProtocolFee({ newProtocolFee: 300 });
-        }
-
-        LayerZeroFacet _layerZeroFacet = LayerZeroFacet(contracts.prodProxy);
-
-        if (_layerZeroFacet.getDelegate() == address(0)) {
-            _layerZeroFacet.setDelegate({ delegate: contracts.multisig });
-        }
-        if (_layerZeroFacet.defaultGasLimit() == 0) {
-            _layerZeroFacet.setDefaultGasLimit({ newDefaultGasLimit: 50_000 });
-        }
-
-        if (EntryPoint(payable(contracts.prodProxy)).getFeeContractAddress() == address(0)) {
-            EntryPoint(payable(contracts.prodProxy)).setFeeContractAddress({
-                feeContractAddress: contracts.prodFeeContractProxy
-            });
-        }
-
-        IOwnable2Step(contracts.prodProxy).transferOwnership({ newOwner: contracts.multisig });
-        IOwnable2Step(contracts.prodFeeContractProxy).transferOwnership({ newOwner: contracts.multisig });
-
-        console2.log("dexContract", contracts.prodProxy);
-        console2.log("feeContract", contracts.prodFeeContractProxy);
-
-        vm.stopBroadcast();
     }
 }

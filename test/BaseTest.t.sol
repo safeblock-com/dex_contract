@@ -33,6 +33,10 @@ import { SymbiosisFacet, ISymbiosisFacet, ISymbiosis } from "../src/facets/bridg
 
 import { TransientStorageFacetLibrary } from "../src/libraries/TransientStorageFacetLibrary.sol";
 
+import { EfficientSwapAmount, IUniswapPool, HelperV3Lib } from "../src/lens/libraries/EfficientSwapAmount.sol";
+
+import { console } from "forge-std/console.sol";
+
 contract BaseTest is Test {
     address owner;
     uint256 ownerPk;
@@ -72,7 +76,7 @@ contract BaseTest is Test {
             implementation: DeployEngine.deployEntryPoint({ contracts: contracts }),
             data: abi.encodeCall(IEntryPoint.initialize, (owner, new bytes[](0)))
         });
-        entryPoint.setFeeContractAddress({ feeContractAddress: address(feeContract) });
+        entryPoint.setFeeContractAddressAndFee({ feeContractAddress: address(feeContract), fee: 0 });
     }
 
     // helper
@@ -166,7 +170,7 @@ contract BaseTest is Test {
         assertTrue(contains);
     }
 
-    modifier checkTokenStorage() {
+    modifier checkTokenStorage(address[] memory tokens) {
         _;
 
         // CALLBACK
@@ -174,14 +178,17 @@ contract BaseTest is Test {
             vm.load(address(entryPoint), 0x1248b983d56fa782b7a88ee11066fc0746058888ea550df970b9eea952d65dd1), bytes32(0)
         );
 
-        // TOKEN and AMOUNT
-        assertEq(
-            vm.load(address(entryPoint), 0xc0abc52de3d4e570867f700eb5dfe2c039750b7f48720ee0d6152f3aa8676374), bytes32(0)
-        );
+        for (uint256 i; i < tokens.length; ++i) {
+            assertEq(vm.load(address(entryPoint), bytes32(uint256(uint160(tokens[i])))), bytes32(0));
+        }
 
         // SENDER
         assertEq(
             vm.load(address(entryPoint), 0x289cc669fe96ce33e95427b15b06e5cf0e5e79eb9894ad468d456975ce05c198), bytes32(0)
+        );
+
+        assertEq(
+            vm.load(address(entryPoint), 0xc0abc52de3d4e570867f700eb5dfe2c039750b7f48720ee0d6152f3aa8676374), bytes32(0)
         );
     }
 }

@@ -43,25 +43,26 @@ contract SymbiosisFacet is ISymbiosisFacet {
     /// @inheritdoc ISymbiosisFacet
     function sendSymbiosis(ISymbiosisFacet.SymbiosisTransaction calldata symbiosisTransaction) external {
         address sender = TransientStorageFacetLibrary.getSenderAddress();
-        (address token, uint256 amount) = TransientStorageFacetLibrary.getTokenAndAmount();
-        if (token == address(0) && amount == 0) {
-            TransferHelper.safeTransferFrom({
-                token: symbiosisTransaction.rtoken,
-                from: sender,
-                to: address(this),
-                value: symbiosisTransaction.amount
-            });
+
+        address token = symbiosisTransaction.rtoken;
+        uint256 amount = symbiosisTransaction.amount;
+
+        uint256 _amount = TransientStorageFacetLibrary.getAmountForToken({ token: token });
+        if (_amount == 0) {
+            TransferHelper.safeTransferFrom({ token: token, from: sender, to: address(this), value: amount });
+        } else {
+            amount = _amount;
         }
 
-        amount = FeeLibrary.payFee({ token: symbiosisTransaction.rtoken, amount: symbiosisTransaction.amount });
+        amount = FeeLibrary.payFee({ token: token, amount: amount });
 
-        symbiosisTransaction.rtoken.safeApprove({ spender: address(_portal), value: amount });
+        token.safeApprove({ spender: address(_portal), value: amount });
 
         _portal.metaSynthesize({
             _metaSynthesizeTransaction: ISymbiosis.MetaSynthesizeTransaction({
                 stableBridgingFee: symbiosisTransaction.stableBridgingFee,
                 amount: amount,
-                rtoken: symbiosisTransaction.rtoken,
+                rtoken: token,
                 chain2address: symbiosisTransaction.chain2address,
                 receiveSide: 0xb8f275fBf7A959F4BCE59999A2EF122A099e81A8, // Synthesis on BOBA BNB
                 oppositeBridge: 0x5523985926Aa12BA58DC5Ad00DDca99678D7227E, // BridgeV2 on BOBA BNB

@@ -16872,6 +16872,38 @@ library Solarray {
         return arr;
     }
 
+    function bytess(
+        bytes[] memory mainArray,
+        bytes memory a,
+        bytes memory b,
+        bytes memory c,
+        bytes memory d,
+        bytes memory e,
+        bytes memory f,
+        bytes memory g,
+        bytes memory h
+    )
+        internal
+        pure
+        returns (bytes[] memory)
+    {
+        bytes[] memory arr = new bytes[](mainArray.length + 8);
+        uint256 i;
+        for (; i < mainArray.length; i++) {
+            arr[i] = mainArray[i];
+        }
+
+        arr[i + 0] = a;
+        arr[i + 1] = b;
+        arr[i + 2] = c;
+        arr[i + 3] = d;
+        arr[i + 4] = e;
+        arr[i + 5] = f;
+        arr[i + 6] = g;
+        arr[i + 7] = h;
+        return arr;
+    }
+
     function bytes32Arrays(bytes32[] memory a) internal pure returns (bytes32[][] memory) {
         bytes32[][] memory arr = new bytes32[][](1);
         arr[0] = a;

@@ -1,21 +1,26 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {
+    UNRECORDED_TOKEN_MASK,
+    CALLBACK_FACET_STORAGE,
+    SENDER_FACET_STORAGE,
+    FEE_PAID_FLAG,
+    TOKEN_FACET_STORAGE,
+    TOKEN_FACET_STORAGE_START
+} from "./Constants.sol";
+
 /// @title TransientStorageFacetLibrary
 /// @dev library for store transient data
 library TransientStorageFacetLibrary {
-    // keccak256("callback.facet.storage")
-    bytes32 internal constant CALLBACK_FACET_STORAGE =
-        0x1248b983d56fa782b7a88ee11066fc0746058888ea550df970b9eea952d65dd1;
+    // =========================
+    // errors
+    // =========================
 
-    // keccak256("sender.facet.storage")
-    bytes32 internal constant SENDER_FACET_STORAGE = 0x289cc669fe96ce33e95427b15b06e5cf0e5e79eb9894ad468d456975ce05c198;
+    /// @notice Throws when token not transferred from this contract after call
+    error TokenNotTransferredFromContract();
 
-    // keccak256("token.facet.storage")
-    bytes32 internal constant TOKEN_FACET_STORAGE = 0xc0abc52de3d4e570867f700eb5dfe2c039750b7f48720ee0d6152f3aa8676374;
-
-    uint256 internal constant FEE_PAID_FLAG = 0x010000000000000000000000000000000000000000;
-
+    /// @notice Throws if `sender` is address(0)
     error TransientStorageFacetLibrary_InvalidSenderAddress();
 
     /// @notice get callback address
@@ -62,22 +67,57 @@ library TransientStorageFacetLibrary {
         assembly ("memory-safe") {
             sstore(SENDER_FACET_STORAGE, senderAddress)
 
-            if iszero(senderAddress) { sstore(TOKEN_FACET_STORAGE, 0) }
+            if iszero(senderAddress) {
+                for {
+                    let tokenIndex := sload(TOKEN_FACET_STORAGE)
+                    sstore(TOKEN_FACET_STORAGE, 0)
+
+                    let start := TOKEN_FACET_STORAGE_START
+                } tokenIndex {
+                    start := add(start, 1)
+                    tokenIndex := sub(tokenIndex, 1)
+                } {
+                    if sload(start) {
+                        // TokenNotTransferredFromContract()
+                        mstore(0, 0xc26d3d6a)
+                        revert(28, 4)
+                    }
+                }
+            }
         }
     }
 
     /// @notice set token address an amount which involved in multicall
-    function setTokenAndAmount(address token, uint256 amount) internal {
+    function setAmountForToken(address token, uint256 amount, bool record) internal {
         assembly ("memory-safe") {
-            sstore(TOKEN_FACET_STORAGE, or(token, shl(160, amount)))
+            if amount {
+                let tokenIndex
+
+                switch record
+                case 0 { tokenIndex := UNRECORDED_TOKEN_MASK }
+                case 1 {
+                    tokenIndex := sload(TOKEN_FACET_STORAGE)
+                    sstore(TOKEN_FACET_STORAGE, add(tokenIndex, 1))
+                    sstore(add(tokenIndex, TOKEN_FACET_STORAGE_START), token)
+                }
+
+                sstore(token, add(shl(224, tokenIndex), amount))
+            }
         }
     }
 
     /// @notice get token address an amount which involved in multicall
-    function getTokenAndAmount() internal view returns (address token, uint256 amount) {
+    function getAmountForToken(address token) internal returns (uint256 value) {
         assembly ("memory-safe") {
-            token := sload(TOKEN_FACET_STORAGE)
-            amount := shr(160, token)
+            value := sload(token)
+
+            if value {
+                sstore(token, 0)
+
+                let tokenIndex := shr(224, value)
+                if lt(tokenIndex, UNRECORDED_TOKEN_MASK) { sstore(add(TOKEN_FACET_STORAGE_START, tokenIndex), 0) }
+                value := shr(32, shl(32, value))
+            }
         }
     }
 }

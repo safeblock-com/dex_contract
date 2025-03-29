@@ -3,15 +3,16 @@ src = "src"
 out = "out"
 libs = ["lib"]
 solc = "0.8.19"
+# auto_detect_solc = true
 optimizer = true
 optimizer_runs = 1000
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 
 [rpc_endpoints]
-optimism_public = "https://rpc.ankr.com/optimism"
+optimism_public = "https://optimism-rpc.publicnode.com"
 bsc_public = "https://bsc-dataseed1.ninicoin.io"
-ethereum_public = "https://rpc.ankr.com/eth"
+ethereum_public = "https://ethereum-rpc.publicnode.com"
 ethereum = "${ETH_RPC_URL}"
 bsc = "${BSC_RPC_URL}"
 bsctest = "https://data-seed-prebsc-1-s3.bnbchain.org:8545"

@@ -54,7 +54,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
         _transferOwnership(newOwner);
 
         if (initialCalls.length > 0) {
-            _multicall(true, bytes32(0), initialCalls);
+            _multicall(true, initialCalls);
         }
     }
 
@@ -63,13 +63,13 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
     // =========================
 
     /// @inheritdoc IEntryPoint
-    function setFeeContractAddress(address feeContractAddress) external onlyOwner {
-        FeeLibrary.setFeeContractAddress(feeContractAddress);
+    function setFeeContractAddressAndFee(address feeContractAddress, uint256 fee) external onlyOwner {
+        FeeLibrary.setFeeContractAddress(feeContractAddress, fee);
     }
 
     /// @inheritdoc IEntryPoint
-    function getFeeContractAddress() external view returns (address feeContractAddress) {
-        feeContractAddress = FeeLibrary.getFeeContractAddress();
+    function getFeeContractAddressAndFee() external view returns (address feeContractAddress, uint256 fee) {
+        (feeContractAddress, fee) = FeeLibrary.getFeeContractAddress();
     }
 
     // =========================
@@ -78,12 +78,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
 
     /// @inheritdoc IEntryPoint
     function multicall(bytes[] calldata data) external payable {
-        _multicall(false, bytes32(0), data);
-    }
-
-    /// @inheritdoc IEntryPoint
-    function multicall(bytes32 replace, bytes[] calldata data) external payable {
-        _multicall(true, replace, data);
+        _multicall(false, data);
     }
 
     /// @notice Fallback function to execute facet associated with incoming function selectors.
@@ -167,8 +162,8 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
     // internal function
     // =======================
 
-    function _multicall(bool isOverride, bytes32 replace, bytes[] calldata data) internal {
-        address[] memory _facets = _getAddresses(isOverride, data);
+    function _multicall(bool isOffset, bytes[] calldata data) internal {
+        address[] memory _facets = _getAddresses(isOffset, data);
 
         TransientStorageFacetLibrary.setSenderAddress({ senderAddress: msg.sender });
 
@@ -178,13 +173,15 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
                 let memoryOffset := add(_facets, 32)
                 let ptr := mload(64)
 
-                let cDataStart := mul(isOverride, 32)
-                let cDataOffset := add(68, cDataStart)
-                cDataStart := add(68, cDataStart)
+                let cDataStart := 68
+                let cDataOffset := 68
+
+                if isOffset {
+                    cDataStart := add(cDataStart, 32)
+                    cDataOffset := add(cDataOffset, 32)
+                }
 
                 let facet
-
-                let argReplace
             } length {
                 length := sub(length, 1)
                 cDataOffset := add(cDataOffset, 32)
@@ -208,20 +205,9 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
                 let cSize := calldataload(offset)
                 calldatacopy(ptr, add(offset, 32), cSize)
 
-                // all methods will return only 32 bytes
-                if argReplace {
-                    if returndatasize() { returndatacopy(add(ptr, argReplace), 0, 32) }
-                    argReplace := 0
-                }
-
                 if iszero(callcode(gas(), facet, 0, ptr, cSize, 0, 0)) {
                     returndatacopy(0, 0, returndatasize())
                     revert(0, returndatasize())
-                }
-
-                if replace {
-                    argReplace := and(replace, 0xffff)
-                    replace := shr(16, replace)
                 }
             }
         }
@@ -260,7 +246,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
     /// @dev Uses binary search to find the facet addresses in facetsAndSelectors bytes.
     /// @param datas The calldata to be searched.
     /// @return _facets The addresses of the facet contracts.
-    function _getAddresses(bool isOverride, bytes[] calldata datas) internal view returns (address[] memory _facets) {
+    function _getAddresses(bool isOffset, bytes[] calldata datas) internal view returns (address[] memory _facets) {
         uint256 length = datas.length;
         _facets = new address[](length);
 
@@ -275,7 +261,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
         uint256 selectorsLength;
         uint256 addressesOffset;
         assembly ("memory-safe") {
-            cDataStart := mul(isOverride, 32)
+            cDataStart := mul(isOffset, 32)
             offset := add(68, cDataStart)
             cDataStart := add(68, cDataStart)
 

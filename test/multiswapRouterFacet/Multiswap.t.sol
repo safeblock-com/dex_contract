@@ -13,7 +13,8 @@ import {
     ITransferFacet,
     ISignatureTransfer,
     console2,
-    TransientStorageFacetLibrary
+    TransientStorageFacetLibrary,
+    EfficientSwapAmount
 } from "../BaseTest.t.sol";
 
 import "../Helpers.t.sol";
@@ -114,12 +115,64 @@ contract MultiswapTest is BaseTest {
                 })
             );
 
+            address[] memory tokensOut = Solarray.addresses(USDT);
+
             entryPoint.multicall({
                 data: Solarray.bytess(
-                    abi.encodeCall(TransferFacet.transferFromPermit2, (USDT, 1e18, nonce, block.timestamp, signature))
+                    abi.encodeCall(TransferFacet.transferFromPermit2, (USDT, 1e18, nonce, block.timestamp, signature)),
+                    abi.encodeCall(TransferFacet.transferToken, (user, tokensOut))
                 )
             });
         }
+    }
+
+    // =========================
+    // multiswap without multicall
+    // =========================
+
+    function test_multiswapRouterFacet_multiswap_withoutMulticall_shouldRevert() external {
+        IMultiswapRouterFacet.MultiswapCalldata memory mData;
+
+        mData.amountIn = 100e18;
+        mData.tokenIn = USDT;
+        mData.pairs =
+            Solarray.bytes32s(USDT_USDC_Cake, USDC_CAKE_Cake, BUSD_CAKE_Biswap, BUSD_ETH_Biswap, WBNB_ETH_Bakery);
+
+        _resetPrank(user);
+        vm.expectRevert(TransientStorageFacetLibrary.TransientStorageFacetLibrary_InvalidSenderAddress.selector);
+        IMultiswapRouterFacet(address(entryPoint)).multiswap({ data: mData });
+    }
+
+    // =========================
+    // multiswap without transferToken
+    // =========================
+
+    function test_multiswapRouterFacet_multiswap_withoutTransferToken_shouldRevert() external {
+        IMultiswapRouterFacet.MultiswapCalldata memory mData;
+
+        mData.amountIn = 100e18;
+        mData.tokenIn = USDT;
+        mData.pairs =
+            Solarray.bytes32s(USDT_USDC_Cake, USDC_CAKE_Cake, BUSD_CAKE_Biswap, BUSD_ETH_Biswap, WBNB_ETH_Bakery);
+
+        _resetPrank(user);
+        uint256 nonce = ITransferFacet(address(entryPoint)).getNonceForPermit2({ user: user });
+        bytes memory signature = _permit2Sign(
+            userPk,
+            ISignatureTransfer.PermitTransferFrom({
+                permitted: ISignatureTransfer.TokenPermissions({ token: USDT, amount: 100e18 }),
+                nonce: nonce,
+                deadline: block.timestamp
+            })
+        );
+
+        vm.expectRevert(TransientStorageFacetLibrary.TokenNotTransferredFromContract.selector);
+        entryPoint.multicall({
+            data: Solarray.bytess(
+                abi.encodeCall(TransferFacet.transferFromPermit2, (USDT, 100e18, nonce, block.timestamp, signature)),
+                abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData))
+            )
+        });
     }
 
     // =========================
@@ -156,13 +209,13 @@ contract MultiswapTest is BaseTest {
         USDT.safeApprove({ spender: address(entryPoint), value: 100e18 });
 
         // tokenIn is not in sent pair
-        vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidTokenIn.selector);
+        vm.expectRevert(EfficientSwapAmount.EfficientSwapAmount_InvalidTokenIn.selector);
         mData.tokenIn = USDT;
         mData.amountIn = 100e18;
         mData.pairs = Solarray.bytes32s(WBNB_CAKE_CakeV3_500, BUSD_USDT_UniV3_3000);
         entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData))) });
 
-        vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidTokenIn.selector);
+        vm.expectRevert(EfficientSwapAmount.EfficientSwapAmount_InvalidTokenIn.selector);
         mData.tokenIn = USDT;
         mData.amountIn = 100e18;
         mData.pairs = Solarray.bytes32s(BUSD_USDT_UniV3_3000, WBNB_CAKE_CakeV3_500);
@@ -191,13 +244,14 @@ contract MultiswapTest is BaseTest {
             })
         );
 
+        address[] memory tokensOut = Solarray.addresses(WBNB);
+
         _resetPrank(user);
         entryPoint.multicall({
-            replace: 0x0000000000000000000000000000000000000000000000000000000000000024,
             data: Solarray.bytess(
                 abi.encodeCall(TransferFacet.transferFromPermit2, (USDT, 100e18, nonce, block.timestamp, signature)),
                 abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
-                abi.encodeCall(TransferFacet.transferToken, (user))
+                abi.encodeCall(TransferFacet.transferToken, (user, tokensOut))
             )
         });
 
@@ -228,12 +282,13 @@ contract MultiswapTest is BaseTest {
             })
         );
 
+        address[] memory tokensOut = Solarray.addresses(ETH);
+
         entryPoint.multicall({
-            replace: 0x0000000000000000000000000000000000000000000000000000000000000024,
             data: Solarray.bytess(
                 abi.encodeCall(TransferFacet.transferFromPermit2, (USDT, 100e18, nonce, block.timestamp, signature)),
                 abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
-                abi.encodeCall(TransferFacet.transferToken, (user))
+                abi.encodeCall(TransferFacet.transferToken, (user, tokensOut))
             )
         });
 
@@ -254,11 +309,13 @@ contract MultiswapTest is BaseTest {
         _resetPrank(user);
         USDC.safeApprove({ spender: address(entryPoint), value: 100e18 });
 
+        address[] memory tokensOut = Solarray.addresses(CAKE);
+
         vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_FailedV3Swap.selector);
         entryPoint.multicall({
             data: Solarray.bytess(
                 abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
-                abi.encodeCall(TransferFacet.transferToken, (user))
+                abi.encodeCall(TransferFacet.transferToken, (user, tokensOut))
             )
         });
     }
@@ -285,11 +342,10 @@ contract MultiswapTest is BaseTest {
 
         vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_FailedV2Swap.selector);
         entryPoint.multicall({
-            replace: 0x0000000000000000000000000000000000000000000000000000000000000024,
             data: Solarray.bytess(
                 abi.encodeCall(TransferFacet.transferFromPermit2, (USDT, 100e18, nonce, block.timestamp, signature)),
                 abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
-                abi.encodeCall(TransferFacet.transferToken, (user))
+                abi.encodeCall(TransferFacet.transferToken, (user, Solarray.addresses(WBNB)))
             )
         });
     }
@@ -324,13 +380,14 @@ contract MultiswapTest is BaseTest {
             })
         );
 
+        address[] memory tokensOut = Solarray.addresses(WBNB);
+
         vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidAmountOut.selector);
         entryPoint.multicall({
-            replace: 0x0000000000000000000000000000000000000000000000000000000000000024,
             data: Solarray.bytess(
                 abi.encodeCall(TransferFacet.transferFromPermit2, (USDT, 100e18, nonce, block.timestamp, signature)),
                 abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
-                abi.encodeCall(TransferFacet.transferToken, (user))
+                abi.encodeCall(TransferFacet.transferToken, (user, tokensOut))
             )
         });
     }
@@ -360,12 +417,13 @@ contract MultiswapTest is BaseTest {
             })
         );
 
+        address[] memory tokensOut = Solarray.addresses(WBNB);
+
         entryPoint.multicall({
-            replace: 0x0000000000000000000000000000000000000000000000000000000000000024,
             data: Solarray.bytess(
                 abi.encodeCall(TransferFacet.transferFromPermit2, (USDT, 100e18, nonce, block.timestamp, signature)),
                 abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
-                abi.encodeCall(TransferFacet.transferToken, (user))
+                abi.encodeCall(TransferFacet.transferToken, (user, tokensOut))
             )
         });
     }
@@ -392,10 +450,12 @@ contract MultiswapTest is BaseTest {
 
         uint256 userBalanceBefore = USDT.safeGetBalance({ account: user });
 
+        address[] memory tokensOut = Solarray.addresses(USDT);
+
         entryPoint.multicall{ value: 10e18 }({
             data: Solarray.bytess(
                 abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
-                abi.encodeCall(TransferFacet.transferToken, (user))
+                abi.encodeCall(TransferFacet.transferToken, (user, tokensOut))
             )
         });
 
@@ -427,7 +487,6 @@ contract MultiswapTest is BaseTest {
         uint256 userBalanceBefore = user.balance;
 
         entryPoint.multicall({
-            replace: 0x0000000000000000000000000000000000000000000000000000000000000024,
             data: Solarray.bytess(
                 abi.encodeCall(TransferFacet.transferFromPermit2, (USDT, 100e18, nonce, block.timestamp, signature)),
                 abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
@@ -444,9 +503,8 @@ contract MultiswapTest is BaseTest {
 
     function test_multiswapRouterFacet_multiswap_shouldCalculateFee() external {
         _resetPrank(owner);
-        quoter.setFeeContract({ newFeeContract: address(feeContract) });
-        // 0.03%
-        feeContract.setProtocolFee({ newProtocolFee: 300 });
+        entryPoint.setFeeContractAddressAndFee({ feeContractAddress: address(feeContract), fee: 300 });
+        quoter.setRouter({ router: address(entryPoint) });
 
         IMultiswapRouterFacet.MultiswapCalldata memory mData;
 
@@ -471,18 +529,19 @@ contract MultiswapTest is BaseTest {
             })
         );
 
+        address[] memory tokensOut = Solarray.addresses(ETH);
+
         _expectERC20TransferCall(ETH, address(feeContract), quoterAmountOut * 300 / (1e6 - 300));
         entryPoint.multicall({
-            replace: 0x0000000000000000000000000000000000000000000000000000000000000024,
             data: Solarray.bytess(
                 abi.encodeCall(TransferFacet.transferFromPermit2, (USDT, 100e18, nonce, block.timestamp, signature)),
                 abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
-                abi.encodeCall(TransferFacet.transferToken, (user))
+                abi.encodeCall(TransferFacet.transferToken, (user, tokensOut))
             )
         });
 
         assertEq(ETH.safeGetBalance({ account: user }), quoterAmountOut);
-        assertEq(feeContract.profit({ owner: address(feeContract), token: ETH }), quoterAmountOut * 300 / (1e6 - 300));
+        assertEq(feeContract.profit({ token: ETH }), quoterAmountOut * 300 / (1e6 - 300));
     }
 
     // =========================
@@ -500,13 +559,15 @@ contract MultiswapTest is BaseTest {
             ETH_USDT_UniV3_500, WBNB_ETH_UniV3_500, WBNB_CAKE_UniV3_3000, WBNB_CAKE_CakeV3_500, WBNB_ETH_UniV3_3000
         );
 
+        address[] memory tokensOut = Solarray.addresses(ETH);
+
         _resetPrank(user);
 
         vm.expectRevert(TransferHelper.TransferHelper_TransferFromError.selector);
         entryPoint.multicall({
             data: Solarray.bytess(
                 abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
-                abi.encodeCall(TransferFacet.transferToken, (user))
+                abi.encodeCall(TransferFacet.transferToken, (user, tokensOut))
             )
         });
     }
