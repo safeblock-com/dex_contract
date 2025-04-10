@@ -202,12 +202,6 @@ contract EntryPointTest is BaseTest {
         EntryPoint(payable(address(proxy))).multicall({
             data: Solarray.bytess(abi.encodeCall(Facet1.setValue1, (1)), abi.encodeCall(Facet2.setValue2, (2)))
         });
-
-        vm.expectRevert(abi.encodeWithSelector(IEntryPoint.EntryPoint_FunctionDoesNotExist.selector, bytes4(0x000000)));
-        EntryPoint(payable(address(proxy))).multicall({
-            replace: bytes32(0),
-            data: Solarray.bytess(abi.encodeCall(Facet1.setValue1, (1)), abi.encodeCall(Facet2.setValue2, (2)))
-        });
     }
 
     // =========================
@@ -215,9 +209,15 @@ contract EntryPointTest is BaseTest {
     // =========================
 
     function test_entryPoint_setFeeContractAddress_shouldSetFeeContractAddress() external {
-        assertEq(entryPoint.getFeeContractAddress(), address(0));
-        entryPoint.setFeeContractAddress({ feeContractAddress: address(feeContract) });
-        assertEq(entryPoint.getFeeContractAddress(), address(feeContract));
+        (address feeContract, uint256 fee) = entryPoint.getFeeContractAddressAndFee();
+        assertEq(feeContract, address(0));
+        assertEq(fee, 0);
+
+        entryPoint.setFeeContractAddressAndFee({ feeContractAddress: address(feeContract), fee: 300 });
+
+        (feeContract, fee) = entryPoint.getFeeContractAddressAndFee();
+        assertEq(feeContract, address(feeContract));
+        assertEq(fee, 300);
     }
 
     // =========================
@@ -267,33 +267,6 @@ contract EntryPointTest is BaseTest {
                 abi.encodeWithSelector(Facet1.setValue1.selector, 1), abi.encodeWithSelector(Facet1.revertMethod.selector)
             )
         });
-    }
-
-    // =========================
-    // multicall with replace
-    // =========================
-
-    function test_entryPoint_multicallWithReplace_shouldCallSeveralMethodsInOneTx(
-        uint256 value1,
-        uint256 value2
-    )
-        external
-    {
-        Facet1(address(entryPoint)).setValue1({ value: value1 });
-        Facet2(address(entryPoint)).setValue3({ value: value2 });
-
-        entryPoint.multicall({
-            replace: 0x0000000000000000000000000000000000000000000000000000000400000004,
-            data: Solarray.bytess(
-                abi.encodeCall(Facet1.getValue1, ()),
-                abi.encodeCall(Facet2.setValue2, (0)),
-                abi.encodeCall(Facet2.getValue3, ()),
-                abi.encodeCall(Facet1.setValue1, (0))
-            )
-        });
-
-        assertEq(Facet1(address(entryPoint)).getValue1(), value2);
-        assertEq(Facet2(address(entryPoint)).getValue2(), value1);
     }
 
     // =========================

@@ -8,12 +8,6 @@ interface IMultiswapRouterFacet {
     // errors
     // =========================
 
-    /// @notice Throws if `fee` is invalid
-    error MultiswapRouterFacet_InvalidFeeValue();
-
-    /// @notice Throws if `sender` is not the owner
-    error MultiswapRouterFacet_SenderIsNotOwner();
-
     /// @notice Throws if amount out is less than minimum amount out
     error MultiswapRouterFacet_InvalidAmountOut();
 
@@ -35,15 +29,6 @@ interface IMultiswapRouterFacet {
     /// @notice Throws if `amount` is larger than `int256.max`
     error MultiswapRouterFacet_InvalidIntCast();
 
-    /// @notice Throws if `newOwner` is the zero address
-    error MultiswapRouterFacet_NewOwnerIsZeroAddress();
-
-    /// @notice Throws if `sender` is not the wrapped native token for receive function
-    error MultiswapRouterFacet_InvalidNativeSender();
-
-    /// @notice Throws if `tokenIn` is not in the `pair`
-    error MultiswapRouterFacet_InvalidTokenIn();
-
     /// @notice Throws if `amountIn` is 0
     error MultiswapRouterFacet_InvalidAmountIn();
 
@@ -63,7 +48,7 @@ interface IMultiswapRouterFacet {
         uint256 amountIn;
         // minimal amountOut
         uint256 minAmountOut;
-        // first token in swap
+        // the first token in swap
         address tokenIn;
         // array of bytes32 values (pairs) involved in the swap
         // from right to left:
@@ -73,18 +58,15 @@ interface IMultiswapRouterFacet {
         bytes32[] pairs;
     }
 
-    /// @notice Swaps through the data.pairs array
-    function multiswap(MultiswapCalldata calldata data) external returns (uint256);
-
     struct Multiswap2Calldata {
         // exact value in for part swap
         uint256 fullAmount;
-        // minimal amountOut
-        uint256 minAmountOut;
         // token in
         address tokenIn;
         // token out
-        address tokenOut;
+        address[] tokensOut;
+        // minimal amountOut
+        uint256[] minAmountsOut;
         // array of percentages of fullAmount for each swap, corresponding to the path for the swap from the pairs array
         uint256[] amountInPercentages;
         // array of bytes32[] values (pairs) involved in the swap
@@ -98,5 +80,5 @@ interface IMultiswapRouterFacet {
     /// @notice Swaps tokenIn through each path separately
     /// @dev each path in the pairs array must have tokenIn and have the same tokenOut,
     /// the result of swap is the sum after each swap
-    function multiswap2(Multiswap2Calldata calldata data) external returns (uint256);
+    function multiswap2(Multiswap2Calldata calldata data) external;
 }

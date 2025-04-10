@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.0;
 
-interface IUniswapV3Pool {
+interface IUniswapPool {
+    // ================================================
+    // ============ IUniswapV3Pool ============
+    // ================================================
+
     /// @notice The 0th storage slot in the pool stores many values, and is exposed as a single method to save gas
     /// when accessed externally.
     /// @return sqrtPriceX96 The current price of the pool as a sqrt(token1/token0) Q64.96 value
@@ -85,8 +89,6 @@ interface IUniswapV3Pool {
         external
         returns (int256 amount0, int256 amount1);
 
-    function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
-
     /// @notice Returns data about a specific observation index
     /// @param index The element of the observations array to fetch
     /// @dev You most likely want to use #observe() instead of this method to get an observation as of some amount of time
@@ -132,4 +134,33 @@ interface IUniswapV3Pool {
             uint32 secondsOutside,
             bool initialized
         );
+
+    // ================================================
+    // ============ IUniswapV2Pair ============
+    // ================================================
+
+    /// @notice Swap token0 for token1, or token1 for token0
+    /// @param amount0Out The amount of token0 to swap for token1
+    /// @param amount1Out The amount of token1 to swap for token0
+    /// @param to The address to receive the output
+    /// @param data Any data to be passed through to the callback
+    function swap(uint256 amount0Out, uint256 amount1Out, address to, bytes calldata data) external;
+
+    /// @notice Swap token0 for token1, or token1 for token0 without data
+    /// @param amount0Out The amount of token0 to swap for token1
+    /// @param amount1Out The amount of token1 to swap for token0
+    /// @param to The address to receive the output
+    function swap(uint256 amount0Out, uint256 amount1Out, address to) external;
+
+    /// @notice Returns the current reserves of the pair in token0 and token1
+    /// @return reserve0 The amount of token0 in the pair
+    /// @return reserve1 The amount of token1 in the pair
+    function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
+
+    /// @notice Returns the amount of token that can be received for a given amount of other token
+    /// @dev using for SolidlyV2 pairs
+    /// @param amountIn The amount of token to swap
+    /// @param tokenIn The address of the token to swap
+    /// @return amountOut The amount of token that can be received
+    function getAmountOut(uint256 amountIn, address tokenIn) external view returns (uint256);
 }

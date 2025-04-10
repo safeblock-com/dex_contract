@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-library HelperLib {
-    uint256 constant E6 = 1e6;
+import { E6 } from "../../libraries/Constants.sol";
 
+library HelperLib {
     error UniswapV2_InsufficientInputAmount();
     error UniswapV2_InsufficientOutputAmount();
     error UniswapV2_InsufficientLiquidity();

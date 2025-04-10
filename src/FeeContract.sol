@@ -9,18 +9,20 @@ import { UUPSUpgradeable } from "./proxy/UUPSUpgradeable.sol";
 
 import { IFeeContract } from "./interfaces/IFeeContract.sol";
 
+import { IEntryPoint } from "./interfaces/IEntryPoint.sol";
+
+import { FEE_MAX } from "./libraries/Constants.sol";
+
 /// @title FeeContract
 contract FeeContract is Ownable2Step, UUPSUpgradeable, Initializable, IFeeContract {
+    using TransferHelper for address;
+
     // =========================
     // storage
     // =========================
 
-    uint256 private constant FEE_MAX = 1_000_000;
-
-    uint256 private constant PROTOCOL_PART_MASK = 0xffffffffffffffffffffffffffffffff;
-
-    uint256 _protocolFee;
-    mapping(address owner => mapping(address token => uint256 balance)) _profit;
+    uint256 _protocolFee_deprecated;
+    mapping(address owner => mapping(address token => uint256 balance)) _profit_deprecated;
 
     address private _router;
 
@@ -48,15 +50,8 @@ contract FeeContract is Ownable2Step, UUPSUpgradeable, Initializable, IFeeContra
     }
 
     /// @inheritdoc IFeeContract
-    function profit(address owner, address token) external view returns (uint256 balance) {
-        return _profit[owner][token];
-    }
-
-    /// @inheritdoc IFeeContract
-    function fees() external view returns (uint256 protocolFee) {
-        assembly ("memory-safe") {
-            protocolFee := sload(_protocolFee.slot)
-        }
+    function profit(address token) external view returns (uint256 balance) {
+        return TransferHelper.safeGetBalance({ account: address(this), token: token });
     }
 
     // =========================
@@ -68,42 +63,32 @@ contract FeeContract is Ownable2Step, UUPSUpgradeable, Initializable, IFeeContra
         _router = newRouter;
     }
 
-    /// @inheritdoc IFeeContract
-    function setProtocolFee(uint256 newProtocolFee) external onlyOwner {
-        if (newProtocolFee > FEE_MAX) {
-            revert IFeeContract.FeeContract_InvalidFeeValue();
-        }
-        _protocolFee = newProtocolFee;
-    }
-
     // =========================
     // fees logic
     // =========================
 
     /// @inheritdoc IFeeContract
     function collectProtocolFees(address token, address recipient, uint256 amount) external onlyOwner {
-        uint256 balanceOf = _profit[address(this)][token];
+        uint256 balanceOf = TransferHelper.safeGetBalance({ account: address(this), token: token });
         if (balanceOf < amount) {
             amount = balanceOf;
         }
 
         if (amount > 0) {
-            unchecked {
-                _profit[address(this)][token] -= amount;
-            }
             TransferHelper.safeTransfer({ token: token, to: recipient, value: amount });
         }
     }
 
-    /// @inheritdoc IFeeContract
-    function writeFees(address token, uint256 amount) external returns (uint256 fee) {
+    function writeFees(address, uint256 amount) external view returns (uint256 fee) {
         if (msg.sender != _router) {
             revert IFeeContract.FeeContract_InvalidSender({ sender: msg.sender });
         }
 
-        unchecked {
-            fee = (amount * _protocolFee) / FEE_MAX;
-            _profit[address(this)][token] += fee;
+        (, uint256 protocolFee) = IEntryPoint(_router).getFeeContractAddressAndFee();
+        if (protocolFee > 0) {
+            unchecked {
+                fee = (amount * protocolFee) / FEE_MAX;
+            }
         }
     }
 

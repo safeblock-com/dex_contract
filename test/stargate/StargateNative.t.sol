@@ -26,19 +26,20 @@ contract StargateFacetTest is BaseTest {
 
         deal({ to: user, give: 1000e18 });
 
-        feeContract.setProtocolFee({ newProtocolFee: 300 });
+        entryPoint.setFeeContractAddressAndFee({ feeContractAddress: address(feeContract), fee: 300 });
     }
 
     // =========================
     // sendStargate with native
     // =========================
 
-    event TransferNative(address to) anonymous;
-
     address stargatePool = 0x77b2043768d28E9C9aB44E1aBfC95944bcE57931;
     uint16 dstEidV2 = 30_110;
 
-    function test_stargateFacet_sendStargateNative_shouldSendStargateWithNativePool() external checkTokenStorage {
+    function test_stargateFacet_sendStargateNative_shouldRevertIfSendStargateWithNativePool()
+        external
+        checkTokenStorage(new address[](0))
+    {
         _resetPrank(user);
 
         (uint256 fee,) = IStargateFacet(address(entryPoint)).quoteV2({
@@ -52,10 +53,8 @@ contract StargateFacetTest is BaseTest {
 
         assertGt(fee, 0.111111111111111111e18);
 
-        vm.expectEmitAnonymous();
-        emit TransferNative({ to: address(feeContract) });
+        vm.expectRevert(IStargateFacet.StargateFacet_UnsupportedAsset.selector);
         entryPoint.multicall{ value: fee }({
-            replace: 0x0000000000000000000000000000000000000000000000000000000000000000,
             data: Solarray.bytess(
                 abi.encodeCall(
                     IStargateFacet.sendStargateV2, (stargatePool, dstEidV2, 0.111111111111111111e18, user, 0, bytes(""))

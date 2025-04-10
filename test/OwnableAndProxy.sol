@@ -70,7 +70,7 @@ contract OwnableAndProxyTest is BaseTest {
         entryPoint.transferOwnership({ newOwner: notOwner });
 
         vm.expectRevert(abi.encodeWithSelector(IOwnable.Ownable_SenderIsNotOwner.selector, notOwner));
-        feeContract.setProtocolFee({ newProtocolFee: 123 });
+        entryPoint.setFeeContractAddressAndFee({ feeContractAddress: notOwner, fee: 300 });
 
         vm.expectRevert(abi.encodeWithSelector(IOwnable.Ownable_SenderIsNotOwner.selector, notOwner));
         feeContract.setRouter({ newRouter: notOwner });
@@ -188,27 +188,6 @@ contract OwnableAndProxyTest is BaseTest {
         address impl_ = address(uint160(uint256(vm.load(address(entryPoint), ERC1967Utils.IMPLEMENTATION_SLOT))));
 
         assertEq(impl_, impl);
-    }
-
-    // =========================
-    // changeFees
-    // =========================
-
-    function test_feeContract_changeFees_shouldRevertIfDataInvalid() external {
-        _resetPrank(owner);
-        vm.expectRevert(IFeeContract.FeeContract_InvalidFeeValue.selector);
-        feeContract.setProtocolFee({ newProtocolFee: 1_000_001 });
-    }
-
-    function test_feeContract_changeFees_shouldSuccessfulChangeFees(uint256 newPotocolFee) external {
-        newPotocolFee = bound(newPotocolFee, 300, 10_000);
-
-        _resetPrank(owner);
-        feeContract.setProtocolFee({ newProtocolFee: newPotocolFee });
-
-        uint256 protocolFee = feeContract.fees();
-
-        assertEq(protocolFee, newPotocolFee);
     }
 
     // =========================

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.0;
 
-import { IUniswapV3Pool } from "../../../interfaces/IUniswapV3Pool.sol";
+import { IUniswapPool } from "../../../interfaces/IUniswapPool.sol";
 
 /// @title Packed tick initialized state library
 /// @notice Stores a packed mapping of tick index to its initialized state
@@ -26,7 +26,7 @@ library TickBitmap {
     /// @return next The next initialized or uninitialized tick up to 256 ticks away from the current tick
     /// @return initialized Whether the next tick is initialized, as the function only searches within up to 256 ticks
     function nextInitializedTickWithinOneWord(
-        IUniswapV3Pool pool,
+        IUniswapPool pool,
         int24 tick,
         int24 tickSpacing,
         bool lte

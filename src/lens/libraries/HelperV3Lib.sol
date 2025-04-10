@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { IUniswapV3Pool } from "../../interfaces/IUniswapV3Pool.sol";
+import { IUniswapPool } from "../../interfaces/IUniswapPool.sol";
 
 import { TickBitmap } from "./uni3Libs/TickBitmap.sol";
 import { TickMath } from "./uni3Libs/TickMath.sol";
@@ -9,6 +9,8 @@ import { SwapMath } from "./uni3Libs/SwapMath.sol";
 import { SafeCast } from "./uni3Libs/SafeCast.sol";
 import { FixedPoint128 } from "./uni3Libs/FixedPoint128.sol";
 import { FullMath } from "./uni3Libs/FullMath.sol";
+
+import { PoolTicksCounter } from "./uni3Libs/PoolTicksCounter.sol";
 
 struct Slot0 {
     // the current price
@@ -65,9 +67,10 @@ struct FeeAndTickSpacing {
 
 library HelperV3Lib {
     function quoteV3(
-        IUniswapV3Pool pool,
+        IUniswapPool pool,
         bool zeroForOne,
-        int256 amountSpecified
+        int256 amountSpecified,
+        uint160 sqrtPriceLimitX96
     )
         internal
         view
@@ -84,6 +87,20 @@ library HelperV3Lib {
                 slot0Start.sqrtPriceX96 = sqrtPriceX96;
                 slot0Start.tick = tick;
                 slot0Start.feeProtocol = feeProtocol;
+
+                unchecked {
+                    if (zeroForOne) {
+                        if (sqrtPriceLimitX96 > slot0Start.sqrtPriceX96 || sqrtPriceLimitX96 < TickMath.MIN_SQRT_RATIO)
+                        {
+                            sqrtPriceLimitX96 = TickMath.MIN_SQRT_RATIO + 1;
+                        }
+                    } else {
+                        if (sqrtPriceLimitX96 < slot0Start.sqrtPriceX96 || sqrtPriceLimitX96 > TickMath.MAX_SQRT_RATIO)
+                        {
+                            sqrtPriceLimitX96 = TickMath.MAX_SQRT_RATIO - 1;
+                        }
+                    }
+                }
             }
 
             (uint24 fee, int24 tickSpacing, uint128 liquidity) = getFeeTickSpacingAndLiquidity(pool);
@@ -106,7 +123,7 @@ library HelperV3Lib {
             state.liquidity = liquidity;
         }
 
-        while (state.amountSpecifiedRemaining != 0) {
+        while (state.amountSpecifiedRemaining != 0 && state.sqrtPriceX96 != sqrtPriceLimitX96) {
             StepComputations memory step;
 
             step.sqrtPriceStartX96 = state.sqrtPriceX96;
@@ -127,7 +144,9 @@ library HelperV3Lib {
             // compute values to swap to the target tick, price limit, or point where input/output amount is exhausted
             (state.sqrtPriceX96, step.amountIn, step.amountOut, step.feeAmount) = SwapMath.computeSwapStep(
                 state.sqrtPriceX96,
-                step.sqrtPriceNextX96,
+                (zeroForOne ? step.sqrtPriceNextX96 < sqrtPriceLimitX96 : step.sqrtPriceNextX96 > sqrtPriceLimitX96)
+                    ? sqrtPriceLimitX96
+                    : step.sqrtPriceNextX96,
                 state.liquidity,
                 state.amountSpecifiedRemaining,
                 feeAndTickSpacing.fee
@@ -183,14 +202,6 @@ library HelperV3Lib {
             }
         }
 
-        // update tick and write an oracle entry if the tick change
-        if (state.tick != slot0Start.tick) {
-            (slot0Start.sqrtPriceX96, slot0Start.tick) = (state.sqrtPriceX96, state.tick);
-        } else {
-            // otherwise just update the price
-            slot0Start.sqrtPriceX96 = state.sqrtPriceX96;
-        }
-
         unchecked {
             (int256 amount0, int256 amount1) = zeroForOne == exactInput
                 ? (amountSpecified - state.amountSpecifiedRemaining, state.amountCalculated)
@@ -203,12 +214,12 @@ library HelperV3Lib {
         }
     }
 
-    function getTickLiquidityNet(IUniswapV3Pool pool, int24 tick) internal view returns (int128 liquidityNet) {
+    function getTickLiquidityNet(IUniswapPool pool, int24 tick) internal view returns (int128 liquidityNet) {
         (, bytes memory data) = address(pool).staticcall(abi.encodeWithSignature("ticks(int24)", tick));
         (, liquidityNet,,,,,,) = abi.decode(data, (uint128, int128, uint256, uint256, int256, uint256, uint256, bool));
     }
 
-    function getFeeTickSpacingAndLiquidity(IUniswapV3Pool pool)
+    function getFeeTickSpacingAndLiquidity(IUniswapPool pool)
         internal
         view
         returns (uint24 fee, int24 tickSpacing, uint128 liquidity)
@@ -231,7 +242,7 @@ library HelperV3Lib {
         liquidity = abi.decode(data, (uint128));
     }
 
-    function getSlot0(IUniswapV3Pool pool)
+    function getSlot0(IUniswapPool pool)
         internal
         view
         returns (uint160 sqrtPriceX96, int24 tick, uint256 feeProtocol)

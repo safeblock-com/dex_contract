@@ -28,6 +28,8 @@ contract SymbiosisFacetTest is BaseTest {
         deployForTest();
 
         deal({ token: USDC, to: user, give: 1000e18 });
+
+        entryPoint.setFeeContractAddressAndFee({ feeContractAddress: address(feeContract), fee: 300 });
     }
 
     // =========================
@@ -45,9 +47,6 @@ contract SymbiosisFacetTest is BaseTest {
     // =========================
 
     function test_symbiosisFacet_sendSymbiosis_shouldTransferFromFromMsgSender() external {
-        _resetPrank(owner);
-        feeContract.setProtocolFee({ newProtocolFee: 300 });
-
         _resetPrank(user);
 
         IERC20(USDC).approve({ spender: address(entryPoint), amount: 1000e18 });
@@ -78,21 +77,109 @@ contract SymbiosisFacetTest is BaseTest {
             )
         );
 
-        bytes memory finalSwapCalldata = abi.encodeWithSignature(
-            "multicall(bytes[])",
-            Solarray.bytess(
+        address[] memory tokensOut = Solarray.addresses(CAKE);
+
+        bytes memory finalSwapCalldata = abi.encodeCall(
+            IEntryPoint.multicall,
+            (
+                Solarray.bytess(
+                    abi.encodeCall(
+                        IMultiswapRouterFacet.multiswap2,
+                        (
+                            IMultiswapRouterFacet.Multiswap2Calldata({
+                                amountInPercentages: Solarray.uint256s(1e18),
+                                fullAmount: 0,
+                                minAmountsOut: Solarray.uint256s(0),
+                                tokenIn: USDC,
+                                tokensOut: tokensOut,
+                                pairs: Solarray.bytes32Arrays(Solarray.bytes32s(USDC_CAKE_Cake))
+                            })
+                        )
+                    ),
+                    abi.encodeCall(ITransferFacet.transferToken, (user, tokensOut))
+                )
+            )
+        );
+
+        _expectERC20TransferFromCall(USDC, user, address(entryPoint), 1000e18);
+        _expectERC20TransferCall(USDC, address(feeContract), 1000e18 * 300 / 1_000_000);
+        _expectERC20ApproveCall(USDC, contracts.symbiosisPortal, 1000e18 * (1_000_000 - 300) / 1_000_000);
+        entryPoint.multicall({
+            data: Solarray.bytess(
                 abi.encodeCall(
-                    IMultiswapRouterFacet.multiswap,
+                    SymbiosisFacet.sendSymbiosis,
                     (
-                        IMultiswapRouterFacet.MultiswapCalldata({
-                            amountIn: 0,
-                            minAmountOut: 0,
-                            tokenIn: USDC,
-                            pairs: Solarray.bytes32s(USDC_CAKE_Cake)
+                        ISymbiosisFacet.SymbiosisTransaction({
+                            stableBridgingFee: 0.3e18,
+                            amount: 1000e18,
+                            rtoken: USDC,
+                            chain2address: user,
+                            swapTokens: Solarray.addresses(
+                                0x5e19eFc6AC9C80bfAA755259c9fab2398A8E87eB, 0x59AA2e5F628659918A4890A2a732E6C8bD334E7A
+                            ),
+                            secondSwapCalldata: secondSwapCalldata,
+                            finalReceiveSide: address(entryPoint),
+                            finalCalldata: finalSwapCalldata,
+                            finalOffset: 232
                         })
                     )
+                )
+            )
+        });
+    }
+
+    function test_symbiosisFacet_sendSymbiosis_shouldTransferFromFromMsgSenderAfterSwap() external {
+        _resetPrank(user);
+
+        IERC20(USDC).approve({ spender: address(entryPoint), amount: 1000e18 });
+
+        bytes memory secondSwapCalldata = abi.encodeCall(
+            ISymbiosis.multicall,
+            (
+                1000e18,
+                Solarray.bytess(
+                    abi.encodeCall(
+                        ISymbiosis.swap,
+                        (
+                            3,
+                            10,
+                            1000e18 - 0.3e18,
+                            997e6,
+                            0xcB28fbE3E9C0FEA62E0E63ff3f232CECfE555aD4,
+                            block.timestamp + 1200
+                        )
+                    )
                 ),
-                abi.encodeCall(ITransferFacet.transferToken, (user))
+                Solarray.addresses(0x6148FD6C649866596C3d8a971fC313E5eCE84882),
+                Solarray.addresses(
+                    0x5e19eFc6AC9C80bfAA755259c9fab2398A8E87eB, 0x59AA2e5F628659918A4890A2a732E6C8bD334E7A
+                ),
+                Solarray.uint256s(100),
+                0x2cBABD7329b84e2c0A317702410E7c73D0e0246d
+            )
+        );
+
+        address[] memory tokensOut = Solarray.addresses(CAKE);
+
+        bytes memory finalSwapCalldata = abi.encodeCall(
+            IEntryPoint.multicall,
+            (
+                Solarray.bytess(
+                    abi.encodeCall(
+                        IMultiswapRouterFacet.multiswap2,
+                        (
+                            IMultiswapRouterFacet.Multiswap2Calldata({
+                                amountInPercentages: Solarray.uint256s(1e18),
+                                fullAmount: 0,
+                                minAmountsOut: Solarray.uint256s(0),
+                                tokenIn: USDC,
+                                tokensOut: tokensOut,
+                                pairs: Solarray.bytes32Arrays(Solarray.bytes32s(USDC_CAKE_Cake))
+                            })
+                        )
+                    ),
+                    abi.encodeCall(ITransferFacet.transferToken, (user, tokensOut))
+                )
             )
         );
 
@@ -124,9 +211,6 @@ contract SymbiosisFacetTest is BaseTest {
     }
 
     function test_symbiosisFacet_sendSymbiosis_shouldTransferFromViaPermit2() external {
-        _resetPrank(owner);
-        feeContract.setProtocolFee({ newProtocolFee: 300 });
-
         _resetPrank(user);
 
         IERC20(USDC).approve({ spender: contracts.permit2, amount: type(uint256).max });
@@ -168,21 +252,27 @@ contract SymbiosisFacetTest is BaseTest {
             )
         );
 
-        bytes memory finalSwapCalldata = abi.encodeWithSignature(
-            "multicall(bytes[])",
-            Solarray.bytess(
-                abi.encodeCall(
-                    IMultiswapRouterFacet.multiswap,
-                    (
-                        IMultiswapRouterFacet.MultiswapCalldata({
-                            amountIn: 0,
-                            minAmountOut: 0,
-                            tokenIn: USDC,
-                            pairs: Solarray.bytes32s(USDC_CAKE_Cake)
-                        })
-                    )
-                ),
-                abi.encodeCall(ITransferFacet.transferToken, (user))
+        address[] memory tokensOut = Solarray.addresses(CAKE);
+
+        bytes memory finalSwapCalldata = abi.encodeCall(
+            IEntryPoint.multicall,
+            (
+                Solarray.bytess(
+                    abi.encodeCall(
+                        IMultiswapRouterFacet.multiswap2,
+                        (
+                            IMultiswapRouterFacet.Multiswap2Calldata({
+                                amountInPercentages: Solarray.uint256s(1e18),
+                                fullAmount: 0,
+                                minAmountsOut: Solarray.uint256s(0),
+                                tokenIn: USDC,
+                                tokensOut: tokensOut,
+                                pairs: Solarray.bytes32Arrays(Solarray.bytes32s(USDC_CAKE_Cake))
+                            })
+                        )
+                    ),
+                    abi.encodeCall(ITransferFacet.transferToken, (user, tokensOut))
+                )
             )
         );
 
@@ -190,7 +280,6 @@ contract SymbiosisFacetTest is BaseTest {
         _expectERC20TransferCall(USDC, address(feeContract), 1000e18 * 300 / 1_000_000);
         _expectERC20ApproveCall(USDC, contracts.symbiosisPortal, 1000e18 * (1_000_000 - 300) / 1_000_000);
         entryPoint.multicall({
-            replace: 0x0000000000000000000000000000000000000000000000000000000000000044,
             data: Solarray.bytess(
                 abi.encodeCall(ITransferFacet.transferFromPermit2, (USDC, 1000e18, nonce, block.timestamp, signature)),
                 abi.encodeCall(
@@ -250,27 +339,32 @@ contract SymbiosisFacetTest is BaseTest {
             )
         );
 
-        bytes memory finalSwapCalldata = abi.encodeWithSignature(
-            "multicall(bytes[])",
-            Solarray.bytess(
-                abi.encodeCall(
-                    IMultiswapRouterFacet.multiswap,
-                    (
-                        IMultiswapRouterFacet.MultiswapCalldata({
-                            amountIn: 0,
-                            minAmountOut: 0,
-                            tokenIn: USDC,
-                            pairs: Solarray.bytes32s(USDC_CAKE_Cake)
-                        })
-                    )
-                ),
-                abi.encodeCall(ITransferFacet.transferToken, (user))
+        address[] memory tokensOut = Solarray.addresses(CAKE);
+
+        bytes memory finalSwapCalldata = abi.encodeCall(
+            IEntryPoint.multicall,
+            (
+                Solarray.bytess(
+                    abi.encodeCall(
+                        IMultiswapRouterFacet.multiswap2,
+                        (
+                            IMultiswapRouterFacet.Multiswap2Calldata({
+                                amountInPercentages: Solarray.uint256s(1e18),
+                                fullAmount: 0,
+                                minAmountsOut: Solarray.uint256s(0),
+                                tokenIn: USDC,
+                                tokensOut: tokensOut,
+                                pairs: Solarray.bytes32Arrays(Solarray.bytes32s(USDC_CAKE_Cake))
+                            })
+                        )
+                    ),
+                    abi.encodeCall(ITransferFacet.transferToken, (user, tokensOut))
+                )
             )
         );
 
         vm.expectRevert(TransferHelper.TransferHelper_TransferFromError.selector);
         entryPoint.multicall({
-            replace: 0x0000000000000000000000000000000000000000000000000000000000000000,
             data: Solarray.bytess(
                 abi.encodeCall(
                     SymbiosisFacet.sendSymbiosis,
@@ -303,18 +397,28 @@ contract SymbiosisFacetTest is BaseTest {
     function test_symbiosisFacet_receiveSymbiosis_shouldReceiveSymbiosis() external {
         _resetPrank(bridge);
 
-        IMultiswapRouterFacet.MultiswapCalldata memory mData;
+        IMultiswapRouterFacet.Multiswap2Calldata memory m2Data;
 
-        mData.amountIn = 0;
-        mData.tokenIn = USDC;
-        mData.pairs = Solarray.bytes32s(USDC_CAKE_Cake);
+        m2Data.fullAmount = 1000e18;
+        m2Data.amountInPercentages = Solarray.uint256s(0.2e18, 0.2e18, 0.3e18, 0.3e18);
+        m2Data.tokenIn = USDT;
+        m2Data.pairs = Solarray.bytes32Arrays(
+            Solarray.bytes32s(USDT_CAKE_Cake),
+            Solarray.bytes32s(USDT_USDC_Bakery),
+            Solarray.bytes32s(WBNB_USDT_Cake),
+            Solarray.bytes32s(WBNB_USDT_CakeV3_500)
+        );
+        m2Data.tokensOut = Solarray.addresses(WBNB, CAKE, USDC);
 
-        bytes memory multicallData = abi.encodeWithSignature(
-            "multicall(bytes32,bytes[])",
-            0x0000000000000000000000000000000000000000000000000000000000000024,
-            Solarray.bytess(
-                abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
-                abi.encodeCall(ITransferFacet.transferToken, (user))
+        m2Data.minAmountsOut = quoter.multiswap2({ data: m2Data });
+
+        bytes memory multicallData = abi.encodeCall(
+            IEntryPoint.multicall,
+            (
+                Solarray.bytess(
+                    abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data)),
+                    abi.encodeCall(ITransferFacet.transferToken, (user, m2Data.tokensOut))
+                )
             )
         );
 
@@ -334,18 +438,22 @@ contract SymbiosisFacetTest is BaseTest {
     function test_symbiosisFacet_receiveSymbiosis_shouldSendTokensToReceiverIfCallFailed() external {
         _resetPrank(bridge);
 
-        IMultiswapRouterFacet.MultiswapCalldata memory mData;
+        IMultiswapRouterFacet.Multiswap2Calldata memory m2Data;
 
-        mData.amountIn = 0;
-        mData.tokenIn = USDC;
-        mData.pairs = Solarray.bytes32s(ETH_USDT_UniV3_500);
+        m2Data.fullAmount = 0;
+        m2Data.tokenIn = USDC;
+        m2Data.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(ETH_USDT_UniV3_500));
+        m2Data.tokensOut = Solarray.addresses(ETH);
+        m2Data.minAmountsOut = Solarray.uint256s(0);
+        m2Data.amountInPercentages = Solarray.uint256s(1e18);
 
-        bytes memory multicallData = abi.encodeWithSignature(
-            "multicall(bytes32,bytes[])",
-            0x0000000000000000000000000000000000000000000000000000000000000024,
-            Solarray.bytess(
-                abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
-                abi.encodeCall(ITransferFacet.transferToken, (user))
+        bytes memory multicallData = abi.encodeCall(
+            IEntryPoint.multicall,
+            (
+                Solarray.bytess(
+                    abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data)),
+                    abi.encodeCall(ITransferFacet.transferToken, (user, m2Data.tokensOut))
+                )
             )
         );
 
