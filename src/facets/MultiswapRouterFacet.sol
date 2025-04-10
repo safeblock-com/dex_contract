@@ -84,19 +84,6 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
     // =========================
 
     /// @inheritdoc IMultiswapRouterFacet
-    function multiswap(IMultiswapRouterFacet.MultiswapCalldata calldata data) external {
-        uint256 amountIn = data.amountIn;
-
-        (uint256 amountOut, address tokenOut) = _multiswap(data.pairs, amountIn, _wrapNative(data.tokenIn, amountIn));
-
-        TransientStorageFacetLibrary.setAmountForToken({
-            token: tokenOut,
-            amount: _payFeeIfNecessary(tokenOut, amountOut, data.minAmountOut),
-            record: true
-        });
-    }
-
-    /// @inheritdoc IMultiswapRouterFacet
     function multiswap2(IMultiswapRouterFacet.Multiswap2Calldata calldata data) external {
         // cache length of pairs to stack for gas savings
         uint256 length = data.pairs.length;
@@ -153,7 +140,7 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
                     fullAmount = _payFeeIfNecessary(tokenIn, balanceInAfterTransfer - balanceInBeforeTransfer, 0);
                 }
             } else {
-                fullAmount = _payFeeIfNecessary(tokenIn, fullAmount, 0);
+                fullAmount = _payFeeIfNecessary(tokenIn, amount, 0);
             }
         }
 
@@ -176,9 +163,6 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
                         remainingAmount -= amountIn;
                     }
                 }
-
-                // set token and amount for the next swap through pairs array
-                TransientStorageFacetLibrary.setAmountForToken({ token: tokenIn, amount: amountIn, record: false });
 
                 (uint256 amountOut, address tokenOut) = _multiswap(data.pairs[i], amountIn, tokenIn);
 
@@ -258,15 +242,15 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
         internal
         returns (uint256, address)
     {
-        // cache length of pairs to stack for gas savings
-        uint256 length = pairs.length;
-        // if length of array is zero -> revert
-        if (length == 0) {
-            revert IMultiswapRouterFacet.MultiswapRouterFacet_InvalidPairsArray();
-        }
-
         if (amountIn == 0) {
             revert IMultiswapRouterFacet.MultiswapRouterFacet_InvalidAmountIn();
+        }
+
+        // cache length of pairs to stack for gas savings
+        uint256 length = pairs.length;
+        // if length of array is zero -> returns amountIn and tokenIn
+        if (length == 0) {
+            return (amountIn, tokenIn);
         }
 
         bytes32 pair = pairs[0];
@@ -282,40 +266,10 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
                 uni3 := and(pair, UNISWAP_V3_MASK)
             }
 
-            uint256 amount = TransientStorageFacetLibrary.getAmountForToken({ token: tokenIn });
-            if (amount == 0) {
-                uint256 balanceInBeforeTransfer;
-                if (uni3) {
-                    balanceInBeforeTransfer = TransferHelper.safeGetBalance({ token: tokenIn, account: address(this) });
-                }
-
-                // execute transferFrom:
+            if (!uni3) {
+                // execute transfer:
                 //     if the pair belongs to version 2 of the protocol -> transfer tokens to the pair
-                //     if version 3 -> to this contract
-                TransferHelper.safeTransferFrom({
-                    token: tokenIn,
-                    from: TransientStorageFacetLibrary.getSenderAddress(),
-                    to: uni3 ? address(this) : firstPair,
-                    value: amountIn
-                });
-
-                if (uni3) {
-                    uint256 balanceInAfterTransfer =
-                        TransferHelper.safeGetBalance({ token: tokenIn, account: address(this) });
-
-                    _checkOutputAmount(balanceInAfterTransfer, balanceInBeforeTransfer);
-
-                    unchecked {
-                        amountIn = balanceInAfterTransfer - balanceInBeforeTransfer;
-                    }
-                }
-            } else {
-                amountIn = amount;
-                if (!uni3) {
-                    // execute transfer:
-                    //     if the pair belongs to version 2 of the protocol -> transfer tokens to the pair
-                    TransferHelper.safeTransfer({ token: tokenIn, to: firstPair, value: amountIn });
-                }
+                TransferHelper.safeTransfer({ token: tokenIn, to: firstPair, value: amountIn });
             }
         }
 

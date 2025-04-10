@@ -36,20 +36,27 @@ contract ReceiveStargateFacetTest is BaseTest {
         external
         checkTokenStorage(Solarray.addresses(USDT, USDC))
     {
-        IMultiswapRouterFacet.MultiswapCalldata memory mData;
+        IMultiswapRouterFacet.Multiswap2Calldata memory m2Data;
 
-        mData.amountIn = 0;
-        mData.tokenIn = USDT;
-        mData.pairs = Solarray.bytes32s(USDT_USDC_UniV3_100);
+        m2Data.fullAmount = 1000e18;
+        m2Data.amountInPercentages = Solarray.uint256s(0.2e18, 0.2e18, 0.3e18, 0.3e18);
+        m2Data.tokenIn = USDT;
+        m2Data.pairs = Solarray.bytes32Arrays(
+            Solarray.bytes32s(USDT_CAKE_Cake),
+            Solarray.bytes32s(USDT_USDC_Bakery),
+            Solarray.bytes32s(WBNB_USDT_Cake),
+            Solarray.bytes32s(WBNB_USDT_CakeV3_500)
+        );
+        m2Data.tokensOut = Solarray.addresses(WBNB, CAKE, USDC);
 
-        address[] memory tokensOut = Solarray.addresses(USDC);
+        m2Data.minAmountsOut = quoter.multiswap2({ data: m2Data });
 
         bytes memory multicallData = abi.encodeCall(
             IEntryPoint.multicall,
             (
                 Solarray.bytess(
-                    abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
-                    abi.encodeCall(ITransferFacet.transferToken, (user, tokensOut))
+                    abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data)),
+                    abi.encodeCall(ITransferFacet.transferToken, (user, m2Data.tokensOut))
                 )
             )
         );
@@ -75,32 +82,41 @@ contract ReceiveStargateFacetTest is BaseTest {
 
     function test_stargateFacet_lzCompose_shouldLzCompose()
         external
-        checkTokenStorage(Solarray.addresses(USDT, CAKE))
+        checkTokenStorage(Solarray.addresses(USDT, CAKE, USDC))
     {
-        IMultiswapRouterFacet.MultiswapCalldata memory mData;
+        _resetPrank(owner);
+        entryPoint.setFeeContractAddressAndFee({ feeContractAddress: address(feeContract), fee: 300 });
 
-        mData.amountIn = 0;
-        mData.tokenIn = USDT;
-        mData.pairs = Solarray.bytes32s(USDT_CAKE_Cake);
+        IMultiswapRouterFacet.Multiswap2Calldata memory m2Data;
 
-        deal(USDT, address(entryPoint), 995.1e18);
+        m2Data.fullAmount = 0;
+        m2Data.amountInPercentages = Solarray.uint256s(0.2e18, 0.3e18, 0.5e18);
+        m2Data.tokenIn = USDC;
+        m2Data.pairs = Solarray.bytes32Arrays(
+            Solarray.bytes32s(USDC_CAKE_Cake), Solarray.bytes32s(USDT_USDC_UniV3_100), new bytes32[](0)
+        );
+        m2Data.tokensOut = Solarray.addresses(USDT, CAKE, USDC);
+        m2Data.minAmountsOut = Solarray.uint256s(0, 0, 0);
 
-        address[] memory tokensOut = Solarray.addresses(CAKE);
+        deal(USDC, address(entryPoint), 995.1e18);
+
+        address[] memory tokensOut = Solarray.addresses(USDT, CAKE, USDC);
 
         bytes memory multicallData = abi.encodeCall(
             IEntryPoint.multicall,
             (
                 Solarray.bytess(
-                    abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
+                    abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data)),
                     abi.encodeCall(ITransferFacet.transferToken, (user, tokensOut))
                 )
             )
         );
 
-        bytes memory composeMsg = abi.encode(USDT, user, multicallData);
+        bytes memory composeMsg = abi.encode(USDC, user, multicallData);
 
         _resetPrank(contracts.layerZeroEndpointV2);
 
+        _expectERC20TransferCall(USDC, address(uint160(uint256(USDC_CAKE_Cake))), 995.1e18 * 0.2e18 / 1e18);
         ILayerZeroComposer(address(entryPoint)).lzCompose({
             _from: user,
             _guid: bytes32(uint256(1)),

@@ -34,6 +34,7 @@ import { SymbiosisFacet, ISymbiosisFacet, ISymbiosis } from "../src/facets/bridg
 import { TransientStorageFacetLibrary } from "../src/libraries/TransientStorageFacetLibrary.sol";
 
 import { EfficientSwapAmount, IUniswapPool, HelperV3Lib } from "../src/lens/libraries/EfficientSwapAmount.sol";
+import { PoolHelper } from "../src/facets/libraries/PoolHelper.sol";
 
 import { console } from "forge-std/console.sol";
 

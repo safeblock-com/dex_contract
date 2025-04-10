@@ -56,7 +56,7 @@ library TransientStorageFacetLibrary {
         assembly ("memory-safe") {
             let value := sload(SENDER_FACET_STORAGE)
 
-            _isFeePaid := shr(160, value)
+            _isFeePaid := or(shr(160, value), eq(value, address()))
 
             if and(gt(value, 0), iszero(_isFeePaid)) { sstore(SENDER_FACET_STORAGE, add(value, FEE_PAID_FLAG)) }
         }

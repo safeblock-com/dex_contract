@@ -9,6 +9,8 @@ import { UUPSUpgradeable } from "./proxy/UUPSUpgradeable.sol";
 
 import { IFeeContract } from "./interfaces/IFeeContract.sol";
 
+import { IEntryPoint } from "./interfaces/IEntryPoint.sol";
+
 import { FEE_MAX } from "./libraries/Constants.sol";
 
 /// @title FeeContract
@@ -74,6 +76,19 @@ contract FeeContract is Ownable2Step, UUPSUpgradeable, Initializable, IFeeContra
 
         if (amount > 0) {
             TransferHelper.safeTransfer({ token: token, to: recipient, value: amount });
+        }
+    }
+
+    function writeFees(address, uint256 amount) external view returns (uint256 fee) {
+        if (msg.sender != _router) {
+            revert IFeeContract.FeeContract_InvalidSender({ sender: msg.sender });
+        }
+
+        (, uint256 protocolFee) = IEntryPoint(_router).getFeeContractAddressAndFee();
+        if (protocolFee > 0) {
+            unchecked {
+                fee = (amount * protocolFee) / FEE_MAX;
+            }
         }
     }
 

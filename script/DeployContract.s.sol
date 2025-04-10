@@ -18,9 +18,11 @@ import { LayerZeroFacet } from "../src/facets/bridges/LayerZeroFacet.sol";
 import { IOwnable2Step } from "../src/external/IOwnable2Step.sol";
 
 contract Deploy is Script {
-    bytes32 constant salt = keccak256("entry-point-salt-1");
+    bytes32 constant salt_V1 = keccak256("entry-point-salt-1");
     bytes32 constant quoterSalt = keccak256("quoter-salt-1");
     bytes32 constant feeContractSalt = keccak256("fee-contract-salt-1");
+
+    bytes32 constant salt_V2 = keccak256("entry-point-salt-3");
 
     bytes32 constant devSalt = keccak256("entry-point-salt-2");
     bytes32 constant devFeeContractSalt = keccak256("fee-contract-salt-2");
@@ -30,7 +32,7 @@ contract Deploy is Script {
     Contracts contracts;
     address deployer;
 
-    function run(bool prod) external {
+    function run(uint256 version) external {
         deployer = vm.rememberKey(vm.envUint("PRIVATE_KEY"));
 
         vm.startBroadcast(deployer);
@@ -52,9 +54,18 @@ contract Deploy is Script {
             }
         }
 
-        if (prod) {
-            _runProd();
-            _setup(contracts.prodProxy, contracts.prodFeeContractProxy);
+        if (version > 0) {
+            bytes32 salt;
+            address proxy;
+            if (version == 1) {
+                proxy = contracts.prodProxy;
+                salt = salt_V1;
+            } else if (version == 2) {
+                proxy = contracts.prodProxyV2;
+                salt = salt_V2;
+            }
+
+            _setup(_runProd(proxy, salt), contracts.prodFeeContractProxy);
         } else {
             _runDev();
             _setup(contracts.proxy, contracts.feeContractProxy);
@@ -99,18 +110,18 @@ contract Deploy is Script {
         }
     }
 
-    function _runProd() internal {
-        if (contracts.prodProxy == address(0)) {
-            contracts.prodProxy = _deployProxy(abi.encode(deployer), salt);
+    function _runProd(address proxy, bytes32 salt) internal returns (address) {
+        if (proxy == address(0)) {
+            proxy = _deployProxy(abi.encode(deployer), salt);
 
             bytes[] memory initCalls = new bytes[](0);
 
-            InitialImplementation(contracts.prodProxy).upgradeTo({
+            InitialImplementation(proxy).upgradeTo({
                 implementation: contracts.prodEntryPoint,
                 data: abi.encodeCall(EntryPoint.initialize, (deployer, initCalls))
             });
-        } else if (_getProxyImplementation(contracts.prodProxy) != contracts.prodEntryPoint) {
-            EntryPoint(payable(contracts.prodProxy)).upgradeTo({ newImplementation: contracts.prodEntryPoint });
+        } else if (_getProxyImplementation(proxy) != contracts.prodEntryPoint) {
+            EntryPoint(payable(proxy)).upgradeTo({ newImplementation: contracts.prodEntryPoint });
         }
 
         if (contracts.prodFeeContractProxy == address(0)) {
@@ -118,14 +129,13 @@ contract Deploy is Script {
 
             InitialImplementation(contracts.prodFeeContractProxy).upgradeTo({
                 implementation: contracts.feeContract,
-                data: abi.encodeCall(FeeContract.initialize, (deployer, contracts.prodProxy))
+                data: abi.encodeCall(FeeContract.initialize, (deployer, proxy))
             });
         } else if (_getProxyImplementation(contracts.prodFeeContractProxy) != contracts.feeContract) {
             FeeContract(payable(contracts.prodFeeContractProxy)).upgradeTo({ newImplementation: contracts.feeContract });
         }
 
-        console2.log("dexContract", contracts.prodProxy);
-        console2.log("feeContract", contracts.prodFeeContractProxy);
+        return proxy;
     }
 
     function _setup(address proxy, address feeContractProxy) internal {

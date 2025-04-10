@@ -84,13 +84,15 @@ contract SymbiosisFacetTest is BaseTest {
             (
                 Solarray.bytess(
                     abi.encodeCall(
-                        IMultiswapRouterFacet.multiswap,
+                        IMultiswapRouterFacet.multiswap2,
                         (
-                            IMultiswapRouterFacet.MultiswapCalldata({
-                                amountIn: 0,
-                                minAmountOut: 0,
+                            IMultiswapRouterFacet.Multiswap2Calldata({
+                                amountInPercentages: Solarray.uint256s(1e18),
+                                fullAmount: 0,
+                                minAmountsOut: Solarray.uint256s(0),
                                 tokenIn: USDC,
-                                pairs: Solarray.bytes32s(USDC_CAKE_Cake)
+                                tokensOut: tokensOut,
+                                pairs: Solarray.bytes32Arrays(Solarray.bytes32s(USDC_CAKE_Cake))
                             })
                         )
                     ),
@@ -164,13 +166,15 @@ contract SymbiosisFacetTest is BaseTest {
             (
                 Solarray.bytess(
                     abi.encodeCall(
-                        IMultiswapRouterFacet.multiswap,
+                        IMultiswapRouterFacet.multiswap2,
                         (
-                            IMultiswapRouterFacet.MultiswapCalldata({
-                                amountIn: 0,
-                                minAmountOut: 0,
+                            IMultiswapRouterFacet.Multiswap2Calldata({
+                                amountInPercentages: Solarray.uint256s(1e18),
+                                fullAmount: 0,
+                                minAmountsOut: Solarray.uint256s(0),
                                 tokenIn: USDC,
-                                pairs: Solarray.bytes32s(USDC_CAKE_Cake)
+                                tokensOut: tokensOut,
+                                pairs: Solarray.bytes32Arrays(Solarray.bytes32s(USDC_CAKE_Cake))
                             })
                         )
                     ),
@@ -255,13 +259,15 @@ contract SymbiosisFacetTest is BaseTest {
             (
                 Solarray.bytess(
                     abi.encodeCall(
-                        IMultiswapRouterFacet.multiswap,
+                        IMultiswapRouterFacet.multiswap2,
                         (
-                            IMultiswapRouterFacet.MultiswapCalldata({
-                                amountIn: 0,
-                                minAmountOut: 0,
+                            IMultiswapRouterFacet.Multiswap2Calldata({
+                                amountInPercentages: Solarray.uint256s(1e18),
+                                fullAmount: 0,
+                                minAmountsOut: Solarray.uint256s(0),
                                 tokenIn: USDC,
-                                pairs: Solarray.bytes32s(USDC_CAKE_Cake)
+                                tokensOut: tokensOut,
+                                pairs: Solarray.bytes32Arrays(Solarray.bytes32s(USDC_CAKE_Cake))
                             })
                         )
                     ),
@@ -340,13 +346,15 @@ contract SymbiosisFacetTest is BaseTest {
             (
                 Solarray.bytess(
                     abi.encodeCall(
-                        IMultiswapRouterFacet.multiswap,
+                        IMultiswapRouterFacet.multiswap2,
                         (
-                            IMultiswapRouterFacet.MultiswapCalldata({
-                                amountIn: 0,
-                                minAmountOut: 0,
+                            IMultiswapRouterFacet.Multiswap2Calldata({
+                                amountInPercentages: Solarray.uint256s(1e18),
+                                fullAmount: 0,
+                                minAmountsOut: Solarray.uint256s(0),
                                 tokenIn: USDC,
-                                pairs: Solarray.bytes32s(USDC_CAKE_Cake)
+                                tokensOut: tokensOut,
+                                pairs: Solarray.bytes32Arrays(Solarray.bytes32s(USDC_CAKE_Cake))
                             })
                         )
                     ),
@@ -389,20 +397,27 @@ contract SymbiosisFacetTest is BaseTest {
     function test_symbiosisFacet_receiveSymbiosis_shouldReceiveSymbiosis() external {
         _resetPrank(bridge);
 
-        IMultiswapRouterFacet.MultiswapCalldata memory mData;
+        IMultiswapRouterFacet.Multiswap2Calldata memory m2Data;
 
-        mData.amountIn = 0;
-        mData.tokenIn = USDC;
-        mData.pairs = Solarray.bytes32s(USDC_CAKE_Cake);
+        m2Data.fullAmount = 1000e18;
+        m2Data.amountInPercentages = Solarray.uint256s(0.2e18, 0.2e18, 0.3e18, 0.3e18);
+        m2Data.tokenIn = USDT;
+        m2Data.pairs = Solarray.bytes32Arrays(
+            Solarray.bytes32s(USDT_CAKE_Cake),
+            Solarray.bytes32s(USDT_USDC_Bakery),
+            Solarray.bytes32s(WBNB_USDT_Cake),
+            Solarray.bytes32s(WBNB_USDT_CakeV3_500)
+        );
+        m2Data.tokensOut = Solarray.addresses(WBNB, CAKE, USDC);
 
-        address[] memory tokensOut = Solarray.addresses(CAKE);
+        m2Data.minAmountsOut = quoter.multiswap2({ data: m2Data });
 
         bytes memory multicallData = abi.encodeCall(
             IEntryPoint.multicall,
             (
                 Solarray.bytess(
-                    abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
-                    abi.encodeCall(ITransferFacet.transferToken, (user, tokensOut))
+                    abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data)),
+                    abi.encodeCall(ITransferFacet.transferToken, (user, m2Data.tokensOut))
                 )
             )
         );
@@ -423,20 +438,21 @@ contract SymbiosisFacetTest is BaseTest {
     function test_symbiosisFacet_receiveSymbiosis_shouldSendTokensToReceiverIfCallFailed() external {
         _resetPrank(bridge);
 
-        IMultiswapRouterFacet.MultiswapCalldata memory mData;
+        IMultiswapRouterFacet.Multiswap2Calldata memory m2Data;
 
-        mData.amountIn = 0;
-        mData.tokenIn = USDC;
-        mData.pairs = Solarray.bytes32s(ETH_USDT_UniV3_500);
-
-        address[] memory tokensOut = Solarray.addresses(ETH);
+        m2Data.fullAmount = 0;
+        m2Data.tokenIn = USDC;
+        m2Data.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(ETH_USDT_UniV3_500));
+        m2Data.tokensOut = Solarray.addresses(ETH);
+        m2Data.minAmountsOut = Solarray.uint256s(0);
+        m2Data.amountInPercentages = Solarray.uint256s(1e18);
 
         bytes memory multicallData = abi.encodeCall(
             IEntryPoint.multicall,
             (
                 Solarray.bytess(
-                    abi.encodeCall(IMultiswapRouterFacet.multiswap, (mData)),
-                    abi.encodeCall(ITransferFacet.transferToken, (user, tokensOut))
+                    abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data)),
+                    abi.encodeCall(ITransferFacet.transferToken, (user, m2Data.tokensOut))
                 )
             )
         );

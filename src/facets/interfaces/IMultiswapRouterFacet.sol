@@ -58,9 +58,6 @@ interface IMultiswapRouterFacet {
         bytes32[] pairs;
     }
 
-    /// @notice Swaps through the data.pairs array
-    function multiswap(MultiswapCalldata calldata data) external;
-
     struct Multiswap2Calldata {
         // exact value in for part swap
         uint256 fullAmount;

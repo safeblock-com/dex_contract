@@ -17,9 +17,6 @@ library EfficientSwapAmount {
     // errors
     // =========================
 
-    /// @notice Throws if `tokenIn` is not in the `pair`
-    error EfficientSwapAmount_InvalidTokenIn();
-
     /// @notice Throws if the target price is already reached
     error EfficientSwapAmount_TargetPriceIsAlreadyReached();
 

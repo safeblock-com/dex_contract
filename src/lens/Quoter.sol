@@ -61,9 +61,8 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
         view
         returns (uint256 amountOut)
     {
-        (amountOut,) = _multiswap(data.pairs, data.amountIn, data.tokenIn == address(0) ? _wrappedNative : data.tokenIn);
-
-        amountOut = _subFee(amountOut);
+        (amountOut,) =
+            _multiswap(data.pairs, _subFee(data.amountIn), data.tokenIn == address(0) ? _wrappedNative : data.tokenIn);
     }
 
     function multiswapReverse(IMultiswapRouterFacet.MultiswapCalldata calldata data)
@@ -371,7 +370,7 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
             pool := and(bytes32Pool, ADDRESS_MASK)
             fee := and(shr(160, bytes32Pool), FEE_MASK)
             uni3 := and(bytes32Pool, UNISWAP_V3_MASK)
-            isSolidly := and(shr(208, bytes32Pool), 0xff)
+            isSolidly := and(shr(184, bytes32Pool), 0xff)
         }
     }
 

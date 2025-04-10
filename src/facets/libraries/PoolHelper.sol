@@ -10,7 +10,7 @@ library PoolHelper {
     // =========================
 
     /// @notice Throws if `tokenIn` is not in the `pair`
-    error EfficientSwapAmount_InvalidTokenIn();
+    error InvalidTokenIn();
 
     // =========================
     // helper methods
@@ -24,7 +24,7 @@ library PoolHelper {
             return (true, pool.token1());
         } else {
             if (token != pool.token1()) {
-                revert EfficientSwapAmount_InvalidTokenIn();
+                revert InvalidTokenIn();
             }
 
             return (false, token0);
