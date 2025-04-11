@@ -37,6 +37,10 @@ contract Facet1 {
     function revertMethod() external pure {
         revert("revert method");
     }
+
+    function moduleMethod1() external pure { }
+
+    function moduleMethod2() external pure { }
 }
 
 contract Facet2 {
@@ -69,6 +73,8 @@ contract Facet2 {
     function setValue3(uint256 value) external {
         _getLocalStorage().value2 = value;
     }
+
+    function moduleMethod1() external pure { }
 }
 
 contract EntryPointTest is BaseTest {
@@ -327,5 +333,93 @@ contract EntryPointTest is BaseTest {
         for (uint256 i; i < facets[1].functionSelectors.length; ++i) {
             _assertEqual(facets[1].functionSelectors[i], facet2FunctionSelectorsExpected);
         }
+    }
+
+    // =========================
+    // modules
+    // =========================
+
+    function test_entryPoint_modules_shouldAddModule() external {
+        _resetPrank(owner);
+
+        assertEq(entryPoint.getModuleAddress(Facet1.moduleMethod1.selector), address(0));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IEntryPoint.EntryPoint_FunctionDoesNotExist.selector, Facet1.moduleMethod1.selector)
+        );
+        entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(Facet1.moduleMethod1, ())) });
+
+        entryPoint.addModule({ moduleSignature: Facet1.moduleMethod1.selector, moduleAddress: address(facet1) });
+
+        assertEq(entryPoint.getModuleAddress(Facet1.moduleMethod1.selector), address(facet1));
+
+        IEntryPoint.ModuleInfo[] memory modules = entryPoint.getModules();
+
+        assertEq(modules.length, 1);
+        assertEq(modules[0].moduleSignature, Facet1.moduleMethod1.selector);
+        assertEq(modules[0].moduleAddress, address(facet1));
+
+        entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(Facet1.moduleMethod1, ())) });
+
+        entryPoint.addModule({ moduleSignature: Facet1.moduleMethod2.selector, moduleAddress: address(facet1) });
+
+        entryPoint.multicall({
+            data: Solarray.bytess(abi.encodeCall(Facet1.moduleMethod1, ()), abi.encodeCall(Facet1.moduleMethod2, ()))
+        });
+
+        modules = entryPoint.getModules();
+
+        assertEq(modules.length, 2);
+        assertEq(modules[1].moduleSignature, Facet1.moduleMethod2.selector);
+        assertEq(modules[1].moduleAddress, address(facet1));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IEntryPoint.EntryPoint_ModuleAlreadyAdded.selector, Facet1.moduleMethod1.selector)
+        );
+        entryPoint.addModule({ moduleSignature: Facet2.moduleMethod1.selector, moduleAddress: address(facet2) });
+    }
+
+    function test_entryPoint_modules_shouldUpdateOrDeleteModule() external {
+        _resetPrank(owner);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IEntryPoint.EntryPoint_ModuleNotAdded.selector, Facet1.moduleMethod2.selector)
+        );
+        entryPoint.updateModule({ moduleSignature: Facet1.moduleMethod2.selector, moduleAddress: address(facet1) });
+
+        entryPoint.addModule({ moduleSignature: Facet1.moduleMethod2.selector, moduleAddress: address(facet1) });
+        entryPoint.addModule({ moduleSignature: Facet1.moduleMethod1.selector, moduleAddress: address(facet1) });
+
+        IEntryPoint.ModuleInfo[] memory modules = entryPoint.getModules();
+
+        assertEq(modules.length, 2);
+        assertEq(modules[0].moduleSignature, Facet1.moduleMethod2.selector);
+        assertEq(modules[0].moduleAddress, address(facet1));
+        assertEq(modules[1].moduleSignature, Facet1.moduleMethod1.selector);
+        assertEq(modules[1].moduleAddress, address(facet1));
+
+        entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(Facet1.moduleMethod1, ())) });
+
+        entryPoint.updateModule({ moduleSignature: Facet2.moduleMethod1.selector, moduleAddress: address(facet2) });
+
+        assertEq(entryPoint.getModuleAddress(Facet2.moduleMethod1.selector), address(facet2));
+
+        modules = entryPoint.getModules();
+
+        assertEq(modules.length, 2);
+        assertEq(modules[0].moduleSignature, Facet1.moduleMethod2.selector);
+        assertEq(modules[0].moduleAddress, address(facet1));
+        assertEq(modules[1].moduleSignature, Facet2.moduleMethod1.selector);
+        assertEq(modules[1].moduleAddress, address(facet2));
+
+        entryPoint.updateModule({ moduleSignature: Facet1.moduleMethod2.selector, moduleAddress: address(0) });
+
+        assertEq(entryPoint.getModuleAddress(Facet1.moduleMethod2.selector), address(0));
+
+        modules = entryPoint.getModules();
+
+        assertEq(modules.length, 1);
+        assertEq(modules[0].moduleSignature, Facet1.moduleMethod1.selector);
+        assertEq(modules[0].moduleAddress, address(facet2));
     }
 }

@@ -3,6 +3,11 @@ pragma solidity ^0.8.0;
 
 /// @title IEntryPoint - EntryPoint interface
 interface IEntryPoint {
+    struct ModuleInfo {
+        bytes4 moduleSignature;
+        address moduleAddress;
+    }
+
     // =========================
     // errors
     // =========================
@@ -12,6 +17,12 @@ interface IEntryPoint {
 
     /// @notice Throws if new `fee` value is invalid
     error EntryPoint_InvalidFeeValue();
+
+    /// @notice Throws if the module is already added to the EntryPoint
+    error EntryPoint_ModuleAlreadyAdded(bytes4 methodSignature);
+
+    /// @notice Throws if the module is not added to the EntryPoint
+    error EntryPoint_ModuleNotAdded(bytes4 methodSignature);
 
     // =========================
     // initializer

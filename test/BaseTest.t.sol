@@ -36,6 +36,8 @@ import { TransientStorageFacetLibrary } from "../src/libraries/TransientStorageF
 import { EfficientSwapAmount, IUniswapPool, HelperV3Lib } from "../src/lens/libraries/EfficientSwapAmount.sol";
 import { PoolHelper } from "../src/facets/libraries/PoolHelper.sol";
 
+import { CoinFlippersModule, ICoinFlippersModule, ICoinFlippersVault } from "../src/modules/CoinFlippersModule.sol";
+
 import { console } from "forge-std/console.sol";
 
 contract BaseTest is Test {
@@ -51,6 +53,9 @@ contract BaseTest is Test {
     Contracts contracts;
 
     ISignatureTransfer _permit2;
+
+    address coinFlippersModule;
+    address constant coinFlippersVault = 0xA63cB21C43664B762C8401f7FFBBfc3947fF8D70;
 
     function deployForTest() internal {
         contracts = getContracts({ chainId: block.chainid });
@@ -78,6 +83,15 @@ contract BaseTest is Test {
             data: abi.encodeCall(IEntryPoint.initialize, (owner, new bytes[](0)))
         });
         entryPoint.setFeeContractAddressAndFee({ feeContractAddress: address(feeContract), fee: 0 });
+
+        if (block.chainid == 1) {
+            coinFlippersModule = address(new CoinFlippersModule({ coinFlippersVault_: coinFlippersVault }));
+
+            entryPoint.addModule({
+                moduleSignature: ICoinFlippersModule.deposit.selector,
+                moduleAddress: coinFlippersModule
+            });
+        }
     }
 
     // helper
