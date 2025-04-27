@@ -41,19 +41,19 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // ethereum
     if (chainId == 1) {
         return Contracts({
-            multiswapRouterFacet: 0xdd4ec4bFecAb02CbE60CdBA8De49821a1105c24f,
+            multiswapRouterFacet: 0x4FF57397049F32FB6A7c8EA65d7C1dA15b4e309B,
             transferFacet: 0x33E3337E3d68aB3b56C86613CCF34CB0d006Ab04,
             stargateFacet: 0x7559382f22a50e22d5c6026E04be5cd73Bcfa4c4,
             layerZeroFacet: 0x2ef78f53965cB6b6BE3DF79e143D07790c3E84b3,
             symbiosisFacet: 0xf145B88a658AAf85A7169caC1769a389675a073A,
             //
-            quoter: 0x40EC78B5A9170b66Aa12B17627A97429f596a185,
+            quoter: 0x2322D126382844B64E2FbDB1f69fe91A70Db463c,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
             feeContract: 0x453B60E247108B92C3B413bF944853A43da9b850,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0x0BF76A83c92AAc1214C7F256A923863a37c40FBe,
+            prodEntryPoint: 0xE2D0C301c6293a2cA130AF2ACC47051e349079c5,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodFeeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
@@ -70,19 +70,19 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // bnb
     if (chainId == 56) {
         return Contracts({
-            multiswapRouterFacet: 0x17bC5E1A8DC29C702F4af5DC939a06c339ccc23e,
+            multiswapRouterFacet: 0x1291EF9Fde55e8783faFfBe117F3D30613F85055,
             transferFacet: 0xaA57cb7c180100Ea5C8ed2868F72037B0e084A15,
             stargateFacet: 0x85Db0f7aBEA9A1232e7617bE69d7988a3221EF15,
             layerZeroFacet: 0xe1F49D9ADa84de24dfb35aa5DFDAeE8edcCFd5ce,
             symbiosisFacet: 0xc81836107746458e2C0C45eB6a2E5cf22052090c,
             //
-            quoter: 0x09D517Fb8050283a335628BB6B2806bE29ceA372,
+            quoter: 0xA1458B50bb651c2B5231186D7CFef8cC469eC51b,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
             feeContract: 0xd36f8CC82EA004B4d0c15BdCf584D19aaD775209,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0xa51280B52900e808AF87d9BA758066c10a3dFa2a,
+            prodEntryPoint: 0xb2651fB158c2eFeAE836B5445E7dBDe45d21b72f,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodFeeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
@@ -99,19 +99,19 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // polygon
     if (chainId == 137) {
         return Contracts({
-            multiswapRouterFacet: 0x464A62404E5FC95a2a04217f822ee1BC1b7Eb94a,
+            multiswapRouterFacet: 0x64BF7D769F1f8470FF42734f69e056d2A492397C,
             transferFacet: 0xD7D812de23Dfd953F1431322cE62A0Ca818C9570,
             stargateFacet: 0x8fa29093a1c62288220fC894077007A4671858EF,
             layerZeroFacet: 0xE485932717068eCB9B391519d7800eaDB6EbD0c9,
             symbiosisFacet: 0x0392238689977c8d34bAc6A53f2D62489d7362DB,
             //
-            quoter: 0xB3b674c653A43895fB5269D665A1De39ae8818d2,
+            quoter: 0x7F17EA00590d1A1b6384717058f3C29a06391967,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
             feeContract: 0x85Db0f7aBEA9A1232e7617bE69d7988a3221EF15,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0x35f10C95323C34E5994df76BdeA75aaC8Eb10A6b,
+            prodEntryPoint: 0x22c9F7E674d52C71b9f00F6e637bd66A6c83D41A,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodFeeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
@@ -128,19 +128,19 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // avalanche
     if (chainId == 43_114) {
         return Contracts({
-            multiswapRouterFacet: 0xfDf7b550BD971dF0846872080cE93c67dE00853f,
+            multiswapRouterFacet: 0x35f10C95323C34E5994df76BdeA75aaC8Eb10A6b,
             transferFacet: 0xa19BFB487265190E387F099D1dA18F57B8986C4E,
             stargateFacet: 0x92493CC018eA0d7c184cd9A0403Fa2d8729c5A02,
             layerZeroFacet: 0xCc5bdcB370BDff54F92bEBF2EF7EE4cD049E45b0,
             symbiosisFacet: 0x96bf81a8Be089CaD3fcB269e24e2a7E599012346,
             //
-            quoter: 0x8df74FE7575b219155f4F890159b3D9663D4c39D,
+            quoter: 0x09D517Fb8050283a335628BB6B2806bE29ceA372,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
             feeContract: 0x595EeaA4E8A8643bE5E2462f109C94012A472774,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0xB3b674c653A43895fB5269D665A1De39ae8818d2,
+            prodEntryPoint: 0xaA57cb7c180100Ea5C8ed2868F72037B0e084A15,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodFeeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
@@ -157,19 +157,19 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // optimism
     if (chainId == 10) {
         return Contracts({
-            multiswapRouterFacet: 0x0392238689977c8d34bAc6A53f2D62489d7362DB,
+            multiswapRouterFacet: 0xF059b231973e638290f3AcAD7dAE73662Bb06D8B,
             transferFacet: 0xf9Fe66d241BF32610a557c204a0A660348965481,
             stargateFacet: 0x18Df5169aB4b6794cB1A61ADaf4511678e3E3e23,
             layerZeroFacet: 0x8df74FE7575b219155f4F890159b3D9663D4c39D,
             symbiosisFacet: 0x2163682DCf72d01679136f3387E794D51cB006c7,
             //
-            quoter: 0xACCa97a6F48342d069f19fb4502AC5C5c37541d4,
+            quoter: 0xe1F49D9ADa84de24dfb35aa5DFDAeE8edcCFd5ce,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
             feeContract: 0xE846Bc68EC2cE2BC813eBDEB315f24cC46cdf4de,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0x8E3FcD219F82BFF2cA32D0Dd343b5e607028B619,
+            prodEntryPoint: 0x9555c6640E1812560Bb101a377edD3EC416935A3,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodFeeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
@@ -186,19 +186,19 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // arbitrum
     if (chainId == 42_161) {
         return Contracts({
-            multiswapRouterFacet: 0x18Df5169aB4b6794cB1A61ADaf4511678e3E3e23,
+            multiswapRouterFacet: 0x464A62404E5FC95a2a04217f822ee1BC1b7Eb94a,
             transferFacet: 0x8df74FE7575b219155f4F890159b3D9663D4c39D,
             stargateFacet: 0x2163682DCf72d01679136f3387E794D51cB006c7,
             layerZeroFacet: 0x92493CC018eA0d7c184cd9A0403Fa2d8729c5A02,
             symbiosisFacet: 0xCc5bdcB370BDff54F92bEBF2EF7EE4cD049E45b0,
             //
-            quoter: 0xD2A7A4cF1B25B92f47B4A702276DefbB42F45e77,
+            quoter: 0x5fB4C069790315D5183963A4d82A54C07ed1BcC1,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
             feeContract: 0x7E9bF77656C1FB73813e725153c70300C502e56f,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0x96bf81a8Be089CaD3fcB269e24e2a7E599012346,
+            prodEntryPoint: 0x35f10C95323C34E5994df76BdeA75aaC8Eb10A6b,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodFeeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
@@ -215,19 +215,19 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // base
     if (chainId == 8453) {
         return Contracts({
-            multiswapRouterFacet: 0x14969B13A7Da9d2c25D94Dee70890A045e96F8Fb,
+            multiswapRouterFacet: 0x917213eDBEF61B83bc8c80f23Ba16b60Ebe68204,
             transferFacet: 0x4FF57397049F32FB6A7c8EA65d7C1dA15b4e309B,
             stargateFacet: 0xE2D0C301c6293a2cA130AF2ACC47051e349079c5,
             layerZeroFacet: 0x463Bb4d10B9e9194fD8248DF9cE9c00075f645c2,
             symbiosisFacet: 0xF9B37dFa8479C657FddD9fB50dDb75404622EBCe,
             //
-            quoter: 0xFc204864E7E3a1a99504b39e18f5C7C57Eb4fEF7,
+            quoter: 0x490555CBa64d606FFf6f82a3A373cEA5d59B3973,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
             feeContract: 0xfdF5F450CF0dE94F6C0Bf0B2355de1EEb753B39D,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0xB2C81d9cB2B3341eC5a7F42A89B59D282D8c848E,
+            prodEntryPoint: 0xD2A7A4cF1B25B92f47B4A702276DefbB42F45e77,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodFeeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
@@ -235,6 +235,64 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             wrappedNative: 0x4200000000000000000000000000000000000006,
             layerZeroEndpointV2: 0x1a44076050125825900e736c501f859c50fE728c,
             symbiosisPortal: 0xEE981B2459331AD268cc63CE6167b446AF4161f8,
+            permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
+            //
+            multisig: multisig
+        });
+    }
+
+    // scroll
+    if (chainId == 534_352) {
+        return Contracts({
+            multiswapRouterFacet: 0x16a35020a2D45f80cc156649D57E4Cc9d4fC74D2,
+            transferFacet: 0x15ad2B8844a7f42A94F37AdFc90BeeBd5D1c99AA,
+            stargateFacet: 0xEd02D5A7822d474c21F6e239b81e2ACf1137Ace8,
+            layerZeroFacet: 0xa6a39188097bc275593dDb875705491A70DBEC0B,
+            symbiosisFacet: 0x995f1B46F71Bc83a90653286e85185D27956687e,
+            //
+            quoter: 0xe9BEbFC505a738A58319F509EfB51A8ac6c8008f,
+            quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
+            proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
+            feeContract: 0x65DfbA5338137e0De3c7e9C11D9BFEd0B02c33b8,
+            feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
+            //
+            prodEntryPoint: 0x48229df22D71eecFf545A3698ACbacc5CF41D658,
+            prodProxy: address(1),
+            prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
+            prodFeeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
+            //
+            wrappedNative: 0x5300000000000000000000000000000000000004,
+            layerZeroEndpointV2: 0x1a44076050125825900e736c501f859c50fE728c,
+            symbiosisPortal: 0x5Aa5f7f84eD0E5db0a4a85C3947eA16B53352FD4,
+            permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
+            //
+            multisig: multisig
+        });
+    }
+
+    // gnosis
+    if (chainId == 100) {
+        return Contracts({
+            multiswapRouterFacet: 0x3E1D733045E7abdC0bd28A272b45cC8896528bB2,
+            transferFacet: 0xA26c8aC451d9EBbd4B40e8D2Ed91f5c55b989001,
+            stargateFacet: 0xe197BDD7b8bB8f2Ab15c9822602A35f7645a88aF,
+            layerZeroFacet: 0x96Fda36A350e40F89Bcdeb5149eFE4C77316F961,
+            symbiosisFacet: 0xbe35b0b10037e11a6D0A71c326FcF929935A4230,
+            //
+            quoter: 0x1A67084d692Cdb88b0c17Dcb57A636A2b493938B,
+            quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
+            proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
+            feeContract: 0xF307b0a60330512D51e4C8e4ddAA3E26D8f08569,
+            feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
+            //
+            prodEntryPoint: 0x76126f040aF711bE697675137557524Ed79A280B,
+            prodProxy: address(1),
+            prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
+            prodFeeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
+            //
+            wrappedNative: 0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d,
+            layerZeroEndpointV2: 0x1a44076050125825900e736c501f859c50fE728c,
+            symbiosisPortal: 0x292fC50e4eB66C3f6514b9E402dBc25961824D62,
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
             //
             multisig: multisig
