@@ -51,7 +51,7 @@ contract CoinFlippersModule is ICoinFlippersModule {
         if (amount > 0) {
             tokenAddress.safeApprove({ spender: _coinFlippersVault, value: amount });
 
-            ICoinFlippersVault(_coinFlippersVault).deposit({
+            ICoinFlippersVault(_coinFlippersVault).depositFlexibleAmount({
                 merchantId: merchantId,
                 paymentId: paymentId,
                 tokenAddress: tokenAddress,

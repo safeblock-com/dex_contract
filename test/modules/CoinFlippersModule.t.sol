@@ -56,7 +56,7 @@ contract CoinFlippersModuleTest is BaseTest {
         vm.mockCall(
             coinFlippersVault,
             abi.encodeCall(
-                ICoinFlippersVault.deposit,
+                ICoinFlippersVault.depositFlexibleAmount,
                 (
                     keccak256("merchantID"),
                     keccak256("paymentID"),

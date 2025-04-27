@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 interface ICoinFlippersVault {
-    function deposit(
+    function depositFlexibleAmount(
         bytes32 merchantId,
         bytes32 paymentId,
         address tokenAddress,

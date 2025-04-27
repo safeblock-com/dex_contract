@@ -21,6 +21,8 @@ arbitrum = "${ARBITRUM_RPC_URL}"
 optimism = "${OPTIMISM_RPC_URL}"
 avalanche = "${AVALANCHE_C_CHAIN_RPC_URL}"
 base = "${BASE_RPC_URL}"
+scroll = "${SCROLL_RPC_URL}"
+gnosis = "${GNOSIS_RPC_URL}"
 tron = "${TRON_RPC_URL}"
 trontest = "${TRON_TESTNET_RPC_URL}"
 
@@ -31,6 +33,8 @@ polygon = { key = "${POLYGON_API_KEY}", chainid = 137 }
 arbitrum = { key = "${ARBITRUM_API_KEY}", chainid = 42161 }
 optimism = { key = "${OPTIMISM_API_KEY}", chainid = 10 }
 base = { key = "${BASE_API_KEY}", chainid = 8453 }
+scroll = { key = "${SCROLL_API_KEY}", chainid = 534352 }
+gnosis = { key = "${GNOSIS_API_KEY}", chainid = 100 }
 
 [fmt]
 bracket_spacing = true
