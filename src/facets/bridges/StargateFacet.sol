@@ -18,21 +18,31 @@ import { FeeLibrary } from "../../libraries/FeeLibrary.sol";
 import { IStargateFacet } from "./interfaces/IStargateFacet.sol";
 
 /// @title StargateFacet
-/// @notice A stargate facet for cross-chain messaging and token bridging
+/// @notice A facet for cross-chain token bridging and messaging via the Stargate and LayerZero protocols
+///         in a diamond-like proxy contract.
+/// @dev Supports sending tokens across chains, quoting fees, and handling LayerZero compose messages
+///      with callbacks. Inherits ownership controls from `BaseOwnableFacet`.
 contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
     using OptionsBuilder for bytes;
 
-    /// @dev Address of the layerZero endpoint
+    // =========================
+    // storage
+    // =========================
+
+    /// @dev The address of the LayerZero V2 endpoint contract.
+    ///      Immutable, set during construction. Used for validating incoming compose messages in `lzCompose`.
     address private immutable _lzEndpointV2;
 
     // =========================
     // constructor
     // =========================
 
+    /// @notice Initializes the StargateFacet with the LayerZero V2 endpoint address.
+    /// @dev Sets the immutable `_lzEndpointV2` address.
+    /// @param endpointV2 The address of the LayerZero V2 endpoint contract.
     constructor(address endpointV2) {
         _lzEndpointV2 = endpointV2;
     }
-
     // =========================
     // getters
     // =========================
@@ -156,7 +166,13 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
     // internal
     // =========================
 
-    /// @dev Send callback to this address for execute cross chain message.
+    /// @notice Executes a cross-chain callback or transfers tokens to a fallback address on failure.
+    /// @dev Records the token amount in transient storage, attempts a low-level call with the payload,
+    ///      and handles failures by emitting `CallFailed` and transferring tokens to `fallbackAddress`.
+    /// @param asset The address of the token received (or address(0) for native currency).
+    /// @param amountLD The amount of tokens received (in local decimals).
+    /// @param fallbackAddress The address to receive tokens if the callback fails.
+    /// @param payload The encoded callback data to execute.
     function _sendCallback(address asset, uint256 amountLD, address fallbackAddress, bytes memory payload) internal {
         if (asset > address(0)) {
             TransientStorageFacetLibrary.setAmountForToken({ token: asset, amount: amountLD, record: false });
@@ -173,10 +189,7 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
 
             if (!successfulCall) {
                 // zero the temporary value in storage
-                amountLD = FeeLibrary.payFee({
-                    token: asset,
-                    amount: TransientStorageFacetLibrary.getAmountForToken({ token: asset })
-                });
+                amountLD = TransientStorageFacetLibrary.getAmountForToken({ token: asset });
 
                 emit IStargateFacet.CallFailed({ errorMessage: payload });
 
@@ -187,14 +200,28 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
         }
     }
 
-    /// @dev Validate native balance.
+    /// @notice Validates that the contract has sufficient native balance for the required fee.
+    /// @dev Reverts with `StargateFacet_InvalidNativeBalance` if the balance is insufficient.
+    /// @param value The required native currency amount.
     function _validateNativeBalance(uint256 value) internal view {
         if (address(this).balance < value) {
             revert IStargateFacet.StargateFacet_InvalidNativeBalance();
         }
     }
 
-    /// @dev Quote fee for stargate V2.
+    /// @notice Quotes the fee and parameters for a cross-chain token transfer.
+    /// @dev Constructs a `SendParam` with optional compose message options, queries the Stargate pool for the minimum output (`quoteOFT`),
+    ///      and calculates the native fee (`quoteSend`).
+    /// @param poolAddress The address of the Stargate pool contract.
+    /// @param token The address of the token to send.
+    /// @param dstEid The destination chain’s LayerZero endpoint ID.
+    /// @param amountLD The amount of tokens to send (in local decimals).
+    /// @param receiver The recipient address on the destination chain.
+    /// @param composeMsg The optional compose message for cross-chain execution.
+    /// @param composeGasLimit The gas limit for the compose message execution.
+    /// @return valueToSend The native currency fee required for the transfer.
+    /// @return sendParam The `SendParam` struct with transfer details.
+    /// @return messagingFee The `MessagingFee` struct with native and LZ token fees.
     function _quoteV2(
         address poolAddress,
         address token,

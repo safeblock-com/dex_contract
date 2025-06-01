@@ -16,51 +16,37 @@ import { FeeLibrary } from "./libraries/FeeLibrary.sol";
 import { ADDRESS_MASK } from "./libraries/Constants.sol";
 
 /// @title EntryPoint
-/// @notice This contract serves as a proxy for dynamic function execution.
-/// @dev It maps function selectors to their corresponding facet contracts.
+/// @notice A proxy contract for dynamic function execution using a diamond-like architecture.
+/// @dev Maps function selectors to facet contracts, storing data with SSTORE2 and supporting module management.
 contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint {
-    //-----------------------------------------------------------------------//
-    // function selectors and address indexes are stored as bytes data:      //
-    // selector . addressIndex                                               //
-    // sample:                                                               //
-    // 0xaaaaaaaa <- selector                                                //
-    // 0xff <- addressIndex                                                  //
-    // 0xaaaaaaaaff <- one element                                           //
-    //                                                                       //
-    // facetAddresses are stored in the end of the bytes array              //
-    //-----------------------------------------------------------------------//
-
     /// @dev Address where facet and selector bytes are stored using SSTORE2.
     address private immutable _facetsAndSelectorsAddress;
 
+    /// @dev Mapping of module function signatures to their addresses and indices.
     mapping(bytes4 => bytes32) private _moduleSignatureToAddress;
+
+    /// @dev Array of registered module signatures.
     bytes4[] private _moduleSignatures;
 
     // =========================
     // constructor
     // =========================
 
-    /// @notice Initializes a EntryPoint contract.
-    /// @param facetsAndSelectors A bytes array of bytes4 function selectors and facet addresses.
-    ///
-    /// @dev Sets up the facet and selectors for the EntryPoint contract,
-    /// ensuring that the passed selectors are in order and there are no repetitions.
-    /// @dev Ensures that the sizes of selectors and facet addresses match.
-    /// @dev The constructor uses SSTORE2 method to stores the combined facet and selectors
-    /// in a specified storage location.
+    /// @notice Initializes the EntryPoint contract with facet and selector data.
+    /// @dev Stores the provided data using SSTORE2 and disables initializers to prevent reinitialization.
+    /// @param facetsAndSelectors Bytes array containing function selectors and facet addresses.
     constructor(bytes memory facetsAndSelectors) {
         _disableInitializers();
-
         _facetsAndSelectorsAddress = SSTORE2.write({ data: facetsAndSelectors });
     }
 
-    /// @inheritdoc IEntryPoint
-    function initialize(address newOwner, bytes[] calldata initialCalls) external initializer {
-        _transferOwnership(newOwner);
+    // =========================
+    // initializer
+    // =========================
 
-        if (initialCalls.length > 0) {
-            _multicall(true, initialCalls);
-        }
+    /// @inheritdoc IEntryPoint
+    function initialize(address newOwner) external initializer {
+        _transferOwnership(newOwner);
     }
 
     // =========================
@@ -77,6 +63,10 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
         (feeContractAddress, fee) = FeeLibrary.getFeeContractAddress();
     }
 
+    /// @notice Adds a new module with its function signature and address.
+    /// @dev Only callable by the owner. Reverts if the module signature already exists.
+    /// @param moduleSignature The 4-byte function signature of the module.
+    /// @param moduleAddress The address of the module contract.
     function addModule(bytes4 moduleSignature, address moduleAddress) external onlyOwner {
         assembly ("memory-safe") {
             mstore(0, moduleSignature)
@@ -84,10 +74,8 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
             let mappingSlot := keccak256(0, 64)
 
             if sload(mappingSlot) {
-                // revert IEntryPoint.EntryPoint_ModuleAlreadyAdded(moduleSignature);
-                mstore(0, 0xefd5d8e4)
+                mstore(0, 0xefd5d8e4) // IEntryPoint.EntryPoint_ModuleAlreadyAdded
                 mstore(32, moduleSignature)
-
                 revert(28, 36)
             }
 
@@ -105,6 +93,10 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
         }
     }
 
+    /// @notice Updates or removes a module's address for a given function signature.
+    /// @dev Only callable by the owner. Reverts if the module does not exist. Set moduleAddress to zero to remove.
+    /// @param moduleSignature The 4-byte function signature of the module.
+    /// @param moduleAddress The new address of the module contract, or zero to remove.
     function updateModule(bytes4 moduleSignature, address moduleAddress) external onlyOwner {
         assembly ("memory-safe") {
             mstore(0, moduleSignature)
@@ -114,10 +106,8 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
             let currentValue := sload(mappingSlot)
 
             if iszero(currentValue) {
-                // revert IEntryPoint.EntryPoint_ModuleNotAdded(moduleSignature);
-                mstore(0, 0xeac1ef32)
+                mstore(0, 0xeac1ef32) // IEntryPoint.EntryPoint_ModuleNotAdded
                 mstore(32, moduleSignature)
-
                 revert(28, 36)
             }
 
@@ -155,10 +145,17 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
         }
     }
 
+    /// @notice Retrieves the address of a module by its function signature.
+    /// @dev Returns zero if the module does not exist.
+    /// @param moduleSignature The 4-byte function signature of the module.
+    /// @return moduleAddress The address of the module contract.
     function getModuleAddress(bytes4 moduleSignature) external view returns (address moduleAddress) {
         moduleAddress = _getModuleAddress(moduleSignature);
     }
 
+    /// @notice Retrieves information about all registered modules.
+    /// @dev Returns an array of module signatures and their addresses.
+    /// @return info Array of ModuleInfo structs containing module signatures and addresses.
     function getModules() external view returns (IEntryPoint.ModuleInfo[] memory info) {
         uint256 length = _moduleSignatures.length;
 
@@ -183,12 +180,12 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
 
     /// @inheritdoc IEntryPoint
     function multicall(bytes[] calldata data) external payable {
-        _multicall(false, data);
+        _multicall(data);
     }
 
-    /// @notice Fallback function to execute facet associated with incoming function selectors.
-    /// @dev If a facet for the incoming selector is found, it delegates the call to that facet.
-    /// @dev If callback address in storage is not address(0) - it delegates the call to that address.
+    /// @notice Handles incoming calls by delegating to the appropriate facet or callback address.
+    /// @dev Uses the function selector to find the facet or checks for a callback address.
+    ///      Reverts if no facet is found.
     fallback() external payable {
         address facet = TransientStorageFacetLibrary.getCallbackAddress();
 
@@ -210,12 +207,12 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
         }
     }
 
-    /// @notice Function to receive Native currency.
+    /// @notice Allows the contract to receive native currency.
     receive() external payable { }
 
-    // =======================
+    // =========================
     // diamond getters
-    // =======================
+    // =========================
 
     /// @inheritdoc IEntryPoint
     function facets() external view returns (IEntryPoint.Facet[] memory _facets) {
@@ -263,14 +260,15 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
         _facet = _getAddress(functionSelector);
     }
 
-    // =======================
-    // internal function
-    // =======================
+    // =========================
+    // internal functions
+    // =========================
 
-    /// @notice Function to execute facets associated with incoming function selectors.
-    function _multicall(bool isOffset, bytes[] calldata data) internal {
-        address[] memory _facets = _getAddresses(isOffset, data);
-
+    /// @dev Executes multiple function calls, resolving facets or modules for each.
+    ///      Internal function used by initialize and multicall. Sets sender address in transient storage.
+    /// @param data Array of calldata for each function call.
+    function _multicall(bytes[] calldata data) internal {
+        address[] memory _facets = _getAddresses(data);
         TransientStorageFacetLibrary.setSenderAddress({ senderAddress: msg.sender });
 
         assembly ("memory-safe") {
@@ -278,15 +276,8 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
                 let length := data.length
                 let memoryOffset := add(_facets, 32)
                 let ptr := mload(64)
-
                 let cDataStart := 68
                 let cDataOffset := 68
-
-                if isOffset {
-                    cDataStart := add(cDataStart, 32)
-                    cDataOffset := add(cDataOffset, 32)
-                }
-
                 let facet
             } length {
                 length := sub(length, 1)
@@ -301,22 +292,17 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
                             calldataload(add(offset, 32)),
                             0xffffffff00000000000000000000000000000000000000000000000000000000
                         )
-
                     mstore(0, sig)
                     mstore(32, _moduleSignatureToAddress.slot)
                     facet := and(sload(keccak256(0, 64)), ADDRESS_MASK)
-
                     if iszero(facet) {
-                        // revert IEntryPoint.EntryPoint_FunctionDoesNotExist(selector);
-                        mstore(0, 0x9365f537)
+                        mstore(0, 0x9365f537) // IEntryPoint.EntryPoint_FunctionDoesNotExist
                         mstore(32, sig)
                         revert(28, 36)
                     }
                 }
-
                 let cSize := calldataload(offset)
                 calldatacopy(ptr, add(offset, 32), cSize)
-
                 if iszero(callcode(gas(), facet, 0, ptr, cSize, 0, 0)) {
                     returndatacopy(0, 0, returndatasize())
                     revert(0, returndatasize())
@@ -327,17 +313,14 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
         TransientStorageFacetLibrary.setSenderAddress({ senderAddress: address(0) });
     }
 
-    /// @dev Searches for the facet address associated with a function `selector`.
-    /// @dev Uses binary search to find the facet address in facetsAndSelectors bytes.
-    /// @param selector The function selector.
+    /// @dev Retrieves the facet address for a given function selector using binary search.
+    /// @param selector The 4-byte function selector.
     /// @return facet The address of the facet contract.
     function _getAddress(bytes4 selector) internal view returns (address facet) {
         bytes memory facetsAndSelectors = SSTORE2.read(_facetsAndSelectorsAddress);
-
         if (facetsAndSelectors.length < 24) {
             revert IEntryPoint.EntryPoint_FunctionDoesNotExist({ selector: selector });
         }
-
         uint256 selectorsLength;
         uint256 addressesOffset;
         assembly ("memory-safe") {
@@ -345,7 +328,6 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
             selectorsLength := shr(16, value)
             addressesOffset := and(value, 0xffff)
         }
-
         return BinarySearch.binarySearch({
             selector: selector,
             facetsAndSelectors: facetsAndSelectors,
@@ -354,34 +336,28 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
         });
     }
 
-    /// @dev Searches for the facet addresses associated with a function `selectors`.
-    /// @dev Uses binary search to find the facet addresses in facetsAndSelectors bytes.
-    /// @param datas The calldata to be searched.
-    /// @return _facets The addresses of the facet contracts.
-    function _getAddresses(bool isOffset, bytes[] calldata datas) internal view returns (address[] memory _facets) {
+    /// @dev Retrieves facet addresses for an array of function calls.
+    ///      Uses binary search to resolve selectors to facet addresses.
+    /// @param datas Array of calldata for function calls.
+    /// @return _facets Array of facet addresses corresponding to the selectors.
+    function _getAddresses(bytes[] calldata datas) internal view returns (address[] memory _facets) {
         uint256 length = datas.length;
         _facets = new address[](length);
-
         bytes memory facetsAndSelectors = SSTORE2.read(_facetsAndSelectorsAddress);
-
         if (facetsAndSelectors.length < 24) {
             revert IEntryPoint.EntryPoint_FunctionDoesNotExist({ selector: 0x00000000 });
         }
-
         uint256 cDataStart;
         uint256 offset;
         uint256 selectorsLength;
         uint256 addressesOffset;
         assembly ("memory-safe") {
-            cDataStart := mul(isOffset, 32)
             offset := add(68, cDataStart)
             cDataStart := add(68, cDataStart)
-
             let value := shr(224, mload(add(32, facetsAndSelectors)))
             selectorsLength := shr(16, value)
             addressesOffset := and(value, 0xffff)
         }
-
         bytes4 selector;
         for (uint256 i; i < length;) {
             assembly ("memory-safe") {
@@ -392,27 +368,25 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
                     )
                 offset := add(offset, 32)
             }
-
             _facets[i] = BinarySearch.binarySearch({
                 selector: selector,
                 facetsAndSelectors: facetsAndSelectors,
                 length: selectorsLength,
                 addressesOffset: addressesOffset
             });
-
             unchecked {
-                // increment loop counter
                 ++i;
             }
         }
-
         assembly ("memory-safe") {
-            // re-use unnecessary memory
             mstore(64, facetsAndSelectors)
         }
     }
 
-    /// @dev Returns the addresses of the facets.
+    /// @dev Extracts all facet addresses from stored facet and selector data.
+    ///      Parses the SSTORE2 data to return an array of facet addresses.
+    /// @param facetsAndSelectors Bytes array containing facet and selector data.
+    /// @return _facets Array of facet contract addresses.
     function _getAddresses(bytes memory facetsAndSelectors) internal pure returns (address[] memory _facets) {
         assembly ("memory-safe") {
             let counter
@@ -433,13 +407,16 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
                 mstore(offset, value)
                 counter := add(counter, 1)
             }
-
             mstore(_facets, counter)
             mstore(64, add(mload(64), add(32, mul(counter, 32))))
         }
     }
 
-    /// @dev Returns the selectors of the facet with the given index.
+    /// @dev Retrieves function selectors for a facet at a given index.
+    ///      Returns an empty array if the facet index is invalid.
+    /// @param facetsAndSelectors Bytes array containing facet and selector data.
+    /// @param facetIndex The index of the facet in the address list.
+    /// @return _facetFunctionSelectors Array of 4-byte function selectors.
     function _getFacetFunctionSelectors(
         bytes memory facetsAndSelectors,
         uint256 facetIndex
@@ -466,13 +443,15 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
                     offset := add(offset, 32)
                 }
             }
-
             mstore(_facetFunctionSelectors, counter)
             mstore(64, add(mload(64), add(32, mul(counter, 32))))
         }
     }
 
-    /// @dev Returns the address of the module address with the given function signature.
+    /// @dev Retrieves the module address for a given function signature.
+    ///      Returns zero if the module is not registered.
+    /// @param moduleSignature The 4-byte function signature of the module.
+    /// @return moduleAddress The address of the module contract.
     function _getModuleAddress(bytes4 moduleSignature) internal view returns (address moduleAddress) {
         assembly ("memory-safe") {
             mstore(0, moduleSignature)

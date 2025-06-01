@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import { Ownable } from "../../external/Ownable.sol";
+import { BaseOwnableFacet } from "../BaseOwnableFacet.sol";
 
 import {
     ILayerZeroEndpointV2, UlnConfig, Origin, MessagingFee, MessagingParams
@@ -14,36 +14,42 @@ import { TransientStorageFacetLibrary } from "../../libraries/TransientStorageFa
 import { ILayerZeroFacet } from "./interfaces/ILayerZeroFacet.sol";
 
 /// @title LayerZeroFacet
-contract LayerZeroFacet is Ownable, ILayerZeroFacet {
+/// @notice A facet for cross-chain messaging via the LayerZero V2 protocol in a diamond-like proxy contract.
+/// @dev Supports sending native drop messages, configuring trusted peers, gas limits, and ULN configurations.
+contract LayerZeroFacet is BaseOwnableFacet, ILayerZeroFacet {
     // =========================
-    // immutable storage
+    // storage
     // =========================
 
-    /// @dev LayerZeroV2 endpoint
+    /// @dev The address of the LayerZero V2 endpoint contract.
+    ///      Immutable, set during construction. Used for sending messages and querying configurations.
     ILayerZeroEndpointV2 internal immutable _endpointV2;
 
     // =========================
     // storage
     // =========================
 
+    /// @notice Storage struct for the LayerZeroFacet.
+    /// @dev Stores trusted peers, gas limits, and default gas limit to manage cross-chain messaging.
     struct LayerZeroFacetStorage {
-        /// @dev trusted peers, default - address(this)
+        /// @notice Mapping of destination endpoint IDs to trusted peer addresses.
+        /// @dev Stores the trusted peer (bytes32) for each remote chain’s endpoint ID. Defaults to `address(this)` if unset.
         mapping(uint32 eid => bytes32 peer) peers;
-        /// @dev gas limit lookup
+        /// @notice Mapping of destination endpoint IDs to gas limits.
+        /// @dev Stores the gas limit for messages sent to each remote chain. Falls back to `defaultGasLimit` if unset.
         mapping(uint32 eid => uint128 gasLimit) gasLimitLookup;
-        /// @dev default gas limit
+        /// @notice The default gas limit for cross-chain messages.
+        /// @dev Used when no specific gas limit is set for a destination endpoint ID.
         uint128 defaultGasLimit;
     }
 
-    /// @dev Storage position for the layerZero facet, to avoid collisions in storage.
-    /// @dev Uses the "magic" constant to find a unique storage slot.
-    // keccak256("layerZero.storage")
+    /// @dev Storage slot for the LayerZeroFacet to avoid collisions.
+    ///      Computed as keccak256("layerZero.storage") to ensure a unique storage position.
     bytes32 private constant LAYERZERO_FACET_STORAGE =
         0x7f8156d470b4ca2c59b150cce6693dce9d231528b9e476a0fbfb17f10e0dab09;
 
-    /// @dev Returns the storage slot for the LayerZeroFacet.
-    /// @dev This function utilizes inline assembly to directly access the desired storage position.
-    ///
+    /// @dev Retrieves the storage slot for the LayerZeroFacet.
+    ///      Uses inline assembly to access the `LAYERZERO_FACET_STORAGE` slot.
     /// @return s The storage slot pointer for the LayerZeroFacet.
     function _getLocalStorage() internal pure returns (LayerZeroFacetStorage storage s) {
         assembly ("memory-safe") {
@@ -55,10 +61,12 @@ contract LayerZeroFacet is Ownable, ILayerZeroFacet {
     // constructor
     // =========================
 
+    /// @notice Initializes the LayerZeroFacet with the LayerZero V2 endpoint address.
+    /// @dev Sets the immutable `_endpointV2` address and initializes ownership via `Ownable`.
+    /// @param endpointV2 The address of the LayerZero V2 endpoint contract.
     constructor(address endpointV2) {
         _endpointV2 = ILayerZeroEndpointV2(endpointV2);
     }
-
     // =========================
     // getters
     // =========================
@@ -256,7 +264,13 @@ contract LayerZeroFacet is Ownable, ILayerZeroFacet {
     // internal
     // =========================
 
-    /// @dev Creates native drop options for passed `nativeAmount` and `to`.
+    /// @dev Constructs native drop options for a cross-chain message.
+    ///      Encodes the gas limit, native amount, and recipient address into a LayerZero options format,
+    ///      including `lzReceive` and `nativeDrop` types.
+    /// @param remoteEid The remote chain’s endpoint ID.
+    /// @param nativeAmount The amount of native currency to drop.
+    /// @param to The recipient address for the native drop.
+    /// @return The encoded options bytes for the LayerZero message.
     function _createNativeDropOption(
         uint32 remoteEid,
         uint128 nativeAmount,
@@ -290,7 +304,11 @@ contract LayerZeroFacet is Ownable, ILayerZeroFacet {
         );
     }
 
-    /// @dev Calculates fee in native token for passed options.
+    /// @dev Quotes the native fee for a cross-chain message.
+    ///      Constructs a `MessagingParams` struct with the provided options and queries `_endpointV2.quote` for the fee.
+    /// @param remoteEid The remote chain’s endpoint ID.
+    /// @param options The encoded options for the message (e.g., native drop).
+    /// @return nativeFee The estimated native currency fee for the message.
     function _quote(uint32 remoteEid, bytes memory options) internal view returns (uint256 nativeFee) {
         MessagingFee memory fee = _endpointV2.quote({
             params: MessagingParams({
@@ -306,7 +324,10 @@ contract LayerZeroFacet is Ownable, ILayerZeroFacet {
         return fee.nativeFee;
     }
 
-    /// @dev Helper method for get peer for passed remoteEid.
+    /// @dev Retrieves the trusted peer address for a remote endpoint ID.
+    ///      Returns the stored peer from the `peers` mapping or `address(this)` if unset.
+    /// @param remoteEid The remote chain’s endpoint ID.
+    /// @return trustedRemote The trusted peer address (bytes32).
     function _getPeer(uint32 remoteEid) internal view returns (bytes32 trustedRemote) {
         trustedRemote = _getLocalStorage().peers[remoteEid];
         if (trustedRemote == 0) {
@@ -316,7 +337,10 @@ contract LayerZeroFacet is Ownable, ILayerZeroFacet {
         }
     }
 
-    /// @dev Helper method for get gasLimit for passed remoteEid.
+    /// @dev Retrieves the gas limit for messages to a remote endpoint ID.
+    ///      Returns the stored gas limit from `gasLimitLookup` or `defaultGasLimit` if unset.
+    /// @param remoteEid The remote chain’s endpoint ID.
+    /// @return gasLimit The gas limit for messages to the remote chain.
     function _getGasLimit(uint32 remoteEid) internal view returns (uint128 gasLimit) {
         LayerZeroFacetStorage storage s = _getLocalStorage();
 

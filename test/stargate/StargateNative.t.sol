@@ -46,7 +46,7 @@ contract StargateFacetTest is BaseTest {
             poolAddress: stargatePool,
             dstEid: dstEidV2,
             amountLD: 0.111111111111111111e18,
-            composer: user,
+            receiver: user,
             composeMsg: bytes(""),
             composeGasLimit: 0
         });

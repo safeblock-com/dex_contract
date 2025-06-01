@@ -10,19 +10,26 @@ import { ISymbiosis } from "./interfaces/ISymbiosis.sol";
 import { ISymbiosisFacet } from "./interfaces/ISymbiosisFacet.sol";
 
 /// @title SymbiosisFacet
+/// @notice A facet for executing cross-chain token bridging via the Symbiosis protocol in a diamond-like proxy contract.
+/// @dev Handles token transfers, fee payments, and interactions with the Symbiosis Portal contract for meta-synthesis transactions.
 contract SymbiosisFacet is ISymbiosisFacet {
     using TransferHelper for address;
 
     // =========================
-    // immutable storage
+    // storage
     // =========================
 
+    /// @dev The address of the Symbiosis Portal contract.
+    ///      Immutable, set during construction. Used to call `metaSynthesize` for cross-chain bridging.
     ISymbiosis internal immutable _portal;
 
     // =========================
     // constructor
     // =========================
 
+    /// @notice Initializes the SymbiosisFacet with the Symbiosis Portal contract address.
+    /// @dev Sets the immutable `_portal` address.
+    /// @param portal_ The address of the Symbiosis Portal contract.
     constructor(address portal_) {
         _portal = ISymbiosis(portal_);
     }

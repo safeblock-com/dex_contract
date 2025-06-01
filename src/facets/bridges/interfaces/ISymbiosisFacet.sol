@@ -7,13 +7,17 @@ interface ISymbiosisFacet {
     // getters
     // =========================
 
-    /// @notice Gets portal address
+    /// @notice Retrieves the address of the Symbiosis Portal contract.
+    /// @dev Returns the immutable `_portal` address.
+    /// @return The address of the Symbiosis Portal contract.
     function portal() external view returns (address);
 
     // =========================
     // main function
     // =========================
 
+    /// @notice Configuration for a cross-chain bridging transaction via the Symbiosis protocol.
+    /// @dev Specifies the token, amount, and parameters for bridging to a target chain, including optional swap and final call details.
     struct SymbiosisTransaction {
         uint256 stableBridgingFee;
         uint256 amount;
@@ -26,6 +30,10 @@ interface ISymbiosisFacet {
         uint256 finalOffset;
     }
 
-    /// @notice Send Symbiosis Transaction
+    /// @notice Initiates a cross-chain bridging transaction via the Symbiosis protocol.
+    /// @dev Transfers tokens from the sender (or uses pre-transferred tokens), applies protocol fees,
+    ///      approves the Portal contract, and calls `metaSynthesize` to bridge tokens to the target chain.
+    ///      Uses hardcoded addresses and chain ID for BOBA BNB.
+    /// @param symbiosisTransaction The configuration for the cross-chain bridging transaction.
     function sendSymbiosis(SymbiosisTransaction calldata symbiosisTransaction) external;
 }

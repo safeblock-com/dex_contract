@@ -12,16 +12,19 @@ interface IEntryPoint {
     // errors
     // =========================
 
-    /// @notice Throws when the function does not exist in the EntryPoint.
+    /// @dev Thrown when a function selector is not registered in the EntryPoint.
+    /// @param selector The 4-byte function selector that does not exist.
     error EntryPoint_FunctionDoesNotExist(bytes4 selector);
 
-    /// @notice Throws if new `fee` value is invalid
+    /// @dev Thrown when an invalid fee value is provided during fee configuration.
     error EntryPoint_InvalidFeeValue();
 
-    /// @notice Throws if the module is already added to the EntryPoint
+    /// @dev Thrown when attempting to add a module that is already registered.
+    /// @param methodSignature The 4-byte function signature of the module.
     error EntryPoint_ModuleAlreadyAdded(bytes4 methodSignature);
 
-    /// @notice Throws if the module is not added to the EntryPoint
+    /// @dev Thrown when attempting to update or remove a module that is not registered.
+    /// @param methodSignature The 4-byte function signature of the module.
     error EntryPoint_ModuleNotAdded(bytes4 methodSignature);
 
     // =========================
@@ -29,22 +32,32 @@ interface IEntryPoint {
     // =========================
 
     /// @notice Initializes a EntryPoint contract.
-    function initialize(address newOwner, bytes[] calldata initialCalls) external;
+    function initialize(address newOwner) external;
 
-    /// @notice Executes multiple calls in a single transaction.
-    /// @dev Iterates through an array of call data and executes each call.
-    /// If any call fails, the function reverts with the original error message.
-    /// @param data An array of call data to be executed.
+    /// @notice Executes multiple function calls in a single transaction.
+    /// @dev Delegates calls to appropriate facets or modules based on function selectors.
+
+    // =========================
+    // multicall
+    // =========================
+
+    /// @param data Array of calldata for each function call.
     function multicall(bytes[] calldata data) external payable;
 
     // =========================
     // admin methods
     // =========================
 
-    /// @notice Sets the address of the fee contract and the protocol fee.
+    /// @notice Sets the fee contract address and fee amount.
+    /// @dev Only callable by the owner. Updates the fee configuration in FeeLibrary.
+    /// @param feeContractAddress The address of the fee contract.
+    /// @param fee The fee amount to set.
     function setFeeContractAddressAndFee(address feeContractAddress, uint256 fee) external;
 
-    /// @notice Returns the address of the fee contract and the protocol fee.
+    /// @notice Retrieves the current fee contract address and fee amount.
+    /// @dev Reads the fee configuration from FeeLibrary.
+    /// @return feeContractAddress The address of the fee contract.
+    /// @return fee The current fee amount.
     function getFeeContractAddressAndFee() external view returns (address feeContractAddress, uint256 fee);
 
     // =========================
@@ -52,28 +65,30 @@ interface IEntryPoint {
     // =========================
 
     // These functions are expected to be called frequently by tools
-
     struct Facet {
         address facet;
         bytes4[] functionSelectors;
     }
 
-    /// @notice Gets all facet addresses and their four byte function selectors.
-    /// @return _facets Facet
+    /// @notice Retrieves all facets and their associated function selectors.
+    /// @dev Reads facet and selector data from SSTORE2 storage.
+    /// @return _facets Array of Facet structs containing facet addresses and their selectors.
     function facets() external view returns (Facet[] memory _facets);
 
-    /// @notice Gets all the function selectors supported by a specific facet.
-    /// @param facet The facet address.
-    /// @return _facetFunctionSelectors
+    /// @notice Retrieves the function selectors for a specific facet.
+    /// @dev Returns an empty array if the facet is not found.
+    /// @param facet The address of the facet contract.
+    /// @return _facetFunctionSelectors Array of 4-byte function selectors.
     function facetFunctionSelectors(address facet) external view returns (bytes4[] memory _facetFunctionSelectors);
 
-    /// @notice Get all the facet addresses used by a diamond.
-    /// @return _facets
+    /// @notice Retrieves all facet addresses.
+    /// @dev Reads facet addresses from SSTORE2 storage.
+    /// @return _facets Array of facet contract addresses.
     function facetAddresses() external view returns (address[] memory _facets);
 
-    /// @notice Gets the facet that supports the given selector.
-    /// @dev If facet is not found return address(0).
-    /// @param functionSelector The function selector.
-    /// @return _facet The facet address.
+    /// @notice Retrieves the facet address for a given function selector.
+    /// @dev Returns zero if the selector is not found.
+    /// @param functionSelector The 4-byte function selector.
+    /// @return _facet The address of the facet contract.
     function facetAddress(bytes4 functionSelector) external view returns (address _facet);
 }

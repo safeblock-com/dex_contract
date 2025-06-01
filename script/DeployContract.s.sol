@@ -83,11 +83,9 @@ contract Deploy is Script {
             if (contracts.proxy == address(0)) {
                 contracts.proxy = _deployProxy(abi.encode(deployer), devSalt);
 
-                bytes[] memory initCalls = new bytes[](0);
-
                 InitialImplementation(contracts.proxy).upgradeTo({
                     implementation: entryPoint,
-                    data: abi.encodeCall(EntryPoint.initialize, (deployer, initCalls))
+                    data: abi.encodeCall(EntryPoint.initialize, (deployer))
                 });
             } else {
                 EntryPoint(payable(contracts.proxy)).upgradeTo({ newImplementation: entryPoint });
@@ -114,11 +112,9 @@ contract Deploy is Script {
         if (proxy == address(0)) {
             proxy = _deployProxy(abi.encode(deployer), salt);
 
-            bytes[] memory initCalls = new bytes[](0);
-
             InitialImplementation(proxy).upgradeTo({
                 implementation: contracts.prodEntryPoint,
-                data: abi.encodeCall(EntryPoint.initialize, (deployer, initCalls))
+                data: abi.encodeCall(EntryPoint.initialize, (deployer))
             });
         } else if (_getProxyImplementation(proxy) != contracts.prodEntryPoint) {
             EntryPoint(payable(proxy)).upgradeTo({ newImplementation: contracts.prodEntryPoint });

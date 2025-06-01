@@ -8,77 +8,93 @@ interface IMultiswapRouterFacet {
     // errors
     // =========================
 
-    /// @notice Throws if amount out is less than minimum amount out
+    /// @dev Thrown when the output amount is less than the minimum expected amount.
     error MultiswapRouterFacet_InvalidAmountOut();
 
-    /// @notice Throws if swap through UniswapV2 fails
+    /// @dev Thrown when a Uniswap V2 swap fails.
     error MultiswapRouterFacet_FailedV2Swap();
 
-    /// @notice Throws if `pairs` array is empty
+    /// @dev Thrown when the `pairs` array is empty.
     error MultiswapRouterFacet_InvalidPairsArray();
 
-    /// @notice Throws if `multiswap2Calldata` is invalid
+    /// @dev Thrown when the `Multiswap2Calldata` struct contains invalid data.
     error MultiswapRouterFacet_InvalidMultiswap2Calldata();
 
-    /// @notice Throws if swap through UniswapV3 fails
+    /// @dev Thrown when a Uniswap V3 swap fails due to zero liquidity.
     error MultiswapRouterFacet_FailedV3Swap();
 
-    /// @notice Throws if `sender` is not a UniswapV3 pool
+    /// @dev Thrown when the `msg.sender` in the fallback is not the cached Uniswap V3 pool.
     error MultiswapRouterFacet_SenderMustBeUniswapV3Pool();
 
-    /// @notice Throws if `amount` is larger than `int256.max`
+    /// @dev Thrown when the input amount exceeds the maximum value for `int256`.
     error MultiswapRouterFacet_InvalidIntCast();
 
-    /// @notice Throws if `amountIn` is 0
+    /// @dev Thrown when the input amount is zero.
     error MultiswapRouterFacet_InvalidAmountIn();
 
     // =========================
     // getters
     // =========================
 
-    /// @notice Returns the address of the `wrappedNative`
+    /// @notice Retrieves the address of the Wrapped Native token contract.
+    /// @dev Returns the immutable `_wrappedNative` address.
+    /// @return The address of the Wrapped Native token contract.
     function wrappedNative() external view returns (address);
 
     // =========================
     // main logic
     // =========================
 
+    /// @notice Configuration for a single-path swap.
+    /// @dev Specifies the input token, amount, output constraints, and pool path for a single swap sequence.
     struct MultiswapCalldata {
-        // initial exact value in
+        /// @notice The exact input amount for the swap.
+        /// @dev Represents the total amount of `tokenIn` to be swapped.
         uint256 amountIn;
-        // minimal amountOut
+        /// @notice The minimum acceptable output amount.
+        /// @dev Ensures the swap yields at least this amount of the output token, or it reverts.
         uint256 minAmountOut;
-        // the first token in swap
+        /// @notice The address of the input token.
+        /// @dev Can be an ERC20 token or address(0) for native currency (wrapped to Wrapped Native).
         address tokenIn;
-        // array of bytes32 values (pairs) involved in the swap
-        // from right to left:
-        //     address of the pair - 20 bytes
-        //     fee in pair - 3 bytes (for V2 pairs)
-        //     the highest bit shows which version the pair belongs to
+        /// @notice The array of pool identifiers for the swap path.
+        /// @dev Each bytes32 encodes:
+        ///      - Bits 0-159: Pool address (20 bytes).
+        ///      - Bits 160-183: Fee for Uniswap V2 pairs (3 bytes, ignored for V3).
+        ///      - Bit 255: Protocol version (1 for Uniswap V3, 0 for Uniswap V2).
         bytes32[] pairs;
     }
 
+    /// @notice Configuration for a multi-path swap with split input amounts.
+    /// @dev Specifies the input token, total amount, output tokens, minimum outputs,
+    ///      and multiple pool paths with percentage allocations.
     struct Multiswap2Calldata {
-        // exact value in for part swap
+        /// @notice The total input amount for all swap paths.
+        /// @dev Represents the full amount of `tokenIn` to be distributed across paths.
         uint256 fullAmount;
-        // token in
+        /// @notice The address of the input token.
+        /// @dev Can be an ERC20 token or address(0) for native currency (wrapped to Wrapped Native).
         address tokenIn;
-        // token out
+        /// @notice The array of output token addresses.
+        /// @dev Specifies the tokens expected from each swap path.
         address[] tokensOut;
-        // minimal amountOut
+        /// @notice The minimum acceptable output amounts for each output token.
+        /// @dev Ensures each output token yields at least the corresponding amount, or it reverts.
         uint256[] minAmountsOut;
-        // array of percentages of fullAmount for each swap, corresponding to the path for the swap from the pairs array
+        /// @notice The array of percentage allocations for the input amount.
+        /// @dev Each percentage (in 1e18 scale) determines the portion of `fullAmount` used for the corresponding path in `pairs`. Must sum to 1e18.
         uint256[] amountInPercentages;
-        // array of bytes32[] values (pairs) involved in the swap
-        // from left to right:
-        //     address of the pair - 20 bytes
-        //     fee in pair - 3 bytes (for V2 pairs)
-        //     the highest bit shows which version the pair belongs to
+        /// @notice The array of pool paths for each swap.
+        /// @dev Each element is an array of bytes32 pool identifiers, where each bytes32 encodes:
+        ///      - Bits 0-159: Pool address (20 bytes).
+        ///      - Bits 160-183: Fee for Uniswap V2 pairs (3 bytes, ignored for V3).
+        ///      - Bit 255: Protocol version (1 for Uniswap V3, 0 for Uniswap V2).
         bytes32[][] pairs;
     }
 
-    /// @notice Swaps tokenIn through each path separately
-    /// @dev each path in the pairs array must have tokenIn and have the same tokenOut,
-    /// the result of swap is the sum after each swap
+    /// @notice Executes a multi-path swap across Uniswap V2 and V3 pools.
+    /// @dev Transfers input tokens, performs swaps through specified pools, applies fees,
+    ///      and records output amounts. Reverts with various errors for invalid inputs or failed swaps.
+    /// @param data The swap configuration, including input token, pairs, amounts, and minimum outputs.
     function multiswap2(Multiswap2Calldata calldata data) external;
 }

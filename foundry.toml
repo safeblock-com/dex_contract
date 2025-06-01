@@ -2,8 +2,8 @@
 src = "src"
 out = "out"
 libs = ["lib"]
-solc = "0.8.19"
-# auto_detect_solc = true
+# solc = "0.8.19"
+auto_detect_solc = true
 optimizer = true
 optimizer_runs = 1000
 

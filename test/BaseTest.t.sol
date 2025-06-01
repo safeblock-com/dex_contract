@@ -30,6 +30,7 @@ import {
 } from "../src/facets/bridges/StargateFacet.sol";
 import { LayerZeroFacet, ILayerZeroFacet } from "../src/facets/bridges/LayerZeroFacet.sol";
 import { SymbiosisFacet, ISymbiosisFacet, ISymbiosis } from "../src/facets/bridges/SymbiosisFacet.sol";
+import { AcrossFacet, IAcrossFacet } from "../src/facets/bridges/AcrossFacet.sol";
 
 import { TransientStorageFacetLibrary } from "../src/libraries/TransientStorageFacetLibrary.sol";
 
@@ -80,7 +81,7 @@ contract BaseTest is Test {
 
         InitialImplementation(address(entryPoint)).upgradeTo({
             implementation: DeployEngine.deployEntryPoint({ contracts: contracts }),
-            data: abi.encodeCall(IEntryPoint.initialize, (owner, new bytes[](0)))
+            data: abi.encodeCall(IEntryPoint.initialize, (owner))
         });
         entryPoint.setFeeContractAddressAndFee({ feeContractAddress: address(feeContract), fee: 0 });
 
