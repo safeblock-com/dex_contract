@@ -9,23 +9,31 @@ import { ISignatureTransfer } from "./interfaces/ISignatureTransfer.sol";
 
 import { TransientStorageFacetLibrary } from "../libraries/TransientStorageFacetLibrary.sol";
 
-/// @title TransferFacet - Facet for token transfers
+/// @title TransferFacet
+/// @notice A facet for handling token transfers in a diamond-like proxy contract.
+/// @dev Facilitates ERC20 token transfers, permit-based transfers via Permit2,
+///      and native token unwrapping using a wrapped native token contract.
 contract TransferFacet is ITransferFacet {
     // =========================
     // storage
     // =========================
 
-    /// @dev address of the WrappedNative contract for current chain
+    /// @dev The address of the Wrapped Native token contract (e.g., WETH).
+    ///      Immutable, set during construction. Used in `unwrapNativeAndTransferTo` for withdrawing native tokens.
     IWrappedNative private immutable _wrappedNative;
 
-    /// @dev address of the Permit2 contract
+    /// @dev The address of the Permit2 contract for signature-based transfers.
+    ///      Immutable, set during construction. Used in `transferFromPermit2` and `getNonceForPermit2`.
     ISignatureTransfer private immutable _permit2;
 
     // =========================
     // constructor
     // =========================
 
-    /// @notice Constructor
+    /// @notice Initializes the TransferFacet with Wrapped Native and Permit2 contract addresses.
+    /// @dev Sets the immutable `_wrappedNative` and `_permit2` addresses.
+    /// @param wrappedNative The address of the Wrapped Native token contract.
+    /// @param permit2 The address of the Permit2 contract.
     constructor(address wrappedNative, address permit2) {
         _wrappedNative = IWrappedNative(wrappedNative);
         _permit2 = ISignatureTransfer(permit2);

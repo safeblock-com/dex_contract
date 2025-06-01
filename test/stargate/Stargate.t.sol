@@ -38,10 +38,7 @@ contract StargateFacetTest is BaseTest {
     // constructor
     // =========================
 
-    function test_stargateFacet_constructor_shouldInitializeInConstructor()
-        external
-        checkTokenStorage(new address[](0))
-    {
+    function test_stargateFacet_constructor_shouldInitializeInConstructor() external {
         StargateFacet _stargateFacet = new StargateFacet({ endpointV2: contracts.layerZeroEndpointV2 });
 
         assertEq(_stargateFacet.lzEndpoint(), contracts.layerZeroEndpointV2);
@@ -66,7 +63,7 @@ contract StargateFacetTest is BaseTest {
             poolAddress: stargatePool,
             dstEid: dstEidV2,
             amountLD: 1000e18,
-            composer: user,
+            receiver: user,
             composeMsg: bytes(""),
             composeGasLimit: 0
         });
@@ -96,7 +93,7 @@ contract StargateFacetTest is BaseTest {
             poolAddress: stargatePool,
             dstEid: dstEidV2,
             amountLD: 1000e18,
-            composer: user,
+            receiver: user,
             composeMsg: bytes(""),
             composeGasLimit: 0
         });
@@ -119,7 +116,7 @@ contract StargateFacetTest is BaseTest {
             poolAddress: stargatePool,
             dstEid: dstEidV2,
             amountLD: 1000e18,
-            composer: user,
+            receiver: user,
             composeMsg: bytes(""),
             composeGasLimit: 0
         });
@@ -169,7 +166,7 @@ contract StargateFacetTest is BaseTest {
             poolAddress: stargatePool,
             dstEid: dstEidV2,
             amountLD: m2Data.minAmountsOut[0],
-            composer: user,
+            receiver: user,
             composeMsg: bytes(""),
             composeGasLimit: 0
         });
@@ -212,7 +209,7 @@ contract StargateFacetTest is BaseTest {
             poolAddress: stargatePool,
             dstEid: dstEidV2,
             amountLD: m2Data.minAmountsOut[0],
-            composer: user,
+            receiver: user,
             composeMsg: bytes(""),
             composeGasLimit: 0
         });

@@ -37,8 +37,13 @@ interface IUniswapPool {
     /// @return The liquidity at the current price of the pool
     function liquidity() external view returns (uint128);
 
+    function boostedLiquidity() external view returns (uint128);
+
     /// @notice Returns 256 packed tick initialized boolean values. See TickBitmap for more information
     function tickBitmap(int16 wordPosition) external view returns (uint256);
+
+    /// @notice Returns 256 packed tick initialized boolean values. See TickBitmap for more information
+    function tickTable(int16 wordPosition) external view returns (uint256);
 
     /// @notice The contract that deployed the pool, which must adhere to the IUniswapV3Factory interface
     /// @return The contract address
@@ -134,6 +139,19 @@ interface IUniswapPool {
             uint32 secondsOutside,
             bool initialized
         );
+
+    // ================================================
+    // ============ ISolidlyV3Pool ============
+    // ================================================
+
+    function quoteSwap(
+        bool zeroForOne,
+        int256 amountSpecified,
+        uint160 sqrtPriceLimitX96
+    )
+        external
+        view
+        returns (int256 amount0, int256 amount1, uint160 sqrtPriceX96After, int24 tickAfter, uint128 liquidityAfter);
 
     // ================================================
     // ============ IUniswapV2Pair ============

@@ -2,17 +2,19 @@
 pragma solidity ^0.8.0;
 
 /// @title BinarySearch
-/// @dev A library for performing binary search on a bytes array to retrieve addresses.
+/// @notice A library for performing binary search on a bytes array to retrieve facet addresses.
+/// @dev Provides an efficient binary search implementation for mapping function selectors to facet addresses
+///      stored in a sorted bytes array.
 library BinarySearch {
-    /// @notice Searches for the `facet` address associated with the given function `selector`.
-    /// @dev Uses a binary search algorithm to search within a concatenated bytes array
-    /// of facet addresses and function selectors. The array is assumed to be sorted
-    /// by `selectors`. If the function `selector` exists, the associated `facet` address is returned.
-    /// @param selector The function selector (4 bytes) to search for.
-    /// @param facetsAndSelectors The concatenated bytes array of facet addresses and function selectors.
-    /// @param length The length of the `selectors` in the `facetsAndSelectors` array.
-    /// @param addressesOffset The offset of the `facetAddresses` in the `facetsAndSelectors` array.
-    /// @return facet The facet address associated with the given function selector, or address(0) if not found.
+    /// @dev Searches for the facet address associated with a given function selector.
+    ///      Performs a binary search on a sorted bytes array containing concatenated function selectors and facet address indices.
+    ///      The array is assumed to be sorted by selectors, with selectors occupying 4 bytes and address indices 1 byte per entry.
+    ///      If the selector is found, the corresponding facet address is retrieved from the address section of the array.
+    /// @param selector The 4-byte function selector to search for.
+    /// @param facetsAndSelectors The bytes array containing sorted selectors followed by address indices and facet addresses (20 bytes each).
+    /// @param length The number of selector entries in the `facetsAndSelectors` array.
+    /// @param addressesOffset The byte offset in `facetsAndSelectors` where the facet addresses start.
+    /// @return facet The facet address associated with the selector, or `address(0)` if not found.
     function binarySearch(
         bytes4 selector,
         bytes memory facetsAndSelectors,

@@ -6,6 +6,7 @@ import { MultiswapRouterFacet } from "../src/facets/MultiswapRouterFacet.sol";
 import { StargateFacet } from "../src/facets/bridges/StargateFacet.sol";
 import { LayerZeroFacet } from "../src/facets/bridges/LayerZeroFacet.sol";
 import { SymbiosisFacet } from "../src/facets/bridges/SymbiosisFacet.sol";
+import { AcrossFacet } from "../src/facets/bridges/AcrossFacet.sol";
 
 import { EntryPoint } from "../src/EntryPoint.sol";
 
@@ -15,6 +16,7 @@ struct Contracts {
     address stargateFacet;
     address layerZeroFacet;
     address symbiosisFacet;
+    address acrossFacet;
     //
     address quoter;
     address quoterProxy;
@@ -31,6 +33,7 @@ struct Contracts {
     address layerZeroEndpointV2;
     address symbiosisPortal;
     address permit2;
+    address acrossSpokePool;
     //
     address multisig;
 }
@@ -46,14 +49,16 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             stargateFacet: 0x7559382f22a50e22d5c6026E04be5cd73Bcfa4c4,
             layerZeroFacet: 0x2ef78f53965cB6b6BE3DF79e143D07790c3E84b3,
             symbiosisFacet: 0xf145B88a658AAf85A7169caC1769a389675a073A,
+            acrossFacet: 0x194Fb60509a5c50905456b0A783A171D7E4Ed895,
             //
-            quoter: 0x2322D126382844B64E2FbDB1f69fe91A70Db463c,
+            quoter: 0xACCa97a6F48342d069f19fb4502AC5C5c37541d4,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
             feeContract: 0x453B60E247108B92C3B413bF944853A43da9b850,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
             prodEntryPoint: 0xE2D0C301c6293a2cA130AF2ACC47051e349079c5,
+            // 0xFd431Bcc7D1aAc3166e7D6c328b21567c55AAfD0 new
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodFeeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
@@ -62,6 +67,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             layerZeroEndpointV2: 0x1a44076050125825900e736c501f859c50fE728c,
             symbiosisPortal: 0xb8f275fBf7A959F4BCE59999A2EF122A099e81A8,
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
+            acrossSpokePool: 0x5c7BCd6E7De5423a257D81B442095A1a6ced35C5,
             //
             multisig: multisig
         });
@@ -75,8 +81,9 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             stargateFacet: 0x85Db0f7aBEA9A1232e7617bE69d7988a3221EF15,
             layerZeroFacet: 0xe1F49D9ADa84de24dfb35aa5DFDAeE8edcCFd5ce,
             symbiosisFacet: 0xc81836107746458e2C0C45eB6a2E5cf22052090c,
+            acrossFacet: address(1),
             //
-            quoter: 0xA1458B50bb651c2B5231186D7CFef8cC469eC51b,
+            quoter: address(0),
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
             feeContract: 0xd36f8CC82EA004B4d0c15BdCf584D19aaD775209,
@@ -91,6 +98,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             layerZeroEndpointV2: 0x1a44076050125825900e736c501f859c50fE728c,
             symbiosisPortal: 0x5Aa5f7f84eD0E5db0a4a85C3947eA16B53352FD4,
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
+            acrossSpokePool: address(0),
             //
             multisig: multisig
         });
@@ -104,14 +112,16 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             stargateFacet: 0x8fa29093a1c62288220fC894077007A4671858EF,
             layerZeroFacet: 0xE485932717068eCB9B391519d7800eaDB6EbD0c9,
             symbiosisFacet: 0x0392238689977c8d34bAc6A53f2D62489d7362DB,
+            acrossFacet: 0x90DF6f51165AFEccb379c047d1bc34f70225Fc71,
             //
-            quoter: 0x7F17EA00590d1A1b6384717058f3C29a06391967,
+            quoter: 0xA1458B50bb651c2B5231186D7CFef8cC469eC51b,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
             feeContract: 0x85Db0f7aBEA9A1232e7617bE69d7988a3221EF15,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0x22c9F7E674d52C71b9f00F6e637bd66A6c83D41A,
+            prodEntryPoint: 0x4FCaEDE7768a2019E6C107CEE935c9E2dd963B68,
+            // 0x4FCaEDE7768a2019E6C107CEE935c9E2dd963B68 new
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodFeeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
@@ -120,6 +130,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             layerZeroEndpointV2: 0x1a44076050125825900e736c501f859c50fE728c,
             symbiosisPortal: 0xb8f275fBf7A959F4BCE59999A2EF122A099e81A8,
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
+            acrossSpokePool: 0x9295ee1d8C5b022Be115A2AD3c30C72E34e7F096,
             //
             multisig: multisig
         });
@@ -133,8 +144,9 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             stargateFacet: 0x92493CC018eA0d7c184cd9A0403Fa2d8729c5A02,
             layerZeroFacet: 0xCc5bdcB370BDff54F92bEBF2EF7EE4cD049E45b0,
             symbiosisFacet: 0x96bf81a8Be089CaD3fcB269e24e2a7E599012346,
+            acrossFacet: address(1),
             //
-            quoter: 0x09D517Fb8050283a335628BB6B2806bE29ceA372,
+            quoter: 0x64BF7D769F1f8470FF42734f69e056d2A492397C,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
             feeContract: 0x595EeaA4E8A8643bE5E2462f109C94012A472774,
@@ -149,6 +161,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             layerZeroEndpointV2: 0x1a44076050125825900e736c501f859c50fE728c,
             symbiosisPortal: 0xE75C7E85FE6ADd07077467064aD15847E6ba9877,
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
+            acrossSpokePool: address(0),
             //
             multisig: multisig
         });
@@ -162,14 +175,16 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             stargateFacet: 0x18Df5169aB4b6794cB1A61ADaf4511678e3E3e23,
             layerZeroFacet: 0x8df74FE7575b219155f4F890159b3D9663D4c39D,
             symbiosisFacet: 0x2163682DCf72d01679136f3387E794D51cB006c7,
+            acrossFacet: 0x8318AEB7Dfc6990A2Ec80e0a97F43906a502547a,
             //
-            quoter: 0xe1F49D9ADa84de24dfb35aa5DFDAeE8edcCFd5ce,
+            quoter: 0x61c99d91dFc8D9819E63677A3BEf1e9dfcBa35c2,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
             feeContract: 0xE846Bc68EC2cE2BC813eBDEB315f24cC46cdf4de,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
             prodEntryPoint: 0x9555c6640E1812560Bb101a377edD3EC416935A3,
+            // 0x17bC5E1A8DC29C702F4af5DC939a06c339ccc23e new
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodFeeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
@@ -178,6 +193,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             layerZeroEndpointV2: 0x1a44076050125825900e736c501f859c50fE728c,
             symbiosisPortal: 0x292fC50e4eB66C3f6514b9E402dBc25961824D62,
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
+            acrossSpokePool: 0x6f26Bf09B1C792e3228e5467807a900A503c0281,
             //
             multisig: multisig
         });
@@ -191,14 +207,16 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             stargateFacet: 0x2163682DCf72d01679136f3387E794D51cB006c7,
             layerZeroFacet: 0x92493CC018eA0d7c184cd9A0403Fa2d8729c5A02,
             symbiosisFacet: 0xCc5bdcB370BDff54F92bEBF2EF7EE4cD049E45b0,
+            acrossFacet: 0x77cdee5c19Bf6484a8e8C40BEBe4D688bab6a700,
             //
-            quoter: 0x5fB4C069790315D5183963A4d82A54C07ed1BcC1,
+            quoter: 0xD9Aa9C211ca25d46e04d40dA04A6965bBDe4246A,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
             feeContract: 0x7E9bF77656C1FB73813e725153c70300C502e56f,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
             prodEntryPoint: 0x35f10C95323C34E5994df76BdeA75aaC8Eb10A6b,
+            // 0x64BF7D769F1f8470FF42734f69e056d2A492397C new
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodFeeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
@@ -207,6 +225,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             layerZeroEndpointV2: 0x1a44076050125825900e736c501f859c50fE728c,
             symbiosisPortal: 0x01A3c8E513B758EBB011F7AFaf6C37616c9C24d9,
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
+            acrossSpokePool: 0xe35e9842fceaCA96570B734083f4a58e8F7C5f2A,
             //
             multisig: multisig
         });
@@ -220,14 +239,16 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             stargateFacet: 0xE2D0C301c6293a2cA130AF2ACC47051e349079c5,
             layerZeroFacet: 0x463Bb4d10B9e9194fD8248DF9cE9c00075f645c2,
             symbiosisFacet: 0xF9B37dFa8479C657FddD9fB50dDb75404622EBCe,
+            acrossFacet: 0x7E9bF77656C1FB73813e725153c70300C502e56f,
             //
-            quoter: 0x490555CBa64d606FFf6f82a3A373cEA5d59B3973,
+            quoter: 0x8fa29093a1c62288220fC894077007A4671858EF,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
             feeContract: 0xfdF5F450CF0dE94F6C0Bf0B2355de1EEb753B39D,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
             prodEntryPoint: 0xD2A7A4cF1B25B92f47B4A702276DefbB42F45e77,
+            // 0x595EeaA4E8A8643bE5E2462f109C94012A472774 new
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodFeeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
@@ -236,6 +257,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             layerZeroEndpointV2: 0x1a44076050125825900e736c501f859c50fE728c,
             symbiosisPortal: 0xEE981B2459331AD268cc63CE6167b446AF4161f8,
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
+            acrossSpokePool: 0x09aea4b2242abC8bb4BB78D537A67a245A7bEC64,
             //
             multisig: multisig
         });
@@ -249,14 +271,16 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             stargateFacet: 0xEd02D5A7822d474c21F6e239b81e2ACf1137Ace8,
             layerZeroFacet: 0xa6a39188097bc275593dDb875705491A70DBEC0B,
             symbiosisFacet: 0x995f1B46F71Bc83a90653286e85185D27956687e,
+            acrossFacet: 0x453B60E247108B92C3B413bF944853A43da9b850,
             //
-            quoter: 0xe9BEbFC505a738A58319F509EfB51A8ac6c8008f,
+            quoter: 0x6Bab837Bb491135D99dBAA3c03eff3266776c0AE,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
             feeContract: 0x65DfbA5338137e0De3c7e9C11D9BFEd0B02c33b8,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
             prodEntryPoint: 0x48229df22D71eecFf545A3698ACbacc5CF41D658,
+            // 0x4bb53eBbBbAC038248aC3983fF9242Fa76a39C12 new
             prodProxy: address(1),
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodFeeContractProxy: 0x20F282686b842851C8D7552d6fD095B55dBc775f,
@@ -265,6 +289,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             layerZeroEndpointV2: 0x1a44076050125825900e736c501f859c50fE728c,
             symbiosisPortal: 0x5Aa5f7f84eD0E5db0a4a85C3947eA16B53352FD4,
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
+            acrossSpokePool: 0x3baD7AD0728f9917d1Bf08af5782dCbD516cDd96,
             //
             multisig: multisig
         });
@@ -278,8 +303,9 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             stargateFacet: 0xe197BDD7b8bB8f2Ab15c9822602A35f7645a88aF,
             layerZeroFacet: 0x96Fda36A350e40F89Bcdeb5149eFE4C77316F961,
             symbiosisFacet: 0xbe35b0b10037e11a6D0A71c326FcF929935A4230,
+            acrossFacet: address(1),
             //
-            quoter: 0x1A67084d692Cdb88b0c17Dcb57A636A2b493938B,
+            quoter: 0x07a5C075c12ffE4541F31A83531BA1d3CD1Dcbc1,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
             feeContract: 0xF307b0a60330512D51e4C8e4ddAA3E26D8f08569,
@@ -294,6 +320,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             layerZeroEndpointV2: 0x1a44076050125825900e736c501f859c50fE728c,
             symbiosisPortal: 0x292fC50e4eB66C3f6514b9E402dBc25961824D62,
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
+            acrossSpokePool: address(0),
             //
             multisig: multisig
         });
@@ -307,6 +334,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             stargateFacet: address(0),
             layerZeroFacet: address(0),
             symbiosisFacet: address(0),
+            acrossFacet: address(0),
             //
             quoter: address(0),
             quoterProxy: address(0),
@@ -323,6 +351,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             layerZeroEndpointV2: 0x1a44076050125825900e736c501f859c50fE728c,
             symbiosisPortal: 0xd83B5752b42856a08087748dE6095af0bE52d299,
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
+            acrossSpokePool: 0x5c7BCd6E7De5423a257D81B442095A1a6ced35C5,
             //
             multisig: multisig
         });
@@ -420,6 +449,18 @@ library DeployEngine {
             ++addressIndex;
         }
 
+        if (contracts.acrossFacet > address(1)) {
+            selectors[i++] = AcrossFacet.spokePool.selector;
+            selectors[i++] = AcrossFacet.sendAcrossDepositV3.selector;
+            selectors[i++] = AcrossFacet.handleV3AcrossMessage.selector;
+            for (uint256 k; k < i - iCache; ++k) {
+                addressIndexes[j++] = addressIndex;
+            }
+            iCache = i;
+            facetAddresses[addressIndex] = contracts.acrossFacet;
+            ++addressIndex;
+        }
+
         assembly {
             mstore(selectors, i)
             mstore(addressIndexes, j)
@@ -474,6 +515,14 @@ library DeployEngine {
             upgrade = true;
 
             contracts.symbiosisFacet = address(new SymbiosisFacet({ portal_: contracts.symbiosisPortal }));
+        }
+
+        if (contracts.acrossFacet == address(0) || isTest) {
+            upgrade = true;
+
+            contracts.acrossFacet = address(
+                new AcrossFacet({ spokePool_: contracts.acrossSpokePool, wrappedNative_: contracts.wrappedNative })
+            );
         }
 
         return (contracts, upgrade);

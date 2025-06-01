@@ -116,7 +116,7 @@ contract EntryPointTest is BaseTest {
 
         InitialImplementation(address(entryPoint)).upgradeTo({
             implementation: entryPointImplementation,
-            data: abi.encodeCall(EntryPoint.initialize, (owner, new bytes[](0)))
+            data: abi.encodeCall(EntryPoint.initialize, (owner))
         });
     }
 
@@ -134,53 +134,7 @@ contract EntryPointTest is BaseTest {
         EntryPoint _entryPoint = new EntryPoint({ facetsAndSelectors: bytes("") });
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        _entryPoint.initialize({ newOwner: owner, initialCalls: new bytes[](0) });
-    }
-
-    function test_entryPoint_initialize_shouldInitializeWithNewOwnerAndCallInitialCalls() external {
-        bytes4[] memory selectors = new bytes4[](6);
-        selectors[0] = Facet1.getValue1.selector;
-        selectors[1] = Facet1.setValue1.selector;
-        selectors[2] = Facet2.getValue2.selector;
-        selectors[3] = Facet2.setValue2.selector;
-        selectors[4] = Facet2.getValue3.selector;
-        selectors[5] = Facet2.setValue3.selector;
-
-        address entryPointImplementation = address(
-            new EntryPoint({
-                facetsAndSelectors: DeployEngine.getBytesArray({
-                    selectors: selectors,
-                    addressIndexes: Solarray.uint256s(0, 0, 1, 1, 1, 1),
-                    facetAddresses: Solarray.addresses(facet1, facet2)
-                })
-            })
-        );
-
-        InitialImplementation proxy = InitialImplementation(address(new Proxy({ initialOwner: owner })));
-
-        _resetPrank(owner);
-
-        vm.expectEmit();
-        emit Initialized({ version: 1 });
-        proxy.upgradeTo({
-            implementation: entryPointImplementation,
-            data: abi.encodeCall(
-                EntryPoint.initialize,
-                (
-                    owner,
-                    Solarray.bytess(
-                        abi.encodeCall(Facet1.setValue1, (1)),
-                        abi.encodeCall(Facet2.setValue2, (2)),
-                        abi.encodeCall(Facet2.setValue3, (3))
-                    )
-                )
-            )
-        });
-
-        assertEq(EntryPoint(payable(address(proxy))).owner(), owner);
-        assertEq(Facet1(address(proxy)).getValue1(), 1);
-        assertEq(Facet2(address(proxy)).getValue2(), 2);
-        assertEq(Facet2(address(proxy)).getValue3(), 3);
+        _entryPoint.initialize({ newOwner: owner });
     }
 
     // =========================
@@ -196,7 +150,7 @@ contract EntryPointTest is BaseTest {
 
         proxy.upgradeTo({
             implementation: entryPointImplementation,
-            data: abi.encodeCall(EntryPoint.initialize, (owner, new bytes[](0)))
+            data: abi.encodeCall(EntryPoint.initialize, (owner))
         });
 
         vm.expectRevert(

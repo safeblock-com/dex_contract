@@ -168,8 +168,7 @@ contract ReceiveStargateFacetTest is BaseTest {
 
         _resetPrank(contracts.layerZeroEndpointV2);
 
-        _expectERC20TransferCall(USDT, user, 995.1e18 * (1_000_000 - 300) / 1_000_000);
-        _expectERC20TransferCall(USDT, address(feeContract), 995.1e18 * 300 / 1_000_000);
+        _expectERC20TransferCall(USDT, user, 995.1e18);
         vm.expectEmit();
         emit CallFailed({
             errorMessage: abi.encodeWithSelector(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidAmountOut.selector)

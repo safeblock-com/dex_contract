@@ -16,7 +16,7 @@ contract LayerZeroFacetTest is BaseTest {
 
         deployForTest();
 
-        ILayerZeroFacet(address(entryPoint)).setDefaultGasLimit({ defaultGasLimit_: 50_000 });
+        ILayerZeroFacet(address(entryPoint)).setDefaultGasLimit({ newDefaultGasLimit: 50_000 });
         ILayerZeroFacet(address(entryPoint)).setDelegate({ delegate: owner });
     }
 
@@ -33,7 +33,7 @@ contract LayerZeroFacetTest is BaseTest {
 
         assertEq(ILayerZeroFacet(address(entryPoint)).defaultGasLimit(), 50_000);
 
-        ILayerZeroFacet(address(entryPoint)).setDefaultGasLimit({ defaultGasLimit_: 100_000 });
+        ILayerZeroFacet(address(entryPoint)).setDefaultGasLimit({ newDefaultGasLimit: 100_000 });
         assertEq(ILayerZeroFacet(address(entryPoint)).defaultGasLimit(), 100_000);
 
         assertTrue(ILayerZeroFacet(address(entryPoint)).isSupportedEid({ remoteEid: 30_101 }));
@@ -113,7 +113,7 @@ contract LayerZeroFacetTest is BaseTest {
             poolAddress: stargatePool,
             dstEid: remoteEidV2,
             amountLD: 1000e18,
-            composer: user,
+            receiver: user,
             composeMsg: bytes(""),
             composeGasLimit: 0
         });
@@ -147,7 +147,7 @@ contract LayerZeroFacetTest is BaseTest {
             poolAddress: stargatePool,
             dstEid: remoteEidV2,
             amountLD: 1000e18,
-            composer: user,
+            receiver: user,
             composeMsg: bytes(""),
             composeGasLimit: 0
         });

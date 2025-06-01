@@ -27,33 +27,38 @@ import {
     CAST_INT_CONSTANT
 } from "../libraries/Constants.sol";
 
-/// @title Multiswap Router Facet
-/// @notice Router for UniswapV3 and UniswapV2 multiswaps and partswaps
+/// @title MultiswapRouterFacet
+/// @notice A facet for executing multi-path swaps across Uniswap V2 and V3 pools in a diamond-like proxy contract.
+/// @dev Supports complex swaps with multiple pools, token wrapping, and fee payments, integrating with Uniswap V2/V3 protocols.
 contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
     // =========================
     // storage
     // =========================
 
-    /// @dev address of the WrappedNative contract for current chain
+    /// @dev The address of the Wrapped Native token contract (e.g., WETH).
+    ///      Immutable, set during construction. Used in `_wrapNative` to convert native currency to wrapped tokens.
     IWrappedNative private immutable _wrappedNative;
 
+    /// @dev The address of this contract.
+    ///      Immutable, set during construction. Used in `_swapUniV3` for callback handling and storage.
     address private immutable _self;
 
+    /// @dev Storage struct for the MultiswapRouterFacet.
+    ///      Contains a cached pool address for Uniswap V3 swap callbacks.
     struct MultiswapRouterFacetStorage {
-        /// @dev cache for swapV3Callback
+        /// @dev Cached pool address for Uniswap V3 swap callbacks.
+        ///      Set in `_swapUniV3` and cleared in the `fallback` function after validation.
         address poolAddressCache;
     }
 
-    /// @dev Storage position for the multiswap router facet, to avoid collisions in storage.
-    /// @dev Uses the "magic" constant to find a unique storage slot.
-    // keccak256("multiswap.router.storage")
+    /// @dev Storage slot for the MultiswapRouterFacet to avoid collisions.
+    ///      Computed as keccak256("multiswap.router.storage") to ensure a unique storage position.
     bytes32 private constant MULTISWAP_ROUTER_FACET_STORAGE =
         0x73a3a170c596aa083fa5166abc0f3239e53b41143f45c8bd25a602694c09d735;
 
-    /// @dev Returns the storage slot for the multiswapRouterFacet.
-    /// @dev This function utilizes inline assembly to directly access the desired storage position.
-    ///
-    /// @return s The storage slot pointer for the multiswapRouterFacet.
+    /// @dev Retrieves the storage slot for the MultiswapRouterFacet.
+    ///      Uses inline assembly to access the `MULTISWAP_ROUTER_FACET_STORAGE` slot.
+    /// @return s The storage slot pointer for the MultiswapRouterFacet.
     function _getLocalStorage() internal pure returns (MultiswapRouterFacetStorage storage s) {
         assembly ("memory-safe") {
             s.slot := MULTISWAP_ROUTER_FACET_STORAGE
@@ -64,12 +69,13 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
     // constructor
     // =========================
 
+    /// @notice Initializes the MultiswapRouterFacet with the Wrapped Native token address.
+    /// @dev Sets the immutable `_wrappedNative` and `_self` addresses.
+    /// @param wrappedNative_ The address of the Wrapped Native token contract.
     constructor(address wrappedNative_) {
         _wrappedNative = IWrappedNative(wrappedNative_);
-
         _self = address(this);
     }
-
     // =========================
     // getters
     // =========================
@@ -197,7 +203,10 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
         }
     }
 
-    // for V3Callback
+    /// @notice Handles Uniswap V3 swap callbacks.
+    /// @dev Validates the caller against the cached pool address, processes swap deltas, and transfers tokens to the pool.
+    ///      Reverts with `MultiswapRouterFacet_SenderMustBeUniswapV3Pool` if the caller
+    ///      is invalid or `MultiswapRouterFacet_FailedV3Swap` if the swap has no liquidity.
     fallback() external {
         MultiswapRouterFacetStorage storage s = _getLocalStorage();
 
@@ -233,7 +242,14 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
     // internal methods
     // =========================
 
-    /// @dev Swaps through the data.pairs array
+    /// @dev Executes a swap through a sequence of Uniswap V2 or V3 pools.
+    ///      Iterates over the provided pairs, performing swaps and updating the token and amount.
+    ///      Reverts with `MultiswapRouterFacet_InvalidAmountIn` if the input amount is zero.
+    /// @param pairs The array of pool identifiers (encoded with protocol version, address, and fee).
+    /// @param amountIn The input amount for the first swap.
+    /// @param tokenIn The input token for the first swap.
+    /// @return amountOut The final output amount after all swaps.
+    /// @return tokenOut The final output token after all swaps.
     function _multiswap(
         bytes32[] calldata pairs,
         uint256 amountIn,
@@ -316,7 +332,16 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
         return (amountIn, tokenIn);
     }
 
-    /// @dev uniswapV3 swap exact tokens
+    /// @dev Executes a Uniswap V3 swap with exact input tokens.
+    ///      Calls the Uniswap V3 pool's `swap` function, caches the pool address for the callback,
+    ///      and verifies the output amount if the destination is this contract.
+    /// @param amountIn The input amount for the swap.
+    /// @param tokenIn The input token for the swap.
+    /// @param _pool The encoded pool identifier (includes address and Uniswap V3 flag).
+    /// @param _destination The encoded destination for the output tokens.
+    /// @param destinationIsAddressThis Whether the destination is this contract.
+    /// @return amountOut The output amount from the swap.
+    /// @return tokenOut The output token from the swap.
     function _swapUniV3(
         uint256 amountIn,
         address tokenIn,
@@ -371,7 +396,16 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
         }
     }
 
-    /// @dev uniswapV2 swap exact tokens
+    /// @dev Executes a Uniswap V2 swap with exact input tokens.
+    ///      Transfers input tokens to the pair, calculates the output amount, and calls the pair’s swap function.
+    ///      Supports multiple swap function selectors and Solidly-style pairs.
+    ///      Reverts with `MultiswapRouterFacet_FailedV2Swap` if the swap fails.
+    /// @param _pair The encoded pair identifier (includes address, fee, and Solidly flag).
+    /// @param tokenIn The input token for the swap.
+    /// @param _destination The encoded destination for the output tokens.
+    /// @param destinationIsAddressThis Whether the destination is this contract.
+    /// @return amountOut The output amount from the swap.
+    /// @return tokenOut The output token from the swap.
     function _swapUniV2(
         bytes32 _pair,
         address tokenIn,
@@ -452,28 +486,41 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
         }
     }
 
-    /// @dev check balance after swap
+    /// @dev Validates that the output balance is not less than the input balance.
+    ///      Reverts with `MultiswapRouterFacet_InvalidAmountOut` if the condition is not met.
+    /// @param greaterBalance The balance after the operation.
+    /// @param lowerBalance The balance before the operation.
     function _checkOutputAmount(uint256 greaterBalance, uint256 lowerBalance) internal pure {
         if (greaterBalance < lowerBalance) {
             revert IMultiswapRouterFacet.MultiswapRouterFacet_InvalidAmountOut();
         }
     }
 
-    /// @dev check for overflow has been removed for optimization
+    /// @dev Increments an index by one without overflow checks for gas optimization.
+    ///      Assumes the index will not overflow in typical usage.
+    /// @param i The index to increment.
+    /// @return The incremented index.
     function _unsafeAddOne(uint256 i) internal pure returns (uint256) {
         unchecked {
             return i + 1;
         }
     }
 
-    /// @dev returns address(this) in bytes32 format
+    /// @dev Returns the address of this contract as a bytes32 value.
+    ///      Used to encode the contract address for swap destinations.
+    /// @return addressThisBytes32 The contract address in bytes32 format.
     function _addressThisBytes32() internal view returns (bytes32 addressThisBytes32) {
         assembly ("memory-safe") {
             addressThisBytes32 := address()
         }
     }
 
-    /// @dev check output amount and pay fee to FeeContract if necessary
+    /// @dev Checks the output amount and applies protocol fees if necessary.
+    ///      Validates the output amount against the minimum and calls `FeeLibrary.payFee` to deduct fees.
+    /// @param tokenOut The output token.
+    /// @param amountOut The output amount before fee deduction.
+    /// @param minAmountOut The minimum acceptable output amount.
+    /// @return amount The output amount after fee deduction.
     function _payFeeIfNecessary(
         address tokenOut,
         uint256 amountOut,
@@ -487,12 +534,20 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
         amount = FeeLibrary.payFee({ token: tokenOut, amount: amountOut });
     }
 
-    /// @dev low-level call, returns true if successful
+    /// @dev Performs a low-level call to a contract and returns success status.
+    ///      Used to call Uniswap V2 swap functions with different selectors.
+    /// @param addr The target contract address.
+    /// @param data The encoded function call data.
+    /// @return success True if the call succeeds, false otherwise.
     function _makeCall(address addr, bytes memory data) internal returns (bool success) {
         (success,) = addr.call(data);
     }
 
-    /// @dev wraps native token if needed
+    /// @dev Wraps native currency to Wrapped Native tokens if the input token is native.
+    ///      Deposits native currency to the Wrapped Native contract and records the amount in `TransientStorageFacetLibrary`.
+    /// @param tokenIn The input token address (or address(0) for native currency).
+    /// @param amount The amount to wrap.
+    /// @return _tokenIn The token address (Wrapped Native if native currency was input).
     function _wrapNative(address tokenIn, uint256 amount) internal returns (address _tokenIn) {
         if (tokenIn == address(0)) {
             if (address(this).balance < amount) {
