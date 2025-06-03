@@ -106,7 +106,7 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
             revert IStargateFacet.StargateFacet_UnsupportedAsset();
         }
 
-        amountLD = FeeLibrary.payFee({ token: token, amount: amountLD });
+        amountLD = FeeLibrary.payFee({ token: token, amount: amountLD, exactIn: true });
 
         uint256 balanceBefore;
         if (token > address(0)) {

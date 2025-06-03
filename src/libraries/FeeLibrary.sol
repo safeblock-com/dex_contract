@@ -43,7 +43,7 @@ library FeeLibrary {
     /// @param token The address of the token to transfer.
     /// @param amount The total amount of the token before fee deduction.
     /// @return remainingAmount The amount of the token after deducting the fee, or the original amount if no fee is paid.
-    function payFee(address token, uint256 amount) internal returns (uint256 remainingAmount) {
+    function payFee(address token, uint256 amount, bool exactIn) internal returns (uint256 remainingAmount) {
         if (!TransientStorageFacetLibrary.isFeePaid()) {
             (address feeContract, uint256 fee) = getFeeContractAddress();
             if (feeContract > address(0) && fee > 0) {
@@ -51,7 +51,12 @@ library FeeLibrary {
                     fee = amount * fee / FEE_MAX;
                     if (fee > 0) {
                         TransferHelper.safeTransfer({ token: token, to: feeContract, value: fee });
-                        return amount - fee;
+
+                        if (exactIn) {
+                            return amount - fee;
+                        } else {
+                            return amount + fee;
+                        }
                     }
                 }
             }

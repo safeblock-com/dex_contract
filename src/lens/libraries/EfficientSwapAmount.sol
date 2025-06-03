@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import { IUniswapPool } from "../../interfaces/IUniswapPool.sol";
 
-import { HelperLib } from "./HelperLib.sol";
+import { HelperV2Lib } from "./HelperV2Lib.sol";
 import { HelperV3Lib, Slot0, SwapCache, SwapState, FeeAndTickSpacing, TickMath, E18 } from "./HelperV3Lib.sol";
 
 import { FullMath } from "./uni3Libs/FullMath.sol";
@@ -29,6 +29,7 @@ library EfficientSwapAmount {
     /// @return amountIn The amount of input token to swap
     /// @return amountOut The amount of output token to swap
     function efficientV2Amounts(
+        bool isSolidly,
         IUniswapPool pair,
         address tokenIn,
         uint256 targetPriceImpact,
@@ -38,9 +39,17 @@ library EfficientSwapAmount {
         view
         returns (uint256 amountIn, uint256 amountOut)
     {
-        (bool tokenInIsToken0,) = PoolHelper.validateTokenInPair({ pool: pair, token: tokenIn });
-        (uint256 reserveInput, uint256 reserveOutput) =
-            PoolHelper.getReserves({ pair: pair, tokenInIsToken0: tokenInIsToken0 });
+        address tokenOut;
+        uint256 reserveInput;
+        uint256 reserveOutput;
+        bool stableSwap;
+
+        {
+            bool tokenInIsToken0;
+            (tokenInIsToken0, tokenOut) = PoolHelper.validateTokenInPair({ pool: pair, token: tokenIn });
+            (reserveInput, reserveOutput, stableSwap) =
+                PoolHelper.getReserves({ pair: pair, tokenInIsToken0: tokenInIsToken0, isSolidly: isSolidly });
+        }
 
         unchecked {
             uint256 low = 1;
@@ -56,13 +65,23 @@ library EfficientSwapAmount {
                     return (0, 0);
                 }
 
-                // Execution price: amountOut / amountIn
-                amountOut = HelperLib.getAmountOut({
-                    amountIn: amountIn,
-                    reserveIn: reserveInput,
-                    reserveOut: reserveOutput,
-                    feeE6: feeE6
-                });
+                if (stableSwap) {
+                    amountOut = HelperV2Lib.stableAmountOut({
+                        tokenIn: tokenIn,
+                        tokenOut: tokenOut,
+                        amountIn: amountIn,
+                        reserveIn: reserveInput,
+                        reserveOut: reserveOutput,
+                        feeE6: feeE6
+                    });
+                } else {
+                    amountOut = HelperV2Lib.volatileAmountOut({
+                        amountIn: amountIn,
+                        reserveIn: reserveInput,
+                        reserveOut: reserveOutput,
+                        feeE6: feeE6
+                    });
+                }
 
                 uint256 execPrice = amountOut * E18 / amountIn;
 

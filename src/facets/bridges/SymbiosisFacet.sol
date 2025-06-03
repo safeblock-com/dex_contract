@@ -61,7 +61,7 @@ contract SymbiosisFacet is ISymbiosisFacet {
             amount = _amount;
         }
 
-        amount = FeeLibrary.payFee({ token: token, amount: amount });
+        amount = FeeLibrary.payFee({ token: token, amount: amount, exactIn: true });
 
         token.safeApprove({ spender: address(_portal), value: amount });
 

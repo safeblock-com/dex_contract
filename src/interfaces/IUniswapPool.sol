@@ -181,4 +181,11 @@ interface IUniswapPool {
     /// @param tokenIn The address of the token to swap
     /// @return amountOut The amount of token that can be received
     function getAmountOut(uint256 amountIn, address tokenIn) external view returns (uint256);
+
+    function metadata()
+        external
+        view
+        returns (uint256 dec0, uint256 dec1, uint256 r0, uint256 r1, bool st, address t0, address t1);
+
+    function stableSwap() external view returns (bool);
 }

@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import { BaseOwnableFacet } from "./BaseOwnableFacet.sol";
 
 import { IUniswapPool } from "../interfaces/IUniswapPool.sol";
-import { HelperLib } from "./libraries/HelperLib.sol";
+import { HelperV2Lib } from "./libraries/HelperV2Lib.sol";
 
 import { TransferHelper } from "./libraries/TransferHelper.sol";
 
@@ -40,15 +40,19 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
     IWrappedNative private immutable _wrappedNative;
 
     /// @dev The address of this contract.
-    ///      Immutable, set during construction. Used in `_swapUniV3` for callback handling and storage.
+    ///      Immutable, set during construction. Used in `_swapUniV3ExactIn` for callback handling and storage.
     address private immutable _self;
 
     /// @dev Storage struct for the MultiswapRouterFacet.
     ///      Contains a cached pool address for Uniswap V3 swap callbacks.
     struct MultiswapRouterFacetStorage {
         /// @dev Cached pool address for Uniswap V3 swap callbacks.
-        ///      Set in `_swapUniV3` and cleared in the `fallback` function after validation.
+        ///      Set in `_swapUniV3ExactIn` and cleared in the `fallback` function after validation.
         address poolAddressCache;
+        ///
+        uint8 swapType; // 0 - multiswap, 1 - reverse multiswap
+        ///
+        uint8 pairsLength;
     }
 
     /// @dev Storage slot for the MultiswapRouterFacet to avoid collisions.
@@ -121,7 +125,7 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
                 revert IMultiswapRouterFacet.MultiswapRouterFacet_InvalidMultiswap2Calldata();
             }
 
-            tokenIn = _wrapNative(data.tokenIn, fullAmount);
+            (tokenIn,) = _wrapNative(data.tokenIn, fullAmount);
             uint256 amount = TransientStorageFacetLibrary.getAmountForToken({ token: tokenIn });
             if (amount == 0) {
                 uint256 balanceInBeforeTransfer =
@@ -172,9 +176,9 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
 
                 (uint256 amountOut, address tokenOut) = _multiswap(data.pairs[i], amountIn, tokenIn);
 
-                bool added;
-                for (uint256 j = tokensOut.length; j > 0;) {
-                    unchecked {
+                unchecked {
+                    bool added;
+                    for (uint256 j = tokensOut.length; j > 0;) {
                         --j;
 
                         if (tokensOut[j] == tokenOut) {
@@ -183,9 +187,9 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
                             break;
                         }
                     }
-                }
-                if (!added) {
-                    revert IMultiswapRouterFacet.MultiswapRouterFacet_InvalidMultiswap2Calldata();
+                    if (!added) {
+                        revert IMultiswapRouterFacet.MultiswapRouterFacet_InvalidMultiswap2Calldata();
+                    }
                 }
             }
         }
@@ -203,39 +207,213 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
         }
     }
 
+    function multiswap2Reverse(IMultiswapRouterFacet.Multiswap2Calldata calldata data) external {
+        // cache length of pairs to stack for gas savings
+        uint256 length = data.pairs.length;
+        // if length of array is zero -> revert
+        if (length == 0) {
+            revert IMultiswapRouterFacet.MultiswapRouterFacet_InvalidPairsArray();
+        }
+        if (length != data.tokensOut.length || length != data.minAmountsOut.length) {
+            revert IMultiswapRouterFacet.MultiswapRouterFacet_InvalidMultiswap2Calldata();
+        }
+
+        address[] memory tokensOut;
+        {
+            uint256 amountInPercentagesLength = data.amountInPercentages.length;
+            if (amountInPercentagesLength == 0) {
+                revert IMultiswapRouterFacet.MultiswapRouterFacet_InvalidMultiswap2Calldata();
+            }
+            tokensOut = new address[](amountInPercentagesLength);
+            for (uint256 i; i < amountInPercentagesLength; i = _unsafeAddOne(i)) {
+                // TODO optimize
+                tokensOut[i] = address(uint160(data.amountInPercentages[i]));
+            }
+        }
+
+        uint256 fullAmount = data.fullAmount;
+        if (fullAmount == 0) {
+            revert IMultiswapRouterFacet.MultiswapRouterFacet_InvalidAmountIn();
+        }
+
+        address tokenIn;
+        bool wrap;
+        {
+            (tokenIn, wrap) = _wrapNative(data.tokenIn, fullAmount);
+            uint256 amount = TransientStorageFacetLibrary.getAmountForToken({ token: tokenIn });
+            if (amount == 0) {
+                uint256 balanceInBeforeTransfer =
+                    TransferHelper.safeGetBalance({ token: tokenIn, account: address(this) });
+
+                // Transfer full amountIn for all swaps
+                TransferHelper.safeTransferFrom({
+                    token: tokenIn,
+                    from: TransientStorageFacetLibrary.getSenderAddress(),
+                    to: address(this),
+                    value: fullAmount
+                });
+
+                uint256 balanceInAfterTransfer =
+                    TransferHelper.safeGetBalance({ token: tokenIn, account: address(this) });
+
+                _checkOutputAmount(balanceInAfterTransfer, balanceInBeforeTransfer);
+
+                unchecked {
+                    // for tokens with transfer fee we need to update fullAmount after transfer and get exact amount
+                    // which has been transferred to the contract
+                    fullAmount = balanceInAfterTransfer - balanceInBeforeTransfer;
+                }
+            } else {
+                fullAmount = amount;
+            }
+        }
+
+        uint256[] memory amountsOut = new uint256[](tokensOut.length);
+
+        {
+            uint256 sumAmountIn;
+            address sender = TransientStorageFacetLibrary.getSenderAddress();
+            for (uint256 i; i < length; i = _unsafeAddOne(i)) {
+                address tokenOut = data.tokensOut[i];
+
+                (uint256 amountIn, uint256 amountOut) =
+                    _multiswapReverse(tokenIn, data.minAmountsOut[i], data.pairs[i], tokenOut);
+
+                unchecked {
+                    bool added;
+                    for (uint256 j = tokensOut.length; j > 0;) {
+                        --j;
+                        if (tokensOut[j] == tokenOut) {
+                            amountsOut[j] += amountOut;
+                            added = true;
+                            break;
+                        }
+                    }
+                    if (!added) {
+                        revert IMultiswapRouterFacet.MultiswapRouterFacet_InvalidMultiswap2Calldata();
+                    }
+
+                    sumAmountIn += amountIn;
+                }
+            }
+
+            _payFeeIfNecessaryExactOut(tokenIn, sumAmountIn, fullAmount, wrap, sender);
+        }
+
+        for (uint256 len = amountsOut.length; len > 0;) {
+            unchecked {
+                --len;
+            }
+            address tokenOut = tokensOut[len];
+            TransientStorageFacetLibrary.setAmountForToken({ token: tokenOut, amount: amountsOut[len], record: true });
+        }
+    }
+
     /// @notice Handles Uniswap V3 swap callbacks.
     /// @dev Validates the caller against the cached pool address, processes swap deltas, and transfers tokens to the pool.
     ///      Reverts with `MultiswapRouterFacet_SenderMustBeUniswapV3Pool` if the caller
     ///      is invalid or `MultiswapRouterFacet_FailedV3Swap` if the swap has no liquidity.
     fallback() external {
         MultiswapRouterFacetStorage storage s = _getLocalStorage();
+        uint256 swapType;
+        uint256 pathLength;
 
-        // Checking that msg.sender is equal to the value from the cache
-        // and zeroing the storage
-        if (msg.sender != s.poolAddressCache) {
-            revert IMultiswapRouterFacet.MultiswapRouterFacet_SenderMustBeUniswapV3Pool();
+        {
+            // Checking that msg.sender is equal to the value from the cache
+            // and zeroing the storage
+            address sender;
+
+            assembly ("memory-safe") {
+                sender := sload(s.slot)
+                swapType := and(shr(160, sender), 0xff)
+                pathLength := shr(168, sender)
+                sender := and(sender, ADDRESS_MASK)
+
+                sstore(s.slot, 0)
+            }
+
+            if (msg.sender != sender) {
+                revert IMultiswapRouterFacet.MultiswapRouterFacet_SenderMustBePool();
+            }
         }
-        s.poolAddressCache = address(0);
 
         int256 amount0Delta;
         int256 amount1Delta;
-        address tokenIn;
+        if (swapType == 0) {
+            address tokenIn;
 
-        assembly ("memory-safe") {
-            amount0Delta := calldataload(4)
-            amount1Delta := calldataload(36)
-            tokenIn := calldataload(132)
+            assembly ("memory-safe") {
+                amount0Delta := calldataload(4)
+                amount1Delta := calldataload(36)
+                tokenIn := calldataload(132)
+            }
+
+            // swaps entirely within 0-liquidity regions are not supported
+            if (amount0Delta == 0 && amount1Delta == 0) {
+                revert IMultiswapRouterFacet.MultiswapRouterFacet_FailedV3Swap();
+            }
+
+            uint256 amountToPay = amount0Delta > 0 ? uint256(amount0Delta) : uint256(amount1Delta);
+
+            // transfer tokens to the pool address
+            TransferHelper.safeTransfer({ token: tokenIn, to: msg.sender, value: amountToPay });
+        } else {
+            uint256 amountOut;
+            address tokenOut;
+            bytes32[] memory path;
+
+            assembly ("memory-safe") {
+                let cDataOffset := sub(calldatasize(), add(128, mul(32, pathLength)))
+
+                switch swapType
+                case 1 { amountOut := calldataload(cDataOffset) }
+                default {
+                    amount0Delta := calldataload(4)
+                    amount1Delta := calldataload(36)
+                }
+
+                tokenOut := calldataload(add(cDataOffset, 32))
+
+                pathLength := sub(pathLength, 1)
+
+                if pathLength {
+                    mstore(path, pathLength)
+                    let size := mul(32, pathLength)
+                    calldatacopy(add(path, 32), add(cDataOffset, 128), size)
+
+                    mstore(64, add(path, add(32, size)))
+                }
+            }
+
+            if (swapType == 2) {
+                // swaps entirely within 0-liquidity regions are not supported
+                if (amount0Delta == 0 && amount1Delta == 0) {
+                    revert IMultiswapRouterFacet.MultiswapRouterFacet_FailedV3Swap();
+                }
+
+                amountOut = amount0Delta > 0 ? uint256(amount0Delta) : uint256(amount1Delta);
+            }
+
+            if (pathLength == 0) {
+                TransferHelper.safeTransfer({ token: tokenOut, to: msg.sender, value: amountOut });
+            } else {
+                unchecked {
+                    bytes32 pair = path[pathLength - 1];
+                    bool uni3;
+
+                    assembly ("memory-safe") {
+                        uni3 := and(pair, UNISWAP_V3_MASK)
+                    }
+
+                    if (uni3) {
+                        _swapUniV3ExactOut(amountOut, tokenOut, pair, msg.sender, path);
+                    } else {
+                        _swapUniV2ExactOut(pair, tokenOut, address(this), amountOut, path);
+                        TransferHelper.safeTransfer({ token: tokenOut, to: msg.sender, value: amountOut });
+                    }
+                }
+            }
         }
-
-        // swaps entirely within 0-liquidity regions are not supported
-        if (amount0Delta == 0 && amount1Delta == 0) {
-            revert IMultiswapRouterFacet.MultiswapRouterFacet_FailedV3Swap();
-        }
-
-        uint256 amountToPay = amount0Delta > 0 ? uint256(amount0Delta) : uint256(amount1Delta);
-
-        // transfer tokens to the pool address
-        TransferHelper.safeTransfer({ token: tokenIn, to: msg.sender, value: amountToPay });
     }
 
     // =========================
@@ -316,11 +494,12 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
                 }
 
                 if (uni3) {
-                    (amountIn, tokenIn) =
-                        _swapUniV3(amountIn, tokenIn, pair, uni3Next ? addressThisBytes32 : destination, uni3Next);
+                    (amountIn, tokenIn) = _swapUniV3ExactIn(
+                        amountIn, tokenIn, pair, uni3Next ? addressThisBytes32 : destination, uni3Next
+                    );
                 } else {
                     (amountIn, tokenIn) =
-                        _swapUniV2(pair, tokenIn, uni3Next ? addressThisBytes32 : destination, uni3Next);
+                        _swapUniV2ExactIn(pair, tokenIn, uni3Next ? addressThisBytes32 : destination, uni3Next);
                 }
 
                 // upgrade the pair for the next swap
@@ -330,6 +509,60 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
         }
 
         return (amountIn, tokenIn);
+    }
+
+    function _multiswapReverse(
+        address tokenIn,
+        uint256 amountOut,
+        bytes32[] calldata pairs,
+        address tokenOut
+    )
+        internal
+        returns (uint256, uint256)
+    {
+        // cache length of pairs to stack for gas savings
+        uint256 length = pairs.length;
+        // if length of array is zero -> returns amountOut and tokenOut
+        if (length == 0) {
+            return (amountOut, amountOut);
+        }
+
+        uint256 balanceOutBeforeSwap = TransferHelper.safeGetBalance({ token: tokenOut, account: address(this) });
+        uint256 balanceInBeforeSwap = TransferHelper.safeGetBalance({ token: tokenIn, account: address(this) });
+
+        // scope for swaps, avoids stack too deep errors
+        {
+            bytes32 pair;
+            unchecked {
+                pair = pairs[length - 1];
+            }
+
+            bool uni3;
+
+            assembly ("memory-safe") {
+                uni3 := and(pair, UNISWAP_V3_MASK)
+            }
+
+            if (uni3) {
+                _swapUniV3ExactOut(amountOut, tokenOut, pair, address(this), pairs);
+            } else {
+                _swapUniV2ExactOut(pair, tokenOut, address(this), amountOut, pairs);
+            }
+        }
+
+        uint256 balanceOutAfterSwap = TransferHelper.safeGetBalance({ token: tokenOut, account: address(this) });
+        uint256 balanceInAfterSwap = TransferHelper.safeGetBalance({ token: tokenIn, account: address(this) });
+        _checkOutputAmount(balanceOutAfterSwap, balanceOutBeforeSwap);
+        _checkOutputAmount(balanceInBeforeSwap, balanceInAfterSwap);
+
+        unchecked {
+            // return the exact amountIn of tokens as a result of the swap
+            balanceInAfterSwap = balanceInBeforeSwap - balanceInAfterSwap;
+            // return the exact amountOut of tokens as a result of the swap
+            amountOut = balanceOutAfterSwap - balanceOutBeforeSwap;
+        }
+
+        return (balanceInAfterSwap, amountOut);
     }
 
     /// @dev Executes a Uniswap V3 swap with exact input tokens.
@@ -342,7 +575,7 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
     /// @param destinationIsAddressThis Whether the destination is this contract.
     /// @return amountOut The output amount from the swap.
     /// @return tokenOut The output token from the swap.
-    function _swapUniV3(
+    function _swapUniV3ExactIn(
         uint256 amountIn,
         address tokenIn,
         bytes32 _pool,
@@ -368,9 +601,15 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
             revert IMultiswapRouterFacet.MultiswapRouterFacet_InvalidIntCast();
         }
 
-        // caching pool address and callback address in storage
-        _getLocalStorage().poolAddressCache = address(pool);
-        TransientStorageFacetLibrary.setCallbackAddress({ callbackAddress: _self });
+        {
+            // caching the pool address and swapType in storage
+            MultiswapRouterFacetStorage storage s = _getLocalStorage();
+            assembly ("memory-safe") {
+                sstore(s.slot, pool)
+            }
+            // caching the callback address
+            TransientStorageFacetLibrary.setCallbackAddress({ callbackAddress: _self });
+        }
 
         uint256 balanceOutBeforeSwap;
         if (destinationIsAddressThis) {
@@ -396,6 +635,47 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
         }
     }
 
+    function _swapUniV3ExactOut(
+        uint256 amountOut,
+        address tokenOut,
+        bytes32 _pool,
+        address destination,
+        bytes32[] memory path
+    )
+        internal
+    {
+        IUniswapPool pool;
+        assembly ("memory-safe") {
+            pool := and(_pool, ADDRESS_MASK)
+        }
+
+        (bool zeroForOne, address tokenIn) = PoolHelper.validateTokenInPair(pool, tokenOut);
+
+        // cast a uint256 to a int256, revert on overflow
+        // https://github.com/Uniswap/v3-core/blob/main/contracts/libraries/SafeCast.sol#L24
+        if (amountOut > CAST_INT_CONSTANT) {
+            revert IMultiswapRouterFacet.MultiswapRouterFacet_InvalidIntCast();
+        }
+
+        {
+            // caching the pool address and swapType in storage
+            MultiswapRouterFacetStorage storage s = _getLocalStorage();
+            assembly ("memory-safe") {
+                sstore(s.slot, add(shl(168, mload(path)), add(shl(160, 2), pool)))
+            }
+            // caching the callback address
+            TransientStorageFacetLibrary.setCallbackAddress({ callbackAddress: _self });
+        }
+
+        pool.swap({
+            recipient: destination,
+            zeroForOne: !zeroForOne,
+            amountSpecified: -int256(amountOut),
+            sqrtPriceLimitX96: (!zeroForOne ? MIN_SQRT_RATIO_PLUS_ONE : MAX_SQRT_RATIO_MINUS_ONE),
+            data: abi.encode(0, tokenIn, path)
+        });
+    }
+
     /// @dev Executes a Uniswap V2 swap with exact input tokens.
     ///      Transfers input tokens to the pair, calculates the output amount, and calls the pair’s swap function.
     ///      Supports multiple swap function selectors and Solidly-style pairs.
@@ -406,7 +686,7 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
     /// @param destinationIsAddressThis Whether the destination is this contract.
     /// @return amountOut The output amount from the swap.
     /// @return tokenOut The output token from the swap.
-    function _swapUniV2(
+    function _swapUniV2ExactIn(
         bytes32 _pair,
         address tokenIn,
         bytes32 _destination,
@@ -432,7 +712,8 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
         uint256 amountInput;
         // scope to avoid stack too deep errors
         {
-            (uint256 reserveInput, uint256 reserveOutput) = PoolHelper.getReserves(pair, tokenInIsToken0);
+            (uint256 reserveInput, uint256 reserveOutput, bool stableSwap) =
+                PoolHelper.getReserves({ pair: pair, tokenInIsToken0: tokenInIsToken0, isSolidly: isSolidly > 0 });
 
             // get the exact number of tokens that were sent to the pair
             // underflow is impossible cause after token transfer via token contract
@@ -441,16 +722,22 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
                 amountInput = TransferHelper.safeGetBalance({ token: tokenIn, account: address(pair) }) - reserveInput;
             }
 
-            if (isSolidly == 0) {
-                // get the output number of tokens after swap
-                amountOut = HelperLib.getAmountOut({
+            if (stableSwap) {
+                amountOut = HelperV2Lib.stableAmountOut({
+                    tokenIn: tokenIn,
+                    tokenOut: tokenOut,
                     amountIn: amountInput,
                     reserveIn: reserveInput,
                     reserveOut: reserveOutput,
                     feeE6: fee
                 });
             } else {
-                amountOut = pair.getAmountOut({ amountIn: amountInput, tokenIn: tokenIn });
+                amountOut = HelperV2Lib.volatileAmountOut({
+                    amountIn: amountInput,
+                    reserveIn: reserveInput,
+                    reserveOut: reserveOutput,
+                    feeE6: fee
+                });
             }
         }
 
@@ -483,6 +770,95 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
                 // return the exact amount of tokens as a result of the swap
                 amountOut = balanceOutAfterSwap - balanceOutBeforeSwap;
             }
+        }
+    }
+
+    function _getAmountIn(
+        bytes32 _pair,
+        address tokenOut,
+        uint256 amountOut
+    )
+        internal
+        view
+        returns (IUniswapPool pair, uint256 amountIn, bool tokenInIsToken0, address tokenIn)
+    {
+        uint256 isSolidly;
+        uint256 fee;
+        assembly ("memory-safe") {
+            pair := and(_pair, ADDRESS_MASK)
+            fee := and(shr(160, _pair), FEE_MASK)
+            isSolidly := and(shr(184, _pair), 0xff)
+        }
+
+        (tokenInIsToken0, tokenIn) = PoolHelper.validateTokenInPair(pair, tokenOut);
+
+        // scope to avoid stack too deep errors
+        {
+            (uint256 reserveInput, uint256 reserveOutput, bool stableSwap) =
+                PoolHelper.getReserves({ pair: pair, tokenInIsToken0: !tokenInIsToken0, isSolidly: isSolidly > 0 });
+
+            if (stableSwap) {
+                amountIn = HelperV2Lib.stableAmountIn({
+                    tokenIn: tokenIn,
+                    tokenOut: tokenOut,
+                    amountOut: amountOut,
+                    reserveIn: reserveInput,
+                    reserveOut: reserveOutput,
+                    feeE6: fee
+                });
+            } else {
+                amountIn = HelperV2Lib.volatileAmountIn({
+                    amountOut: amountOut,
+                    reserveIn: reserveInput,
+                    reserveOut: reserveOutput,
+                    feeE6: fee
+                });
+            }
+        }
+    }
+
+    function _swapUniV2ExactOut(
+        bytes32 _pair,
+        address tokenOut,
+        address destination,
+        uint256 amountOut,
+        bytes32[] memory path
+    )
+        internal
+    {
+        IUniswapPool pair;
+        uint256 amountIn;
+        address tokenIn;
+        uint256 amount0Out;
+        uint256 amount1Out;
+        {
+            bool tokenInIsToken0;
+            (pair, amountIn, tokenInIsToken0, tokenIn) = _getAmountIn(_pair, tokenOut, amountOut);
+
+            (amount0Out, amount1Out) = !tokenInIsToken0 ? (uint256(0), amountOut) : (amountOut, uint256(0));
+        }
+
+        {
+            // caching the pool address and swapType in storage
+            MultiswapRouterFacetStorage storage s = _getLocalStorage();
+            assembly ("memory-safe") {
+                sstore(s.slot, add(shl(168, mload(path)), add(shl(160, 1), pair)))
+            }
+            // caching the callback address
+            TransientStorageFacetLibrary.setCallbackAddress({ callbackAddress: _self });
+        }
+
+        if (
+            // do the swap via the most common swap function selector
+            // swap(uint256,uint256,address,bytes) selector
+            !_makeCall(
+                address(pair),
+                abi.encodeWithSelector(
+                    0x022c0d9f, amount0Out, amount1Out, destination, abi.encode(amountIn, tokenIn, path)
+                )
+            )
+        ) {
+            revert IMultiswapRouterFacet.MultiswapRouterFacet_FailedV2Swap();
         }
     }
 
@@ -531,7 +907,35 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
     {
         _checkOutputAmount(amountOut, minAmountOut);
 
-        amount = FeeLibrary.payFee({ token: tokenOut, amount: amountOut });
+        amount = FeeLibrary.payFee({ token: tokenOut, amount: amountOut, exactIn: true });
+    }
+
+    function _payFeeIfNecessaryExactOut(
+        address tokenIn,
+        uint256 amountIn,
+        uint256 maxAmountIn,
+        bool wrap,
+        address sender
+    )
+        internal
+        returns (uint256 amount)
+    {
+        amount = FeeLibrary.payFee({ token: tokenIn, amount: amountIn, exactIn: false });
+
+        _checkOutputAmount(maxAmountIn, amount);
+
+        unchecked {
+            uint256 remaining = maxAmountIn - amount;
+
+            if (remaining > 0) {
+                if (wrap) {
+                    _wrappedNative.withdraw({ wad: remaining });
+                    TransferHelper.safeTransferNative({ to: sender, value: remaining });
+                } else {
+                    TransferHelper.safeTransfer({ token: tokenIn, to: sender, value: remaining });
+                }
+            }
+        }
     }
 
     /// @dev Performs a low-level call to a contract and returns success status.
@@ -548,7 +952,7 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
     /// @param tokenIn The input token address (or address(0) for native currency).
     /// @param amount The amount to wrap.
     /// @return _tokenIn The token address (Wrapped Native if native currency was input).
-    function _wrapNative(address tokenIn, uint256 amount) internal returns (address _tokenIn) {
+    function _wrapNative(address tokenIn, uint256 amount) internal returns (address _tokenIn, bool wrap) {
         if (tokenIn == address(0)) {
             if (address(this).balance < amount) {
                 revert IMultiswapRouterFacet.MultiswapRouterFacet_InvalidAmountIn();
@@ -562,9 +966,9 @@ contract MultiswapRouterFacet is BaseOwnableFacet, IMultiswapRouterFacet {
                 record: false
             });
 
-            return address(_wrappedNative);
+            return (address(_wrappedNative), true);
         }
 
-        return tokenIn;
+        return (tokenIn, false);
     }
 }

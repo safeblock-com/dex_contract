@@ -24,7 +24,7 @@ interface IMultiswapRouterFacet {
     error MultiswapRouterFacet_FailedV3Swap();
 
     /// @dev Thrown when the `msg.sender` in the fallback is not the cached Uniswap V3 pool.
-    error MultiswapRouterFacet_SenderMustBeUniswapV3Pool();
+    error MultiswapRouterFacet_SenderMustBePool();
 
     /// @dev Thrown when the input amount exceeds the maximum value for `int256`.
     error MultiswapRouterFacet_InvalidIntCast();
@@ -71,19 +71,19 @@ interface IMultiswapRouterFacet {
     struct Multiswap2Calldata {
         /// @notice The total input amount for all swap paths.
         /// @dev Represents the full amount of `tokenIn` to be distributed across paths.
-        uint256 fullAmount;
+        uint256 fullAmount; // used for maxAmountIn (project fee must be included)
         /// @notice The address of the input token.
         /// @dev Can be an ERC20 token or address(0) for native currency (wrapped to Wrapped Native).
         address tokenIn;
         /// @notice The array of output token addresses.
         /// @dev Specifies the tokens expected from each swap path.
-        address[] tokensOut;
+        address[] tokensOut; // tokensOut for everyPath
         /// @notice The minimum acceptable output amounts for each output token.
         /// @dev Ensures each output token yields at least the corresponding amount, or it reverts.
-        uint256[] minAmountsOut;
+        uint256[] minAmountsOut; // strict amountsOut for every path
         /// @notice The array of percentage allocations for the input amount.
         /// @dev Each percentage (in 1e18 scale) determines the portion of `fullAmount` used for the corresponding path in `pairs`. Must sum to 1e18.
-        uint256[] amountInPercentages;
+        uint256[] amountInPercentages; // total tokensOut
         /// @notice The array of pool paths for each swap.
         /// @dev Each element is an array of bytes32 pool identifiers, where each bytes32 encodes:
         ///      - Bits 0-159: Pool address (20 bytes).
@@ -97,4 +97,6 @@ interface IMultiswapRouterFacet {
     ///      and records output amounts. Reverts with various errors for invalid inputs or failed swaps.
     /// @param data The swap configuration, including input token, pairs, amounts, and minimum outputs.
     function multiswap2(Multiswap2Calldata calldata data) external;
+
+    function multiswap2Reverse(IMultiswapRouterFacet.Multiswap2Calldata calldata data) external;
 }

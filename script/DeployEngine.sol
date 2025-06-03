@@ -390,6 +390,7 @@ library DeployEngine {
             // multiswap Facet
             selectors[i++] = MultiswapRouterFacet.wrappedNative.selector;
             selectors[i++] = MultiswapRouterFacet.multiswap2.selector;
+            selectors[i++] = MultiswapRouterFacet.multiswap2Reverse.selector;
             for (uint256 k; k < i - iCache; ++k) {
                 addressIndexes[j++] = addressIndex;
             }
