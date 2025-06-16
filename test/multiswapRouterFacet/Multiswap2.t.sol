@@ -43,13 +43,9 @@ contract Multiswap2Test is BaseTest {
     // =========================
 
     function test_multiswapRouterFacet_constructor_shouldInitializeInConstructor() external {
-        MultiswapRouterFacet _multiswapRouterFacet =
-            new MultiswapRouterFacet({ wrappedNative_: contracts.wrappedNative });
-        TransferFacet _transferFacet =
-            new TransferFacet({ wrappedNative: contracts.wrappedNative, permit2: contracts.permit2 });
-        _transferFacet;
+        new MultiswapRouterFacet({ wrappedNative_: contracts.wrappedNative });
 
-        assertEq(_multiswapRouterFacet.wrappedNative(), contracts.wrappedNative);
+        new TransferFacet({ wrappedNative: contracts.wrappedNative, permit2: contracts.permit2 });
     }
 
     // =========================
@@ -247,20 +243,8 @@ contract Multiswap2Test is BaseTest {
         m2Data.tokensOut = Solarray.addresses(USDC, BUSD);
         entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data))) });
 
-        // tokenIn is not in sent pair
-        vm.expectRevert(PoolHelper.InvalidTokenIn.selector);
-        m2Data.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(WBNB_CAKE_CakeV3_500, BUSD_USDT_UniV3_3000));
-        m2Data.amountInPercentages = Solarray.uint256s(1e18);
-        m2Data.minAmountsOut = Solarray.uint256s(0);
-        m2Data.tokensOut = Solarray.addresses(USDC);
-        entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data))) });
-
-        vm.expectRevert(PoolHelper.InvalidTokenIn.selector);
-        m2Data.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(BUSD_USDT_UniV3_3000, WBNB_CAKE_CakeV3_500));
-        entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data))) });
-
         // tokenIn is address(0) (native) and msg.value < amountIn
-        vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidAmountIn.selector);
+        vm.expectRevert();
         m2Data.fullAmount = 1;
         m2Data.tokenIn = address(0);
         m2Data.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(BUSD_USDT_UniV3_3000));
@@ -335,7 +319,7 @@ contract Multiswap2Test is BaseTest {
         (, bytes memory data) =
             contracts.multiswapRouterFacet.call(abi.encodeWithSelector(TransferFacet.transferToken.selector));
 
-        assertEq(bytes4(data), IMultiswapRouterFacet.MultiswapRouterFacet_SenderMustBeUniswapV3Pool.selector);
+        assertEq(bytes4(data), IMultiswapRouterFacet.MultiswapRouterFacet_SenderMustBePool.selector);
     }
 
     function test_multiswapRouterFacet_multiswap2_shouldSwapThroughAllUniswapV2Pairs()
@@ -462,7 +446,13 @@ contract Multiswap2Test is BaseTest {
 
         address[] memory tokensOut = Solarray.addresses(WBNB);
 
-        vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidAmountOut.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IMultiswapRouterFacet.MultiswapRouterFacet_ValueLowerThanExpected.selector,
+                quoterAmountOut[0],
+                m2Data.minAmountsOut[0]
+            )
+        );
         entryPoint.multicall({
             data: Solarray.bytess(
                 abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data)),

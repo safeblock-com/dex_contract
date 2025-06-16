@@ -30,7 +30,6 @@ contract AcrossFacetHandleTest is BaseTest {
         deal({ token: outputTokenWETH, to: address(entryPoint), give: 1000e18 });
 
         entryPoint.setFeeContractAddressAndFee({ feeContractAddress: address(feeContract), fee: 300 });
-        quoter.setRouter({ router: address(entryPoint) });
     }
 
     // =========================
@@ -49,12 +48,14 @@ contract AcrossFacetHandleTest is BaseTest {
     function test_acrossFacet_handleV3AcrossMessage_shouldRevertIfSenderIsNotSpokePool() external {
         _resetPrank(user);
 
+        bytes memory message = _getMessage(optimismUniswapV3_USDC_OP_Pool, 1000e6, false);
+
         vm.expectRevert(IAcrossFacet.AcrossFacet_NotSpokePool.selector);
         IAcrossFacet(address(entryPoint)).handleV3AcrossMessage({
             tokenSent: outputTokenUSDC,
             amount: 1000e6,
             relayer: address(0),
-            message: abi.encode(user, _getMessage(optimismUniswapV3_USDC_OP_Pool, 1000e6, false))
+            message: abi.encode(user, message)
         });
     }
 
@@ -84,16 +85,27 @@ contract AcrossFacetHandleTest is BaseTest {
     {
         _resetPrank(contracts.acrossSpokePool);
 
+        bytes memory message = _getMessage(optimismUniswapV3_USDC_OP_Pool, 1000e6, true);
+
+        uint256 quoterAmountOut;
+        assembly {
+            quoterAmountOut := mload(0)
+        }
+
         vm.expectEmit();
         emit CallFailed({
-            errorMessage: abi.encodeWithSelector(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidAmountOut.selector)
+            errorMessage: abi.encodeWithSelector(
+                IMultiswapRouterFacet.MultiswapRouterFacet_ValueLowerThanExpected.selector,
+                quoterAmountOut,
+                quoterAmountOut * 2
+            )
         });
         _expectERC20TransferCall(outputTokenUSDC, user, 1000e6);
         IAcrossFacet(address(entryPoint)).handleV3AcrossMessage({
             tokenSent: outputTokenUSDC,
             amount: 1000e6,
             relayer: address(0),
-            message: abi.encode(user, _getMessage(optimismUniswapV3_USDC_OP_Pool, 1000e6, true))
+            message: abi.encode(user, message)
         });
     }
 
@@ -115,7 +127,13 @@ contract AcrossFacetHandleTest is BaseTest {
         m2Data.amountInPercentages = Solarray.uint256s(1e18);
         m2Data.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(pool));
         m2Data.tokensOut = Solarray.addresses(OP_TOKEN);
-        m2Data.minAmountsOut = fail ? Solarray.uint256s(10_000e18) : Solarray.uint256s(0);
+
+        uint256 quoterAmountOut = quoter.multiswap2({ data: m2Data })[0];
+        assembly {
+            mstore(0, quoterAmountOut)
+        }
+
+        m2Data.minAmountsOut = fail ? Solarray.uint256s(quoterAmountOut * 2) : Solarray.uint256s(quoterAmountOut);
 
         return abi.encodeCall(
             IEntryPoint.multicall,

@@ -152,9 +152,9 @@ contract ReceiveStargateFacetTest is BaseTest {
         );
         m2Data.tokensOut = Solarray.addresses(WBNB);
 
-        m2Data.minAmountsOut = quoter.multiswap2({ data: m2Data });
+        uint256 quoterAmountOut = quoter.multiswap2({ data: m2Data })[0];
 
-        m2Data.minAmountsOut[0] += 1;
+        m2Data.minAmountsOut = Solarray.uint256s(quoterAmountOut + 1);
 
         bytes memory multicallData = abi.encodeCall(
             IEntryPoint.multicall,
@@ -171,7 +171,11 @@ contract ReceiveStargateFacetTest is BaseTest {
         _expectERC20TransferCall(USDT, user, 995.1e18);
         vm.expectEmit();
         emit CallFailed({
-            errorMessage: abi.encodeWithSelector(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidAmountOut.selector)
+            errorMessage: abi.encodeWithSelector(
+                IMultiswapRouterFacet.MultiswapRouterFacet_ValueLowerThanExpected.selector,
+                quoterAmountOut,
+                m2Data.minAmountsOut[0]
+            )
         });
         ILayerZeroComposer(address(entryPoint)).lzCompose({
             _from: user,

@@ -28,13 +28,14 @@ trontest = "${TRON_TESTNET_RPC_URL}"
 
 [etherscan]
 mainnet = { key = "${ETH_API_KEY}", chainid = 1 }
-bsc = { key = "${BSC_API_KEY}", chainid = 56 }
-polygon = { key = "${POLYGON_API_KEY}", chainid = 137 }
-arbitrum = { key = "${ARBITRUM_API_KEY}", chainid = 42161 }
-optimism = { key = "${OPTIMISM_API_KEY}", chainid = 10 }
-base = { key = "${BASE_API_KEY}", chainid = 8453 }
-scroll = { key = "${SCROLL_API_KEY}", chainid = 534352 }
-gnosis = { key = "${GNOSIS_API_KEY}", chainid = 100 }
+bsc = { key = "${ETH_API_KEY}", chainid = 56 }
+polygon = { key = "${ETH_API_KEY}", chainid = 137 }
+arbitrum = { key = "${ETH_API_KEY}", chainid = 42161 }
+optimism = { key = "${ETH_API_KEY}", chainid = 10 }
+base = { key = "${ETH_API_KEY}", chainid = 8453 }
+scroll = { key = "${ETH_API_KEY}", chainid = 534352 }
+gnosis = { key = "${ETH_API_KEY}", chainid = 100 }
+avalanche = { key = "${ETH_API_KEY}", chainid = 43114 }
 
 [fmt]
 bracket_spacing = true

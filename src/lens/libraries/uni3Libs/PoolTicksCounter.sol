@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { IUniswapPool } from "../../../interfaces/IUniswapPool.sol";
+import { IUniswapPool } from "../../../facets/multiswapRouterFacet/interfaces/IUniswapPool.sol";
 
 library PoolTicksCounter {
     /// @dev This function counts the number of initialized ticks that would incur a gas cost between tickBefore and tickAfter.

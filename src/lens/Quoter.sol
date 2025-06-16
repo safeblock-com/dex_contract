@@ -6,19 +6,22 @@ import { UUPSUpgradeable } from "../proxy/UUPSUpgradeable.sol";
 
 import { Ownable2Step } from "../external/Ownable2Step.sol";
 
-import { IUniswapPool } from "../interfaces/IUniswapPool.sol";
+import { IUniswapPool } from "../facets/multiswapRouterFacet/interfaces/IUniswapPool.sol";
 
-import { HelperLib } from "./libraries/HelperLib.sol";
+import { HelperV2Lib } from "./libraries/HelperV2Lib.sol";
 import { HelperV3Lib, TickMath } from "./libraries/HelperV3Lib.sol";
 
-import { IMultiswapRouterFacet } from "../facets/interfaces/IMultiswapRouterFacet.sol";
-import { IRouter } from "../facets/interfaces/IRouter.sol";
+import { IMultiswapRouterFacet } from "../facets/multiswapRouterFacet/interfaces/IMultiswapRouterFacet.sol";
 
 import { IEntryPoint } from "../interfaces/IEntryPoint.sol";
 
-import { TransferHelper } from "../facets/libraries/TransferHelper.sol";
+import { TransferHelper } from "../libraries/TransferHelper.sol";
 
-import { E18, UNISWAP_V3_MASK, ADDRESS_MASK, FEE_MASK } from "../libraries/Constants.sol";
+import { E18, UNISWAP_V3_MASK, ADDRESS_MASK, FEE_MASK, E6 } from "../libraries/Constants.sol";
+
+import { EfficientSwapAmount } from "./libraries/EfficientSwapAmount.sol";
+
+import { PoolHelper } from "../libraries/PoolHelper.sol";
 
 /// @title Multiswap-Partswap Quoter contract
 contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
@@ -51,9 +54,41 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
         _router = IEntryPoint(router);
     }
 
+    function getPoolFee(address pair) external view returns (uint256) {
+        (,, bool stableSwap) =
+            PoolHelper.getReserves({ pair: IUniswapPool(pair), tokenInIsToken0: true, isSolidly: true });
+
+        return PoolHelper.getFee({ pair: IUniswapPool(pair), stableSwap: stableSwap });
+    }
+
     // =========================
     // main logic
     // =========================
+
+    function efficientAmounts2(
+        bytes32 pair,
+        address tokenIn,
+        uint256 targetPrice
+    )
+        external
+        view
+        returns (uint256 amountIn)
+    {
+        (bool uni3, IUniswapPool pool, uint256 isSolidly, uint256 fee) = _getPoolInfo(pair);
+
+        if (uni3) {
+            amountIn =
+                EfficientSwapAmount.efficientV3Amounts2({ pool: pool, tokenIn: tokenIn, targetPrice: targetPrice });
+        } else {
+            amountIn = EfficientSwapAmount.efficientV2Amounts2({
+                pair: pool,
+                tokenIn: tokenIn,
+                targetPrice: targetPrice,
+                feeE6: fee,
+                isSolidly: isSolidly > 0
+            });
+        }
+    }
 
     //// @inheritdoc IMultiswapRouterFacet
     function multiswap(IMultiswapRouterFacet.MultiswapCalldata calldata data)
@@ -70,7 +105,7 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
         view
         returns (uint256 amountOut)
     {
-        amountOut = _multiswapReverse(data.pairs, data.amountIn, data.tokenIn);
+        amountOut = _addFee(_multiswapReverse(data.pairs, data.amountIn, data.tokenIn));
     }
 
     //// @inheritdoc IMultiswapRouterFacet
@@ -153,6 +188,71 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
         }
     }
 
+    function multiswap2Reverse(IMultiswapRouterFacet.Multiswap2Calldata calldata data)
+        external
+        view
+        returns (uint256 amountIn)
+    {
+        // cache length of pairs to stack for gas savings
+        uint256 length = data.pairs.length;
+        // if length of array is zero -> revert
+        if (length == 0) {
+            return type(uint256).max;
+        }
+        if (length != data.tokensOut.length) {
+            return type(uint256).max;
+        }
+
+        address[] memory tokensOut;
+        {
+            uint256 amountInPercentagesLength = data.amountInPercentages.length;
+            if (amountInPercentagesLength == 0) {
+                revert IMultiswapRouterFacet.MultiswapRouterFacet_InvalidMultiswap2Calldata();
+            }
+            tokensOut = new address[](amountInPercentagesLength);
+            for (uint256 i; i < amountInPercentagesLength;) {
+                // TODO optimize
+                tokensOut[i] = address(uint160(data.amountInPercentages[i]));
+
+                unchecked {
+                    ++i;
+                }
+            }
+        }
+
+        {
+            for (uint256 i; i < length;) {
+                address tokenOut = data.tokensOut[i];
+
+                uint256 _amountIn = _multiswapReverse(data.pairs[i], data.minAmountsOut[i], tokenOut);
+
+                if (_amountIn == type(uint256).max) {
+                    return _amountIn;
+                }
+
+                unchecked {
+                    amountIn += _amountIn;
+
+                    bool added;
+                    for (uint256 j = tokensOut.length; j > 0;) {
+                        --j;
+                        if (tokensOut[j] == tokenOut) {
+                            // amountsOut[j] += _amountOut;
+                            added = true;
+                            break;
+                        }
+                    }
+                    if (!added) {
+                        return type(uint256).max;
+                    }
+                    ++i;
+                }
+            }
+        }
+
+        amountIn = _addFee(amountIn);
+    }
+
     // =========================
     // internal methods
     // =========================
@@ -209,31 +309,22 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
         uint256 length = pairs.length;
         // if length of array is zero -> return invalid value
         if (length == 0) {
-            return type(uint256).max;
-        }
-
-        if (address(_router) > address(0)) {
-            (, uint256 protocolFee) = _router.getFeeContractAddressAndFee();
-
-            if (protocolFee > 0) {
-                unchecked {
-                    amountOut = amountOut * 1e6 / (1e6 - protocolFee);
-                }
-            }
+            return amountOut;
         }
 
         IUniswapPool pool;
         uint256 fee;
         bool uni3;
+        uint256 isSolidly;
 
         for (; length > 0;) {
             unchecked {
                 --length;
             }
 
-            (uni3, pool,, fee) = _getPoolInfo(pairs[length]);
+            (uni3, pool, isSolidly, fee) = _getPoolInfo(pairs[length]);
 
-            (amountOut, tokenOut) = _quoteExactOutput(tokenOut, pool, amountOut, fee, uni3);
+            (amountOut, tokenOut) = _quoteExactOutput(uni3, tokenOut, pool, isSolidly, amountOut, fee);
 
             if (amountOut == type(uint256).max) {
                 break;
@@ -284,33 +375,43 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
                     });
                 }
             } else {
-                try pool.getReserves() returns (uint112 reserve0, uint112 reserve1, uint32) {
-                    (uint256 reserveInput, uint256 reserveOutput) =
-                        tokenIn == _token0 ? (reserve0, reserve1) : (reserve1, reserve0);
+                uint256 reserveInput;
+                uint256 reserveOutput;
+                bool stableSwap;
+                (reserveInput, reserveOutput, stableSwap) = PoolHelper.getReserves({
+                    pair: pool,
+                    tokenInIsToken0: tokenIn == _token0,
+                    isSolidly: isSolidly > 0
+                });
 
-                    if (isSolidly == 0) {
-                        amountOut = HelperLib.getAmountOut({
-                            amountIn: amountIn,
-                            reserveIn: reserveInput,
-                            reserveOut: reserveOutput,
-                            feeE6: fee
-                        });
-                    } else {
-                        amountOut = IRouter(address(pool)).getAmountOut({ amountIn: amountIn, tokenIn: tokenIn });
-                    }
-                } catch {
-                    return (0, address(0));
+                if (stableSwap) {
+                    amountOut = HelperV2Lib.stableAmountOut({
+                        tokenIn: tokenIn,
+                        tokenOut: tokenOut,
+                        amountIn: amountIn,
+                        reserveIn: reserveInput,
+                        reserveOut: reserveOutput,
+                        feeE6: fee
+                    });
+                } else {
+                    amountOut = HelperV2Lib.volatileAmountOut({
+                        amountIn: amountIn,
+                        reserveIn: reserveInput,
+                        reserveOut: reserveOutput,
+                        feeE6: fee
+                    });
                 }
             }
         }
     }
 
     function _quoteExactOutput(
+        bool uni3,
         address tokenOut,
         IUniswapPool pool,
+        uint256 isSolidly,
         uint256 amountOut,
-        uint256 fee,
-        bool uni3
+        uint256 fee
     )
         internal
         view
@@ -344,18 +445,28 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
                     });
                 }
             } else {
-                try pool.getReserves() returns (uint112 reserve0, uint112 reserve1, uint32) {
-                    (uint256 reserveInput, uint256 reserveOutput) =
-                        tokenIn == _token0 ? (reserve0, reserve1) : (reserve1, reserve0);
+                (uint256 reserveInput, uint256 reserveOutput, bool stableSwap) = PoolHelper.getReserves({
+                    pair: pool,
+                    tokenInIsToken0: tokenIn == _token0,
+                    isSolidly: isSolidly > 0
+                });
 
-                    amountIn = HelperLib.getAmountIn({
+                if (stableSwap) {
+                    amountIn = HelperV2Lib.stableAmountIn({
+                        tokenIn: tokenIn,
+                        tokenOut: tokenOut,
                         amountOut: amountOut,
                         reserveIn: reserveInput,
                         reserveOut: reserveOutput,
                         feeE6: fee
                     });
-                } catch {
-                    return (type(uint256).max, address(0));
+                } else {
+                    amountIn = HelperV2Lib.volatileAmountIn({
+                        amountOut: amountOut,
+                        reserveIn: reserveInput,
+                        reserveOut: reserveOutput,
+                        feeE6: fee
+                    });
                 }
             }
         }
@@ -380,7 +491,20 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
 
             if (protocolFee > 0 && amount != 0) {
                 unchecked {
-                    return amount - amount * protocolFee / 1e6;
+                    return amount - amount * protocolFee / E6;
+                }
+            }
+        }
+        return amount;
+    }
+
+    function _addFee(uint256 amount) private view returns (uint256) {
+        if (address(_router) > address(0)) {
+            (, uint256 protocolFee) = _router.getFeeContractAddressAndFee();
+
+            if (protocolFee > 0) {
+                unchecked {
+                    amount = amount * (E6 + protocolFee) / E6;
                 }
             }
         }

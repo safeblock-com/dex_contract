@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.0;
 
-import { IUniswapPool } from "../../../interfaces/IUniswapPool.sol";
+import { IUniswapPool } from "../../../facets/multiswapRouterFacet/interfaces/IUniswapPool.sol";
+import { SwapCache } from "../HelperV3Lib.sol";
 
 /// @title Packed tick initialized state library
 /// @notice Stores a packed mapping of tick index to its initialized state
@@ -68,6 +69,101 @@ library TickBitmap {
                 } catch {
                     masked = pool.tickTable(wordPos) & mask;
                 }
+
+                // if there are no initialized ticks to the left of the current tick, return leftmost in the word
+                initialized = masked != 0;
+                // overflow/underflow is possible, but prevented externally by limiting both tickSpacing and tick
+                next = initialized
+                    ? (compressed + 1 + int24(uint24(leastSignificantBit(masked) - bitPos))) * tickSpacing
+                    : (compressed + 1 + int24(uint24(type(uint8).max - bitPos))) * tickSpacing;
+            }
+        }
+    }
+
+    function nextInitializedTickWithinOneWord(
+        IUniswapPool pool,
+        int24 tick,
+        int24 tickSpacing,
+        bool lte,
+        SwapCache memory cache
+    )
+        internal
+        view
+        returns (int24 next, bool initialized)
+    {
+        unchecked {
+            int24 compressed = tick / tickSpacing;
+
+            if (tick < 0 && tick % tickSpacing != 0) --compressed; // round towards negative infinity
+
+            if (lte) {
+                (int16 wordPos, uint8 bitPos) = position(compressed);
+                // all the 1s at or to the right of the current bitPos
+                uint256 mask = (1 << bitPos) - 1 + (1 << bitPos);
+                uint256 masked;
+
+                uint256 value;
+                {
+                    bool initializedCache;
+                    bool arrayNotFilled = cache.index < cache.liquidityNets.length;
+
+                    if (arrayNotFilled) {
+                        initializedCache = cache.initialized[cache.index];
+                    }
+                    if (initializedCache) {
+                        value = cache.tickBitmaps[cache.index];
+                    } else {
+                        try pool.tickBitmap(wordPos) returns (uint256 retValue) {
+                            value = retValue;
+                        } catch {
+                            value = pool.tickTable(wordPos);
+                        }
+                        if (arrayNotFilled) {
+                            cache.tickBitmaps[cache.index] = value;
+                            cache.initialized[cache.index] = true;
+                        }
+                    }
+                }
+
+                masked = value & mask;
+
+                // if there are no initialized ticks to the right of or at the current tick, return rightmost in the word
+                initialized = masked != 0;
+                // overflow/underflow is possible, but prevented externally by limiting both tickSpacing and tick
+                next = initialized
+                    ? (compressed - int24(uint24(bitPos - mostSignificantBit(masked)))) * tickSpacing
+                    : (compressed - int24(uint24(bitPos))) * tickSpacing;
+            } else {
+                // start from the word of the next tick, since the current tick state doesn't matter
+                (int16 wordPos, uint8 bitPos) = position(compressed + 1);
+                // all the 1s at or to the left of the bitPos
+                uint256 mask = ~((1 << bitPos) - 1);
+                uint256 masked;
+
+                uint256 value;
+                {
+                    bool initializedCache;
+                    bool arrayNotFilled = cache.index < cache.liquidityNets.length;
+
+                    if (arrayNotFilled) {
+                        initializedCache = cache.initialized[cache.index];
+                    }
+                    if (initializedCache) {
+                        value = cache.tickBitmaps[cache.index];
+                    } else {
+                        try pool.tickBitmap(wordPos) returns (uint256 retValue) {
+                            value = retValue;
+                        } catch {
+                            value = pool.tickTable(wordPos);
+                        }
+                        if (arrayNotFilled) {
+                            cache.tickBitmaps[cache.index] = value;
+                            cache.initialized[cache.index] = true;
+                        }
+                    }
+                }
+
+                masked = value & mask;
 
                 // if there are no initialized ticks to the left of the current tick, return leftmost in the word
                 initialized = masked != 0;

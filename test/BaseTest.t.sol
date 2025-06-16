@@ -11,15 +11,18 @@ import { DeployEngine, Contracts, getContracts } from "../script/DeployEngine.so
 import { Proxy, InitialImplementation } from "../src/proxy/Proxy.sol";
 import { IOwnable2Step, IOwnable } from "../src/external/IOwnable2Step.sol";
 import { Ownable } from "../src/external/Ownable.sol";
-import { TransferHelper } from "../src/facets/libraries/TransferHelper.sol";
+import { TransferHelper } from "../src/libraries/TransferHelper.sol";
+import { PoolHelper } from "../src/libraries/PoolHelper.sol";
 
 import { Quoter } from "../src/lens/Quoter.sol";
 
 import { EntryPoint, IEntryPoint, Initializable } from "../src/EntryPoint.sol";
 import { FeeContract, IFeeContract } from "../src/FeeContract.sol";
 
-import { MultiswapRouterFacet, IMultiswapRouterFacet } from "../src/facets/MultiswapRouterFacet.sol";
-import { TransferFacet, ITransferFacet, ISignatureTransfer } from "../src/facets/TransferFacet.sol";
+import {
+    MultiswapRouterFacet, IMultiswapRouterFacet
+} from "../src/facets/multiswapRouterFacet/MultiswapRouterFacet.sol";
+import { TransferFacet, ITransferFacet, ISignatureTransfer } from "../src/facets/transferFacet/TransferFacet.sol";
 
 import {
     StargateFacet,
@@ -27,19 +30,18 @@ import {
     ILayerZeroComposer,
     OptionsBuilder,
     OFTComposeMsgCodec
-} from "../src/facets/bridges/StargateFacet.sol";
-import { LayerZeroFacet, ILayerZeroFacet } from "../src/facets/bridges/LayerZeroFacet.sol";
-import { SymbiosisFacet, ISymbiosisFacet, ISymbiosis } from "../src/facets/bridges/SymbiosisFacet.sol";
-import { AcrossFacet, IAcrossFacet } from "../src/facets/bridges/AcrossFacet.sol";
+} from "../src/facets/stargateFacet/StargateFacet.sol";
+import { LayerZeroFacet, ILayerZeroFacet } from "../src/facets/stargateFacet/LayerZeroFacet.sol";
+import { SymbiosisFacet, ISymbiosisFacet, ISymbiosis } from "../src/facets/symbiosisFacet/SymbiosisFacet.sol";
+import { AcrossFacet, IAcrossFacet } from "../src/facets/acrossFacet/AcrossFacet.sol";
 
 import { TransientStorageFacetLibrary } from "../src/libraries/TransientStorageFacetLibrary.sol";
 
 import { EfficientSwapAmount, IUniswapPool, HelperV3Lib } from "../src/lens/libraries/EfficientSwapAmount.sol";
-import { PoolHelper } from "../src/facets/libraries/PoolHelper.sol";
 
 import { CoinFlippersModule, ICoinFlippersModule, ICoinFlippersVault } from "../src/modules/CoinFlippersModule.sol";
 
-import { console } from "forge-std/console.sol";
+import { console2 } from "forge-std/console2.sol";
 
 contract BaseTest is Test {
     address owner;

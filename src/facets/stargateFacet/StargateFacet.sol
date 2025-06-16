@@ -3,17 +3,15 @@ pragma solidity 0.8.19;
 
 import { BaseOwnableFacet } from "../BaseOwnableFacet.sol";
 
-import { TransferHelper } from "../libraries/TransferHelper.sol";
-
-import { IStargate, SendParam, MessagingFee } from "./stargate/IStargate.sol";
-import { OFTLimit, OFTFeeDetail, OFTReceipt } from "./stargate/IOFT.sol";
-import { ILayerZeroComposer } from "./stargate/ILayerZeroComposer.sol";
-
-import { OptionsBuilder } from "./libraries/OptionsBuilder.sol";
-import { OFTComposeMsgCodec } from "./libraries/OFTComposeMsgCodec.sol";
-
+import { TransferHelper } from "../../libraries/TransferHelper.sol";
+import { OFTComposeMsgCodec } from "../../libraries/OFTComposeMsgCodec.sol";
+import { OptionsBuilder } from "../../libraries/OptionsBuilder.sol";
 import { TransientStorageFacetLibrary } from "../../libraries/TransientStorageFacetLibrary.sol";
 import { FeeLibrary } from "../../libraries/FeeLibrary.sol";
+
+import { IStargate, SendParam, MessagingFee } from "./interfaces/IStargate.sol";
+import { OFTLimit, OFTFeeDetail, OFTReceipt } from "./interfaces/IOFT.sol";
+import { ILayerZeroComposer } from "./interfaces/ILayerZeroComposer.sol";
 
 import { IStargateFacet } from "./interfaces/IStargateFacet.sol";
 
@@ -106,7 +104,9 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
             revert IStargateFacet.StargateFacet_UnsupportedAsset();
         }
 
-        amountLD = FeeLibrary.payFee({ token: token, amount: amountLD });
+        unchecked {
+            amountLD -= FeeLibrary.payFee({ token: token, amount: amountLD });
+        }
 
         uint256 balanceBefore;
         if (token > address(0)) {
