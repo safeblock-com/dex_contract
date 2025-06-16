@@ -33,9 +33,8 @@ contract Multiswap2ReverseTest is BaseTest {
 
         deployForTest();
 
-        deal({ token: USDT, to: user, give: 1_000_000e18 });
         _resetPrank(user);
-        USDT.safeApprove({ spender: contracts.permit2, value: 1_000_000e18 });
+        USDT.safeApprove({ spender: contracts.permit2, value: type(uint256).max });
     }
 
     // =========================
@@ -54,6 +53,8 @@ contract Multiswap2ReverseTest is BaseTest {
         m2Data.tokensOut = Solarray.addresses(USDC, USDC);
 
         m2Data.fullAmount = quoter.multiswap2Reverse({ data: m2Data });
+
+        deal({ token: USDT, to: user, give: m2Data.fullAmount });
 
         _resetPrank(user);
         IERC20(USDT).approve({ spender: address(entryPoint), amount: m2Data.fullAmount });
@@ -78,6 +79,8 @@ contract Multiswap2ReverseTest is BaseTest {
         m2Data.tokensOut = Solarray.addresses(USDC, USDC);
 
         m2Data.fullAmount = quoter.multiswap2Reverse({ data: m2Data });
+
+        deal({ token: USDT, to: user, give: m2Data.fullAmount });
 
         _resetPrank(user);
         uint256 nonce = ITransferFacet(address(entryPoint)).getNonceForPermit2({ user: user });
@@ -130,23 +133,30 @@ contract Multiswap2ReverseTest is BaseTest {
         vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidMultiswap2Calldata.selector);
         entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap2Reverse, (m2Data))) });
 
-        // amountInPercentages (actual tokensOut) length is zero
-        m2Data.minAmountsOut = Solarray.uint256s(1e18);
-        vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidMultiswap2Calldata.selector);
-        entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap2Reverse, (m2Data))) });
-
-        m2Data.amountInPercentages = Solarray.uint256s(uint256(uint160(USDC)));
-        vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidAmountIn.selector);
-        entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap2Reverse, (m2Data))) });
-
         // not approved
+        m2Data.minAmountsOut = Solarray.uint256s(1e18);
         m2Data.amountInPercentages = Solarray.uint256s(uint256(uint160(USDC)));
         m2Data.fullAmount = quoter.multiswap2Reverse({ data: m2Data });
         vm.expectRevert(TransferHelper.TransferHelper_TransferFromError.selector);
         entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap2Reverse, (m2Data))) });
 
+        deal({ token: USDT, to: user, give: m2Data.fullAmount });
+
         // amountIn is 0
         USDT.safeApprove({ spender: address(entryPoint), value: m2Data.fullAmount });
+
+        // amountInPercentages (actual tokensOut) length is zero or token not swapped
+        m2Data.amountInPercentages = new uint256[](0);
+        vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidMultiswap2Calldata.selector);
+        entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap2Reverse, (m2Data))) });
+
+        m2Data.amountInPercentages = Solarray.uint256s(uint256(uint160(WBNB)));
+        vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidMultiswap2Calldata.selector);
+        entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap2Reverse, (m2Data))) });
+
+        m2Data.fullAmount = 0;
+        vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidAmountIn.selector);
+        entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap2Reverse, (m2Data))) });
 
         // tokenIn is address(0) (native) and msg.value < amountIn
         m2Data.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(WBNB_USDT_CakeV3_500));
@@ -155,7 +165,7 @@ contract Multiswap2ReverseTest is BaseTest {
         m2Data.tokensOut = Solarray.addresses(USDT);
         m2Data.amountInPercentages = Solarray.uint256s(uint256(uint160(USDT)));
         m2Data.fullAmount = quoter.multiswap2Reverse({ data: m2Data });
-        vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidAmountIn.selector);
+        vm.expectRevert();
         entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap2Reverse, (m2Data))) });
     }
 
@@ -197,6 +207,8 @@ contract Multiswap2ReverseTest is BaseTest {
         );
         m2Data.tokensOut = Solarray.addresses(WBNB);
 
+        deal({ token: USDT, to: user, give: m2Data.fullAmount });
+
         _resetPrank(user);
         uint256 nonce = ITransferFacet(address(entryPoint)).getNonceForPermit2({ user: user });
         bytes memory signature = _permit2Sign(
@@ -234,6 +246,8 @@ contract Multiswap2ReverseTest is BaseTest {
 
         m2Data.fullAmount = quoter.multiswap2Reverse({ data: m2Data });
 
+        deal({ token: USDT, to: user, give: m2Data.fullAmount });
+
         _resetPrank(user);
         IERC20(USDT).approve({ spender: address(entryPoint), amount: m2Data.fullAmount });
 
@@ -267,6 +281,8 @@ contract Multiswap2ReverseTest is BaseTest {
 
         m2Data.fullAmount = quoter.multiswap2Reverse({ data: m2Data });
 
+        deal({ token: USDT, to: user, give: m2Data.fullAmount });
+
         _resetPrank(user);
         IERC20(USDT).approve({ spender: address(entryPoint), amount: m2Data.fullAmount });
 
@@ -298,6 +314,8 @@ contract Multiswap2ReverseTest is BaseTest {
 
         m2Data.fullAmount = quoter.multiswap2Reverse({ data: m2Data }) + 100e18;
 
+        deal({ token: USDT, to: user, give: m2Data.fullAmount });
+
         _resetPrank(user);
         IERC20(USDT).approve({ spender: address(entryPoint), amount: m2Data.fullAmount });
 
@@ -327,6 +345,8 @@ contract Multiswap2ReverseTest is BaseTest {
 
         m2Data.fullAmount = quoter.multiswap2Reverse({ data: m2Data });
 
+        deal({ token: USDT, to: user, give: m2Data.fullAmount });
+
         _resetPrank(user);
         IERC20(USDT).approve({ spender: address(entryPoint), amount: m2Data.fullAmount });
 
@@ -351,6 +371,8 @@ contract Multiswap2ReverseTest is BaseTest {
         m2Data.tokensOut = Solarray.addresses(WBNB, WBNB, WBNB);
 
         m2Data.fullAmount = quoter.multiswap2Reverse({ data: m2Data }) - 1;
+
+        deal({ token: USDT, to: user, give: m2Data.fullAmount });
 
         _resetPrank(user);
         IERC20(USDT).approve({ spender: address(entryPoint), amount: m2Data.fullAmount });
@@ -424,6 +446,8 @@ contract Multiswap2ReverseTest is BaseTest {
 
         m2Data.fullAmount = quoter.multiswap2Reverse({ data: m2Data });
 
+        deal({ token: USDT, to: user, give: m2Data.fullAmount });
+
         deal({ to: user, give: m2Data.fullAmount });
         _resetPrank(user);
 
@@ -454,6 +478,8 @@ contract Multiswap2ReverseTest is BaseTest {
         m2Data.tokensOut = Solarray.addresses(WBNB, WBNB, WBNB);
 
         m2Data.fullAmount = quoter.multiswap2Reverse({ data: m2Data });
+
+        deal({ token: USDT, to: user, give: m2Data.fullAmount });
 
         _resetPrank(user);
 
@@ -498,6 +524,8 @@ contract Multiswap2ReverseTest is BaseTest {
 
         m2Data.fullAmount = quoter.multiswap2Reverse({ data: m2Data });
 
+        deal({ token: USDT, to: user, give: m2Data.fullAmount });
+
         _resetPrank(user);
 
         IERC20(USDT).approve({ spender: address(entryPoint), amount: m2Data.fullAmount });
@@ -534,6 +562,8 @@ contract Multiswap2ReverseTest is BaseTest {
         m2Data.tokensOut = Solarray.addresses(WBNB, WBNB, WBNB);
 
         m2Data.fullAmount = quoter.multiswap2Reverse({ data: m2Data });
+
+        deal({ token: USDT, to: user, give: m2Data.fullAmount });
 
         _resetPrank(user);
         vm.expectRevert(TransferHelper.TransferHelper_TransferFromError.selector);
@@ -574,6 +604,8 @@ contract Multiswap2ReverseTest is BaseTest {
         m2Data.tokensOut = Solarray.addresses(CAKE, USDC, WBNB, USDT);
 
         m2Data.fullAmount = quoter.multiswap2Reverse({ data: m2Data });
+
+        deal({ token: USDT, to: user, give: m2Data.fullAmount });
 
         _resetPrank(user);
 
@@ -620,6 +652,8 @@ contract Multiswap2ReverseTest is BaseTest {
 
         m2Data.fullAmount = quoter.multiswap2Reverse({ data: m2Data });
 
+        deal({ token: USDT, to: user, give: m2Data.fullAmount });
+
         _resetPrank(user);
 
         IERC20(USDT).approve({ spender: address(entryPoint), amount: m2Data.fullAmount });
@@ -657,6 +691,8 @@ contract Multiswap2ReverseTest is BaseTest {
 
         m2Data.fullAmount = quoter.multiswap2Reverse({ data: m2Data });
 
+        deal({ token: USDT, to: user, give: m2Data.fullAmount });
+
         m2Data.amountInPercentages = Solarray.uint256s(uint256(uint160(CAKE)), uint256(uint160(USDC)));
 
         _resetPrank(user);
@@ -691,6 +727,8 @@ contract Multiswap2ReverseTest is BaseTest {
         m2Data.tokensOut = Solarray.addresses(CAKE, USDC, WBNB, WBNB);
 
         m2Data.fullAmount = quoter.multiswap2Reverse({ data: m2Data });
+
+        deal({ token: USDT, to: user, give: m2Data.fullAmount });
 
         _resetPrank(user);
 

@@ -1,19 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
+import { Ownable2Step } from "./external/Ownable2Step.sol";
+
 import { Initializable } from "./proxy/Initializable.sol";
 import { UUPSUpgradeable } from "./proxy/UUPSUpgradeable.sol";
 
 import { SSTORE2 } from "./libraries/SSTORE2.sol";
 import { BinarySearch } from "./libraries/BinarySearch.sol";
-
-import { IEntryPoint } from "./interfaces/IEntryPoint.sol";
-import { Ownable2Step } from "./external/Ownable2Step.sol";
-
 import { TransientStorageFacetLibrary } from "./libraries/TransientStorageFacetLibrary.sol";
 import { FeeLibrary } from "./libraries/FeeLibrary.sol";
-
 import { ADDRESS_MASK } from "./libraries/Constants.sol";
+
+import { IEntryPoint } from "./interfaces/IEntryPoint.sol";
 
 /// @title EntryPoint
 /// @notice A proxy contract for dynamic function execution using a diamond-like architecture.

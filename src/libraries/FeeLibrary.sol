@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { TransferHelper } from "../facets/libraries/TransferHelper.sol";
+import { TransferHelper } from "./TransferHelper.sol";
 import { TransientStorageFacetLibrary } from "./TransientStorageFacetLibrary.sol";
-
 import { FEE_CONTRACT_STORAGE, FEE_MAX, ADDRESS_MASK } from "./Constants.sol";
 
 /// @title FeeLibrary
@@ -42,25 +41,18 @@ library FeeLibrary {
     ///      Returns the remaining amount after fee deduction.
     /// @param token The address of the token to transfer.
     /// @param amount The total amount of the token before fee deduction.
-    /// @return remainingAmount The amount of the token after deducting the fee, or the original amount if no fee is paid.
-    function payFee(address token, uint256 amount, bool exactIn) internal returns (uint256 remainingAmount) {
+    /// @return feeAmount The amount of the fee paid.
+    function payFee(address token, uint256 amount) internal returns (uint256 feeAmount) {
         if (!TransientStorageFacetLibrary.isFeePaid()) {
             (address feeContract, uint256 fee) = getFeeContractAddress();
-            if (feeContract > address(0) && fee > 0) {
+            if (feeContract > address(0)) {
                 unchecked {
-                    fee = amount * fee / FEE_MAX;
-                    if (fee > 0) {
-                        TransferHelper.safeTransfer({ token: token, to: feeContract, value: fee });
-
-                        if (exactIn) {
-                            return amount - fee;
-                        } else {
-                            return amount + fee;
-                        }
+                    feeAmount = amount * fee / FEE_MAX;
+                    if (feeAmount > 0) {
+                        TransferHelper.safeTransfer({ token: token, to: feeContract, value: feeAmount });
                     }
                 }
             }
         }
-        return amount;
     }
 }

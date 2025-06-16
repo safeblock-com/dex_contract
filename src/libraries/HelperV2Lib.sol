@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { IUniswapPool } from "../../facets/multiswapRouterFacet/interfaces/IUniswapPool.sol";
-import { PoolHelper } from "../../libraries/PoolHelper.sol";
-
-import { E18, E6 } from "../../libraries/Constants.sol";
+import { PoolHelper } from "./PoolHelper.sol";
+import { E6, E18 } from "./Constants.sol";
 
 library HelperV2Lib {
     error UniswapV2_InsufficientInputAmount();
     error UniswapV2_InsufficientOutputAmount();
+    error UniswapV2_InsufficientLiquidity();
 
     // ===========================
     // amountOut
@@ -27,9 +26,8 @@ library HelperV2Lib {
         if (amountIn == 0) {
             revert UniswapV2_InsufficientInputAmount();
         }
-
         if (reserveIn == 0 || reserveOut == 0) {
-            return 0;
+            revert UniswapV2_InsufficientLiquidity();
         }
 
         amountOut = PoolHelper.calculateVolatileAmountOut({
@@ -54,6 +52,9 @@ library HelperV2Lib {
     {
         if (amountIn == 0) {
             revert UniswapV2_InsufficientInputAmount();
+        }
+        if (reserveIn == 0 || reserveOut == 0) {
+            revert UniswapV2_InsufficientLiquidity();
         }
 
         amountOut = PoolHelper.calculateStableAmountOut({
@@ -85,11 +86,11 @@ library HelperV2Lib {
         }
 
         if (reserveIn == 0 || reserveOut == 0) {
-            return type(uint256).max;
+            revert UniswapV2_InsufficientLiquidity();
         }
 
         if (amountOut > reserveOut) {
-            return type(uint256).max;
+            revert UniswapV2_InsufficientOutputAmount();
         }
 
         amountIn = PoolHelper.calculateVolatileAmountIn({
@@ -117,11 +118,11 @@ library HelperV2Lib {
         }
 
         if (reserveIn == 0 || reserveOut == 0) {
-            return type(uint256).max;
+            revert UniswapV2_InsufficientLiquidity();
         }
 
         if (amountOut > reserveOut) {
-            return type(uint256).max;
+            revert UniswapV2_InsufficientOutputAmount();
         }
 
         amountIn = PoolHelper.calculateStableAmountIn({

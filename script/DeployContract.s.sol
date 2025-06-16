@@ -12,8 +12,7 @@ import { DeployEngine, Contracts, getContracts } from "./DeployEngine.sol";
 
 import { FeeContract } from "../src/FeeContract.sol";
 
-import { MultiswapRouterFacet } from "../src/facets/MultiswapRouterFacet.sol";
-import { LayerZeroFacet } from "../src/facets/bridges/LayerZeroFacet.sol";
+import { LayerZeroFacet } from "../src/facets/stargateFacet/LayerZeroFacet.sol";
 
 import { IOwnable2Step } from "../src/external/IOwnable2Step.sol";
 

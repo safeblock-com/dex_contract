@@ -8,7 +8,8 @@ import {
     IMultiswapRouterFacet,
     TransferFacet,
     IUniswapPool,
-    PoolHelper
+    PoolHelper,
+    console2
 } from "../BaseTest.t.sol";
 
 import "../Helpers.t.sol";
@@ -141,7 +142,6 @@ contract MultiswapSolidlyTest is BaseTest {
         _resetPrank(user);
 
         bytes32 pair = bytes32(uint256(uint160(address(SOLIDLY_PAIR3))));
-
         uint256 fee = quoter.getPoolFee({ pair: address(SOLIDLY_PAIR3) });
 
         assembly {
@@ -192,6 +192,13 @@ contract MultiswapSolidlyTest is BaseTest {
         m2Data.tokensOut = Solarray.addresses(tokenOut);
 
         m2Data.fullAmount = quoter.multiswap2Reverse({ data: m2Data });
+
+        (, bytes memory data) = address(SOLIDLY_PAIR2).staticcall(
+            abi.encodeWithSignature(
+                "getAmountOut(uint256,address)", m2Data.fullAmount - m2Data.fullAmount * 300 / 1e6, tokenIn
+            )
+        );
+        console2.log("exactAmountIn", abi.decode(data, (uint256)));
 
         deal({ token: tokenIn, to: user, give: m2Data.fullAmount });
 

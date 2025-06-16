@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import { TransferHelper } from "../libraries/TransferHelper.sol";
-
+import { TransferHelper } from "../../libraries/TransferHelper.sol";
 import { TransientStorageFacetLibrary } from "../../libraries/TransientStorageFacetLibrary.sol";
 import { FeeLibrary } from "../../libraries/FeeLibrary.sol";
 
 import { ISymbiosis } from "./interfaces/ISymbiosis.sol";
+
 import { ISymbiosisFacet } from "./interfaces/ISymbiosisFacet.sol";
 
 /// @title SymbiosisFacet
@@ -61,7 +61,9 @@ contract SymbiosisFacet is ISymbiosisFacet {
             amount = _amount;
         }
 
-        amount = FeeLibrary.payFee({ token: token, amount: amount, exactIn: true });
+        unchecked {
+            amount -= FeeLibrary.payFee({ token: token, amount: amount });
+        }
 
         token.safeApprove({ spender: address(_portal), value: amount });
 

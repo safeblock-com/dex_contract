@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { IUniswapPool } from "../../interfaces/IUniswapPool.sol";
+import { IUniswapPool } from "../../facets/multiswapRouterFacet/interfaces/IUniswapPool.sol";
 
 import { TickBitmap } from "./uni3Libs/TickBitmap.sol";
 import { TickMath } from "./uni3Libs/TickMath.sol";
@@ -12,17 +12,23 @@ import { FullMath } from "./uni3Libs/FullMath.sol";
 
 import { E18, _2E96 } from "../../libraries/Constants.sol";
 
+import { console2 } from "forge-std/console2.sol";
+
 struct Slot0 {
     // the current price
     uint160 sqrtPriceX96;
     // the current tick
     int24 tick;
+    //
+    uint256 targetPrice;
 }
 
 struct SwapCache {
-    // the protocol fee for the input token
-    uint256 feeProtocol;
     uint128 liquidityStart;
+    uint256[] tickBitmaps;
+    int128[] liquidityNets;
+    bool[] initialized;
+    uint256 index;
 }
 
 // the top level state of the swap, the results of which are recorded in storage at the end
@@ -79,20 +85,24 @@ library HelperV3Lib {
             slot0Start.sqrtPriceX96 = sqrtPriceX96;
             slot0Start.tick = tick;
 
-            (uint24 fee, int24 tickSpacing, uint128 liquidity) = getFeeTickSpacingAndLiquidity(pool, tick);
+            (uint24 fee, int24 tickSpacing, uint128 liquidity) = getFeeTickSpacingAndLiquidity(pool);
 
             feeAndTickSpacing.fee = fee;
             feeAndTickSpacing.tickSpacing = tickSpacing;
 
             cache.liquidityStart = liquidity;
+
+            cache.liquidityNets = new int128[](128);
+            cache.tickBitmaps = new uint256[](128);
+            cache.initialized = new bool[](128);
         }
 
         state.amountSpecifiedRemaining = amountSpecified;
         state.sqrtPriceX96 = slot0Start.sqrtPriceX96;
         state.tick = slot0Start.tick;
         state.liquidity = cache.liquidityStart;
-
         state.amountCalculated = 0;
+        cache.index = 0;
     }
 
     function quoteV3(
@@ -118,22 +128,7 @@ library HelperV3Lib {
                 slot0Start.tick = tick;
             }
 
-            if (slot0Start.tick == type(int24).max) {
-                unchecked {
-                    (int256 amount0, int256 amount1,,,) = pool.quoteSwap({
-                        zeroForOne: zeroForOne,
-                        amountSpecified: amountSpecified,
-                        sqrtPriceLimitX96: sqrtPriceLimitX96
-                    });
-
-                    return (
-                        amount0 > 0 ? uint256(amount0) : uint256(amount1),
-                        amount0 < 0 ? uint256(-amount0) : uint256(-amount1)
-                    );
-                }
-            }
-
-            (uint24 fee, int24 tickSpacing, uint128 liquidity) = getFeeTickSpacingAndLiquidity(pool, slot0Start.tick);
+            (uint24 fee, int24 tickSpacing, uint128 liquidity) = getFeeTickSpacingAndLiquidity(pool);
 
             if (liquidity == 0 || amountSpecified == 0) {
                 return (exactInput ? 0 : type(uint256).max, 0);
@@ -230,6 +225,10 @@ library HelperV3Lib {
                 ? (amountSpecified - state.amountSpecifiedRemaining, state.amountCalculated)
                 : (state.amountCalculated, amountSpecified - state.amountSpecifiedRemaining);
 
+            if (amount0 == 0 || amount1 == 0) {
+                return (exactInput ? 0 : type(uint256).max, 0);
+            }
+
             return
                 (amount0 > 0 ? uint256(amount0) : uint256(amount1), amount0 < 0 ? uint256(-amount0) : uint256(-amount1));
         }
@@ -253,21 +252,6 @@ library HelperV3Lib {
 
         getDataForSimulate(pool, slot0Start, cache, state, feeAndTickSpacing, amountSpecified);
 
-        if (slot0Start.tick == type(int24).max) {
-            unchecked {
-                (int256 amount0, int256 amount1,,,) = pool.quoteSwap({
-                    zeroForOne: zeroForOne,
-                    amountSpecified: amountSpecified,
-                    sqrtPriceLimitX96: sqrtPriceLimitX96
-                });
-
-                return (
-                    amount0 > 0 ? uint256(amount0) : uint256(amount1),
-                    amount0 < 0 ? uint256(-amount0) : uint256(-amount1)
-                );
-            }
-        }
-
         if (state.liquidity == 0 || amountSpecified == 0) {
             return (exactInput ? 0 : type(uint256).max, 0);
         }
@@ -276,9 +260,9 @@ library HelperV3Lib {
             StepComputations memory step;
 
             step.sqrtPriceStartX96 = state.sqrtPriceX96;
-
-            (step.tickNext, step.initialized) =
-                TickBitmap.nextInitializedTickWithinOneWord(pool, state.tick, feeAndTickSpacing.tickSpacing, zeroForOne);
+            (step.tickNext, step.initialized) = TickBitmap.nextInitializedTickWithinOneWord(
+                pool, state.tick, feeAndTickSpacing.tickSpacing, zeroForOne, cache
+            );
 
             // ensure that we do not overshoot the min/max tick, as the tick bitmap is not aware of these bounds
             if (step.tickNext < TickMath.MIN_TICK) {
@@ -307,6 +291,14 @@ library HelperV3Lib {
                     state.amountSpecifiedRemaining -= SafeCast.toInt256(step.amountIn + step.feeAmount);
                 }
                 state.amountCalculated -= SafeCast.toInt256(step.amountOut);
+
+                if (
+                    FullMath.mulDiv(
+                        uint256(-state.amountCalculated), E18, uint256(amountSpecified - state.amountSpecifiedRemaining)
+                    ) < slot0Start.targetPrice
+                ) {
+                    return (exactInput ? 0 : type(uint256).max, 0);
+                }
             } else {
                 unchecked {
                     state.amountSpecifiedRemaining += SafeCast.toInt256(step.amountOut);
@@ -314,19 +306,22 @@ library HelperV3Lib {
                 state.amountCalculated += SafeCast.toInt256(step.amountIn + step.feeAmount);
             }
 
-            // if the protocol fee is on, calculate how much is owed, decrement feeAmount
-            if (cache.feeProtocol > 0) {
-                unchecked {
-                    uint256 delta = step.feeAmount / cache.feeProtocol;
-                    step.feeAmount -= delta;
-                }
-            }
-
             // shift tick if we reached the next price
             if (state.sqrtPriceX96 == step.sqrtPriceNextX96) {
                 // if the tick is initialized, run the tick transition
                 if (step.initialized) {
-                    int128 liquidityNet = getTickLiquidityNet(pool, step.tickNext);
+                    int128 liquidityNet;
+                    step.initialized = cache.index < cache.liquidityNets.length;
+                    if (step.initialized) {
+                        liquidityNet = cache.liquidityNets[cache.index];
+                    }
+                    if (liquidityNet == 0) {
+                        liquidityNet = getTickLiquidityNet(pool, step.tickNext);
+
+                        if (step.initialized) {
+                            cache.liquidityNets[cache.index] = liquidityNet;
+                        }
+                    }
                     // if we're moving leftward, we interpret liquidityNet as the opposite sign
                     // safe because liquidityNet cannot be type(int128).min
                     unchecked {
@@ -349,12 +344,17 @@ library HelperV3Lib {
                 // recompute unless we're on a lower tick boundary (i.e. already transitioned ticks), and haven't moved
                 state.tick = TickMath.getTickAtSqrtRatio(state.sqrtPriceX96);
             }
+            ++cache.index;
         }
 
         unchecked {
             (int256 amount0, int256 amount1) = zeroForOne == exactInput
                 ? (amountSpecified - state.amountSpecifiedRemaining, state.amountCalculated)
                 : (state.amountCalculated, amountSpecified - state.amountSpecifiedRemaining);
+
+            if (amount0 == 0 || amount1 == 0) {
+                return (exactInput ? 0 : type(uint256).max, 0);
+            }
 
             return
                 (amount0 > 0 ? uint256(amount0) : uint256(amount1), amount0 < 0 ? uint256(-amount0) : uint256(-amount1));
@@ -367,16 +367,15 @@ library HelperV3Lib {
         if (data.length == 320) {
             (, liquidityNet,,,,,,,,) =
                 abi.decode(data, (uint128, int128, uint256, uint256, uint256, uint256, int256, uint256, uint256, bool));
-        } else {
+        } else if (data.length > 96) {
             (, liquidityNet,,,,,,) =
                 abi.decode(data, (uint128, int128, uint256, uint256, int256, uint256, uint256, bool));
+        } else {
+            (, liquidityNet,) = abi.decode(data, (uint128, int128, bool));
         }
     }
 
-    function getFeeTickSpacingAndLiquidity(
-        IUniswapPool pool,
-        int256 tick
-    )
+    function getFeeTickSpacingAndLiquidity(IUniswapPool pool)
         internal
         view
         returns (uint24 fee, int24 tickSpacing, uint128 liquidity)
@@ -387,11 +386,9 @@ library HelperV3Lib {
 
         bytes memory data;
 
-        if (tick != type(int24).max) {
-            if (fee == 0) {
-                (, data) = address(pool).staticcall(abi.encodeWithSignature("fee()"));
-                fee = abi.decode(data, (uint24));
-            }
+        if (fee == 0) {
+            (, data) = address(pool).staticcall(abi.encodeWithSignature("fee()"));
+            fee = abi.decode(data, (uint24));
         }
 
         (, data) = address(pool).staticcall(abi.encodeWithSignature("tickSpacing()"));
@@ -411,8 +408,12 @@ library HelperV3Lib {
                     tick := mload(add(data, 64))
                 }
             } else {
-                (sqrtPriceX96,,,) = abi.decode(data, (uint160, int24, uint256, uint256));
-                tick = type(int24).max;
+                uint256 fee;
+
+                (sqrtPriceX96, tick, fee,) = abi.decode(data, (uint160, int24, uint256, uint256));
+                assembly ("memory-safe") {
+                    mstore(0x00, fee)
+                }
             }
         } else {
             (, data) = address(pool).staticcall(abi.encodeWithSignature("globalState()"));

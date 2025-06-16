@@ -6,22 +6,22 @@ import { UUPSUpgradeable } from "../proxy/UUPSUpgradeable.sol";
 
 import { Ownable2Step } from "../external/Ownable2Step.sol";
 
-import { IUniswapPool } from "../interfaces/IUniswapPool.sol";
+import { IUniswapPool } from "../facets/multiswapRouterFacet/interfaces/IUniswapPool.sol";
 
 import { HelperV2Lib } from "./libraries/HelperV2Lib.sol";
 import { HelperV3Lib, TickMath } from "./libraries/HelperV3Lib.sol";
 
-import { IMultiswapRouterFacet } from "../facets/interfaces/IMultiswapRouterFacet.sol";
+import { IMultiswapRouterFacet } from "../facets/multiswapRouterFacet/interfaces/IMultiswapRouterFacet.sol";
 
 import { IEntryPoint } from "../interfaces/IEntryPoint.sol";
 
-import { TransferHelper } from "../facets/libraries/TransferHelper.sol";
+import { TransferHelper } from "../libraries/TransferHelper.sol";
 
 import { E18, UNISWAP_V3_MASK, ADDRESS_MASK, FEE_MASK, E6 } from "../libraries/Constants.sol";
 
 import { EfficientSwapAmount } from "./libraries/EfficientSwapAmount.sol";
 
-import { PoolHelper } from "../facets/libraries/PoolHelper.sol";
+import { PoolHelper } from "../libraries/PoolHelper.sol";
 
 /// @title Multiswap-Partswap Quoter contract
 contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
@@ -65,28 +65,25 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
     // main logic
     // =========================
 
-    function efficientAmounts(
-        bytes32 _pool,
+    function efficientAmounts2(
+        bytes32 pair,
         address tokenIn,
-        uint256 targetPriceImpact
+        uint256 targetPrice
     )
         external
         view
-        returns (uint256, uint256)
+        returns (uint256 amountIn)
     {
-        (bool uni3, IUniswapPool pool, uint256 isSolidly, uint256 fee) = _getPoolInfo(_pool);
+        (bool uni3, IUniswapPool pool, uint256 isSolidly, uint256 fee) = _getPoolInfo(pair);
 
         if (uni3) {
-            return EfficientSwapAmount.efficientV3Amounts({
-                pool: pool,
-                tokenIn: tokenIn,
-                targetPriceImpact: targetPriceImpact
-            });
+            amountIn =
+                EfficientSwapAmount.efficientV3Amounts2({ pool: pool, tokenIn: tokenIn, targetPrice: targetPrice });
         } else {
-            return EfficientSwapAmount.efficientV2Amounts({
+            amountIn = EfficientSwapAmount.efficientV2Amounts2({
                 pair: pool,
                 tokenIn: tokenIn,
-                targetPriceImpact: targetPriceImpact,
+                targetPrice: targetPrice,
                 feeE6: fee,
                 isSolidly: isSolidly > 0
             });

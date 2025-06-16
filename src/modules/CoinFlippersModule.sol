@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import { ICoinFlippersModule } from "./interfaces/ICoinFlippersModule.sol";
+import { TransferHelper } from "../libraries/TransferHelper.sol";
+import { TransientStorageFacetLibrary } from "../libraries/TransientStorageFacetLibrary.sol";
 
 import { ICoinFlippersVault } from "./interfaces/ICoinFlippersVault.sol";
 
-import { TransferHelper } from "../facets/libraries/TransferHelper.sol";
-import { TransientStorageFacetLibrary } from "../libraries/TransientStorageFacetLibrary.sol";
+import { ICoinFlippersModule } from "./interfaces/ICoinFlippersModule.sol";
 
 /// @title CoinFlippersModule
 contract CoinFlippersModule is ICoinFlippersModule {

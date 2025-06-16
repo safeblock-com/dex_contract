@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import { UlnConfig, Origin } from "../stargate/ILayerZeroEndpointV2.sol";
+import { UlnConfig, Origin } from "./ILayerZeroEndpointV2.sol";
 
 /// @title ILayerZeroFacet - LayerZeroFacet Interface
 interface ILayerZeroFacet {

@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { IUniswapPool } from "../../interfaces/IUniswapPool.sol";
+import { IERC20 } from "forge-std/interfaces/IERC20.sol";
+
+import { IUniswapPool } from "../../facets/multiswapRouterFacet/interfaces/IUniswapPool.sol";
 
 import { HelperV2Lib } from "./HelperV2Lib.sol";
 import { HelperV3Lib, Slot0, SwapCache, SwapState, FeeAndTickSpacing, TickMath, E18 } from "./HelperV3Lib.sol";
 
 import { FullMath } from "./uni3Libs/FullMath.sol";
 
-import { PoolHelper } from "../../facets/libraries/PoolHelper.sol";
+import { PoolHelper } from "../../libraries/PoolHelper.sol";
 
 library EfficientSwapAmount {
     // =========================
@@ -22,22 +24,37 @@ library EfficientSwapAmount {
     // internal methods
     // =========================
 
-    /// @notice Computes the input amount needed to reach a target price
-    /// @param pair The pair contract address
-    /// @param tokenIn The address of the token to swap
-    /// @param feeE6 The fee to be applied to the swap
-    /// @return amountIn The amount of input token to swap
-    /// @return amountOut The amount of output token to swap
-    function efficientV2Amounts(
+    function getSpotPrice(
+        bool uni3,
+        bool zeroForOne,
+        uint160 sqrtPriceX96,
+        uint256 reserveIn,
+        uint256 reserveOut
+    )
+        internal
+        pure
+        returns (uint256)
+    {
+        if (uni3) {
+            return HelperV3Lib.calculatePrice({ sqrtPriceX96: sqrtPriceX96, zeroForOne: zeroForOne });
+        } else {
+            if (reserveIn == 0 || reserveOut == 0) {
+                return 0;
+            }
+            return FullMath.mulDiv(reserveOut, E18, reserveIn);
+        }
+    }
+
+    function efficientV2Amounts2(
         bool isSolidly,
         IUniswapPool pair,
         address tokenIn,
-        uint256 targetPriceImpact,
+        uint256 targetPrice,
         uint256 feeE6
     )
         internal
         view
-        returns (uint256 amountIn, uint256 amountOut)
+        returns (uint256 amountIn)
     {
         address tokenOut;
         uint256 reserveInput;
@@ -45,24 +62,37 @@ library EfficientSwapAmount {
         bool stableSwap;
 
         {
+            uint256 currentPrice;
             bool tokenInIsToken0;
             (tokenInIsToken0, tokenOut) = PoolHelper.validateTokenInPair({ pool: pair, token: tokenIn });
             (reserveInput, reserveOutput, stableSwap) =
                 PoolHelper.getReserves({ pair: pair, tokenInIsToken0: tokenInIsToken0, isSolidly: isSolidly });
+
+            currentPrice = getSpotPrice({
+                uni3: false,
+                zeroForOne: tokenInIsToken0,
+                sqrtPriceX96: 0,
+                reserveIn: reserveInput,
+                reserveOut: reserveOutput
+            });
+
+            if (currentPrice == 0) {
+                return 0;
+            }
         }
+
+        uint256 amountOut;
+        uint256 tolerance = targetPrice + targetPrice * 1e16 / E18;
 
         unchecked {
             uint256 low = 1;
             uint256 high = reserveInput * 10;
 
-            // Spot price: reserveOut / reserveIn
-            uint256 currentPrice = reserveOutput * E18 / reserveInput;
-
             while (low <= high) {
                 amountIn = (low + high) >> 1;
 
                 if (amountIn == 0) {
-                    return (0, 0);
+                    return 0;
                 }
 
                 if (stableSwap) {
@@ -85,11 +115,12 @@ library EfficientSwapAmount {
 
                 uint256 execPrice = amountOut * E18 / amountIn;
 
-                // Price impact: (currentPrice - execPrice) / currentPrice
-                uint256 priceImpact = (currentPrice - execPrice) * E18 / currentPrice;
-
-                if (priceImpact <= targetPriceImpact) {
+                if (execPrice <= tolerance && execPrice >= targetPrice) {
                     break;
+                }
+
+                if (execPrice > tolerance) {
+                    low = amountIn;
                 } else {
                     high = amountIn - 1;
                 }
@@ -97,14 +128,14 @@ library EfficientSwapAmount {
         }
     }
 
-    function efficientV3Amounts(
+    function efficientV3Amounts2(
         IUniswapPool pool,
         address tokenIn,
-        uint256 targetPriceImpact
+        uint256 targetPrice
     )
         internal
         view
-        returns (uint256 amountIn, uint256 amountOut)
+        returns (uint256 amountIn)
     {
         (bool zeroForOne,) = PoolHelper.validateTokenInPair({ pool: pool, token: tokenIn });
         Slot0 memory slot0Start;
@@ -113,20 +144,16 @@ library EfficientSwapAmount {
         FeeAndTickSpacing memory feeAndTickSpacing;
 
         HelperV3Lib.getDataForSimulate(pool, slot0Start, cache, state, feeAndTickSpacing, 0);
-
-        uint256 currentPrice =
-            HelperV3Lib.calculatePrice({ sqrtPriceX96: slot0Start.sqrtPriceX96, zeroForOne: zeroForOne });
+        slot0Start.targetPrice = targetPrice;
 
         uint256 low = 1;
-        uint256 high = HelperV3Lib.calculateVirtualReserve({
-            sqrtPriceX96: slot0Start.sqrtPriceX96,
-            liquidity: cache.liquidityStart,
-            zeroForOne: zeroForOne
-        });
+        uint256 high = IERC20(tokenIn).balanceOf({ account: address(pool) }) * 100;
+
+        uint256 amountOut;
+        uint256 tolerance = targetPrice + targetPrice * 1e14 / E18;
 
         while (low <= high) {
             uint256 mid = (low + high) >> 1;
-
             (amountIn, amountOut) = HelperV3Lib.efficientQuoteV3({
                 pool: pool,
                 zeroForOne: zeroForOne,
@@ -145,11 +172,12 @@ library EfficientSwapAmount {
 
             uint256 execPrice = FullMath.mulDiv(amountOut, E18, amountIn);
 
-            // Price impact: (currentPrice - execPrice) / currentPrice
-            uint256 priceImpact = (currentPrice - execPrice) * E18 / currentPrice;
-
-            if (priceImpact <= targetPriceImpact) {
+            if (execPrice <= tolerance && execPrice >= targetPrice) {
                 break;
+            }
+
+            if (execPrice > tolerance) {
+                low = mid + 1;
             } else {
                 high = mid - 1;
             }

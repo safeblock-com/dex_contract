@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import { BaseTest, IERC20, Solarray, IStargateFacet, LayerZeroFacet, ILayerZeroFacet } from "../BaseTest.t.sol";
-import { Origin } from "../../src/facets/bridges/stargate/ILayerZeroEndpointV2.sol";
+import { Origin } from "../../src/facets/stargateFacet/interfaces/ILayerZeroEndpointV2.sol";
 
 import "../Helpers.t.sol";
 

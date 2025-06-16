@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import { BaseOwnableFacet } from "../BaseOwnableFacet.sol";
 
-import { TransferHelper } from "../libraries/TransferHelper.sol";
+import { TransferHelper } from "../../libraries/TransferHelper.sol";
 
 import { TransientStorageFacetLibrary } from "../../libraries/TransientStorageFacetLibrary.sol";
 import { FeeLibrary } from "../../libraries/FeeLibrary.sol";

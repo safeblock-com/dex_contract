@@ -9,7 +9,7 @@ interface IMultiswapRouterFacet {
     // =========================
 
     /// @dev Thrown when the output amount is less than the minimum expected amount.
-    error MultiswapRouterFacet_InvalidAmountOut();
+    error MultiswapRouterFacet_ValueLowerThanExpected(uint256 expectedGreaterValue, uint256 expectedLowerBalance);
 
     /// @dev Thrown when a Uniswap V2 swap fails.
     error MultiswapRouterFacet_FailedV2Swap();
@@ -31,15 +31,6 @@ interface IMultiswapRouterFacet {
 
     /// @dev Thrown when the input amount is zero.
     error MultiswapRouterFacet_InvalidAmountIn();
-
-    // =========================
-    // getters
-    // =========================
-
-    /// @notice Retrieves the address of the Wrapped Native token contract.
-    /// @dev Returns the immutable `_wrappedNative` address.
-    /// @return The address of the Wrapped Native token contract.
-    function wrappedNative() external view returns (address);
 
     // =========================
     // main logic
@@ -71,7 +62,7 @@ interface IMultiswapRouterFacet {
     struct Multiswap2Calldata {
         /// @notice The total input amount for all swap paths.
         /// @dev Represents the full amount of `tokenIn` to be distributed across paths.
-        uint256 fullAmount; // used for maxAmountIn (project fee must be included)
+        uint256 fullAmount; // used for maxAmountIn in reverseMultiswap (project fee must be included)
         /// @notice The address of the input token.
         /// @dev Can be an ERC20 token or address(0) for native currency (wrapped to Wrapped Native).
         address tokenIn;
@@ -94,9 +85,14 @@ interface IMultiswapRouterFacet {
 
     /// @notice Executes a multi-path swap across Uniswap V2 and V3 pools.
     /// @dev Transfers input tokens, performs swaps through specified pools, applies fees,
-    ///      and records output amounts. Reverts with various errors for invalid inputs or failed swaps.
+    ///      and records output amounts. Reverts with various errors for invalid inputs, failed checks or failed swaps.
     /// @param data The swap configuration, including input token, pairs, amounts, and minimum outputs.
     function multiswap2(Multiswap2Calldata calldata data) external;
 
+    /// @notice Executes a reverse multi-path swap across Uniswap V2 and V3 pools.
+    /// @dev Transfers input tokens, performs swaps through specified pools in reverse order, applies fees,
+    ///      and records output and input amounts.
+    ///      Reverts with various errors for invalid inputs, failed checks or failed swaps.
+    /// @param data The swap configuration, including input token, pairs, amounts, and minimum outputs.
     function multiswap2Reverse(IMultiswapRouterFacet.Multiswap2Calldata calldata data) external;
 }

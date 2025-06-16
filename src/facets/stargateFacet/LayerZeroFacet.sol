@@ -3,13 +3,17 @@ pragma solidity 0.8.19;
 
 import { BaseOwnableFacet } from "../BaseOwnableFacet.sol";
 
-import {
-    ILayerZeroEndpointV2, UlnConfig, Origin, MessagingFee, MessagingParams
-} from "./stargate/ILayerZeroEndpointV2.sol";
-import { IMessageLibManager } from "./stargate/IMessageLibManager.sol";
-import { ISendLib } from "./stargate/ISendLib.sol";
-
 import { TransientStorageFacetLibrary } from "../../libraries/TransientStorageFacetLibrary.sol";
+
+import {
+    ILayerZeroEndpointV2,
+    UlnConfig,
+    Origin,
+    MessagingFee,
+    MessagingParams
+} from "./interfaces/ILayerZeroEndpointV2.sol";
+import { IMessageLibManager } from "./interfaces/IMessageLibManager.sol";
+import { ISendLib } from "./interfaces/ISendLib.sol";
 
 import { ILayerZeroFacet } from "./interfaces/ILayerZeroFacet.sol";
 
