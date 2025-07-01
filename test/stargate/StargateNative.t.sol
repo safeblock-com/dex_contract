@@ -1,16 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {
-    BaseTest,
-    IERC20,
-    Solarray,
-    IMultiswapRouterFacet,
-    ITransferFacet,
-    StargateFacet,
-    IStargateFacet,
-    TransferHelper
-} from "../BaseTest.t.sol";
+import "../BaseTest.t.sol";
 
 import "../Helpers.t.sol";
 
@@ -53,7 +44,7 @@ contract StargateFacetTest is BaseTest {
 
         assertGt(fee, 0.111111111111111111e18);
 
-        vm.expectRevert(IStargateFacet.StargateFacet_UnsupportedAsset.selector);
+        vm.expectRevert(IErrors.StargateFacet_UnsupportedAsset.selector);
         entryPoint.multicall{ value: fee }({
             data: Solarray.bytess(
                 abi.encodeCall(

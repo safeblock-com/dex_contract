@@ -10,20 +10,12 @@ import {
     TOKEN_FACET_STORAGE_START
 } from "./Constants.sol";
 
+import { IErrors } from "../interfaces/IErrors.sol";
+
 /// @title TransientStorageFacetLibrary
 /// @notice Library for managing transient storage in a diamond-like proxy contract.
 /// @dev Uses assembly for efficient storage operations to manage callback addresses, sender addresses, fees, and token amounts.
 library TransientStorageFacetLibrary {
-    // =========================
-    // errors
-    // =========================
-
-    /// @dev Thrown when a token is not transferred from the contract after a call.
-    error TokenNotTransferredFromContract();
-
-    /// @dev Thrown when the sender address is zero during retrieval.
-    error TransientStorageFacetLibrary_InvalidSenderAddress();
-
     // =========================
     // functions
     // =========================
@@ -49,14 +41,14 @@ library TransientStorageFacetLibrary {
 
     /// @dev Retrieves the sender address from temporary storage.
     ///      Reads from the `SENDER_FACET_STORAGE` slot.
-    ///      Reverts with `TransientStorageFacetLibrary_InvalidSenderAddress` if the sender is zero.
+    ///      Reverts with `IErrors.TransientStorageFacetLibrary_InvalidSenderAddress` if the sender is zero.
     /// @return senderAddress The current sender address.
     function getSenderAddress() internal view returns (address senderAddress) {
         assembly ("memory-safe") {
             senderAddress := sload(SENDER_FACET_STORAGE)
         }
         if (senderAddress == address(0)) {
-            revert TransientStorageFacetLibrary_InvalidSenderAddress();
+            revert IErrors.TransientStorageFacetLibrary_InvalidSenderAddress();
         }
     }
 
@@ -78,8 +70,8 @@ library TransientStorageFacetLibrary {
     /// @param senderAddress The address to set as the sender.
     function setSenderAddress(address senderAddress) internal {
         assembly ("memory-safe") {
-            sstore(SENDER_FACET_STORAGE, senderAddress)
-            if iszero(senderAddress) {
+            switch iszero(senderAddress)
+            case 1 {
                 for {
                     let tokenIndex := sload(TOKEN_FACET_STORAGE)
                     sstore(TOKEN_FACET_STORAGE, 0)
@@ -89,11 +81,15 @@ library TransientStorageFacetLibrary {
                     tokenIndex := sub(tokenIndex, 1)
                 } {
                     if sload(start) {
-                        mstore(0, 0xc26d3d6a) // TokenNotTransferredFromContract
+                        // IErrors.TransientStorageFacetLibrary_TokenNotTransferredFromContract()
+                        mstore(0, 0xfe0b6008)
                         revert(28, 4)
                     }
                 }
+
+                sstore(SENDER_FACET_STORAGE, senderAddress)
             }
+            default { if iszero(sload(SENDER_FACET_STORAGE)) { sstore(SENDER_FACET_STORAGE, senderAddress) } }
         }
     }
 

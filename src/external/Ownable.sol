@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
+import { IErrors } from "../interfaces/IErrors.sol";
 import { IOwnable } from "./IOwnable.sol";
 
 /// @title Ownable
@@ -44,10 +45,10 @@ abstract contract Ownable is IOwnable {
 
     /// @dev Internal function to verify if the caller is the owner of the contract.
     /// Errors:
-    /// - Thrown `Ownable_SenderIsNotOwner` if the caller is not the owner.
+    /// - Thrown `IErrors.Ownable_SenderIsNotOwner` if the caller is not the owner.
     function _checkOwner() internal view {
         if (_owner != msg.sender) {
-            revert Ownable_SenderIsNotOwner(msg.sender);
+            revert IErrors.Ownable_SenderIsNotOwner(msg.sender);
         }
     }
 

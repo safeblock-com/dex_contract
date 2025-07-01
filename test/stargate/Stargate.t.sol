@@ -1,17 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {
-    BaseTest,
-    IERC20,
-    Solarray,
-    IMultiswapRouterFacet,
-    ITransferFacet,
-    StargateFacet,
-    IStargateFacet,
-    TransferHelper,
-    TransferHelper
-} from "../BaseTest.t.sol";
+import "../BaseTest.t.sol";
 
 import "../Helpers.t.sol";
 
@@ -98,7 +88,7 @@ contract StargateFacetTest is BaseTest {
             composeGasLimit: 0
         });
 
-        vm.expectRevert(IStargateFacet.StargateFacet_InvalidNativeBalance.selector);
+        vm.expectRevert(abi.encodeWithSelector(IErrors.ValueLowerThanExpected.selector, fee >> 1, fee));
         entryPoint.multicall{ value: fee >> 1 }({
             data: Solarray.bytess(
                 abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool, dstEidV2, 1000e18, user, 0, bytes("")))
@@ -121,7 +111,7 @@ contract StargateFacetTest is BaseTest {
             composeGasLimit: 0
         });
 
-        vm.expectRevert(TransferHelper.TransferHelper_TransferFromError.selector);
+        vm.expectRevert(IErrors.TransferHelper_TransferFromError.selector);
         entryPoint.multicall{ value: fee }({
             data: Solarray.bytess(
                 abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool, dstEidV2, 1000e18, user, 0, bytes("")))
@@ -130,7 +120,7 @@ contract StargateFacetTest is BaseTest {
 
         deal({ token: USDT, to: user, give: 1000e18 });
 
-        vm.expectRevert(TransferHelper.TransferHelper_TransferFromError.selector);
+        vm.expectRevert(IErrors.TransferHelper_TransferFromError.selector);
         entryPoint.multicall{ value: fee }({
             data: Solarray.bytess(
                 abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool, dstEidV2, 1000e18, user, 0, bytes("")))
@@ -214,7 +204,7 @@ contract StargateFacetTest is BaseTest {
             composeGasLimit: 0
         });
 
-        vm.expectRevert(TransferHelper.TransferHelper_TransferFromError.selector);
+        vm.expectRevert(IErrors.TransferHelper_TransferFromError.selector);
         entryPoint.multicall{ value: fee }({
             data: Solarray.bytess(
                 abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data)),

@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import { BaseOwnableFacet } from "../BaseOwnableFacet.sol";
-
 import { TransferHelper } from "../../libraries/TransferHelper.sol";
 
 import { TransientStorageFacetLibrary } from "../../libraries/TransientStorageFacetLibrary.sol";
-import { FeeLibrary } from "../../libraries/FeeLibrary.sol";
 
+import { IErrors } from "../../interfaces/IErrors.sol";
 import { IV3SpokePool } from "./interfaces/IV3SpokePool.sol";
 import { IAcrossFacet } from "./interfaces/IAcrossFacet.sol";
 
@@ -16,7 +14,7 @@ import { E18 } from "../../libraries/Constants.sol";
 /// @title AcrossFacet
 /// @notice A facet for cross-chain token bridging and message passing via the Across V3 protocol in a diamond-like proxy contract.
 /// @dev Supports depositing tokens for cross-chain transfer and handling incoming messages with callbacks.
-contract AcrossFacet is BaseOwnableFacet, IAcrossFacet {
+contract AcrossFacet is IAcrossFacet {
     // =========================
     // storage
     // =========================
@@ -101,7 +99,7 @@ contract AcrossFacet is BaseOwnableFacet, IAcrossFacet {
         external
     {
         if (msg.sender != _spokePool) {
-            revert IAcrossFacet.AcrossFacet_NotSpokePool();
+            revert IErrors.AcrossFacet_NotSpokePool();
         }
 
         (address fallbackAddress, bytes memory payload) = abi.decode(message, (address, bytes));

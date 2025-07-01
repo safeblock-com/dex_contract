@@ -12,8 +12,6 @@ import { FullMath } from "./uni3Libs/FullMath.sol";
 
 import { E18, _2E96 } from "../../libraries/Constants.sol";
 
-import { console2 } from "forge-std/console2.sol";
-
 struct Slot0 {
     // the current price
     uint160 sqrtPriceX96;
@@ -105,6 +103,67 @@ library HelperV3Lib {
         cache.index = 0;
     }
 
+    function quoteV3Range(
+        IUniswapPool pool,
+        bool zeroForOne,
+        SwapState memory state,
+        FeeAndTickSpacing memory feeAndTickSpacing
+    )
+        internal
+        view
+        returns (uint256, uint256)
+    {
+        if (state.liquidity == 0) {
+            return (0, 0);
+        }
+
+        StepComputations memory step;
+
+        step.sqrtPriceStartX96 = state.sqrtPriceX96;
+        (step.tickNext, step.initialized) =
+            TickBitmap.nextInitializedTickWithinOneWord(pool, state.tick, feeAndTickSpacing.tickSpacing, zeroForOne);
+
+        // ensure that we do not overshoot the min/max tick, as the tick bitmap is not aware of these bounds
+        if (step.tickNext < TickMath.MIN_TICK) {
+            step.tickNext = TickMath.MIN_TICK;
+        } else if (step.tickNext > TickMath.MAX_TICK) {
+            step.tickNext = TickMath.MAX_TICK;
+        }
+
+        // get the price for the next tick
+        step.sqrtPriceNextX96 = TickMath.getSqrtRatioAtTick(step.tickNext);
+
+        // compute values to swap to the target tick, price limit, or point where input/output amount is exhausted
+        (state.sqrtPriceX96, step.amountIn, step.amountOut, step.feeAmount) =
+            SwapMath.computeSwapStep(state.sqrtPriceX96, step.sqrtPriceNextX96, state.liquidity, feeAndTickSpacing.fee);
+
+        // shift tick if we reached the next price
+        if (state.sqrtPriceX96 == step.sqrtPriceNextX96) {
+            // if the tick is initialized, run the tick transition
+            if (step.initialized) {
+                int128 liquidityNet = getTickLiquidityNet(pool, step.tickNext);
+                // if we're moving leftward, we interpret liquidityNet as the opposite sign
+                // safe because liquidityNet cannot be type(int128).min
+                unchecked {
+                    if (zeroForOne) liquidityNet = -liquidityNet;
+                }
+
+                state.liquidity = liquidityNet < 0
+                    ? state.liquidity - uint128(-liquidityNet)
+                    : state.liquidity + uint128(liquidityNet);
+            }
+
+            unchecked {
+                state.tick = zeroForOne ? step.tickNext - 1 : step.tickNext;
+            }
+        } else if (state.sqrtPriceX96 != step.sqrtPriceStartX96) {
+            // recompute unless we're on a lower tick boundary (i.e. already transitioned ticks), and haven't moved
+            state.tick = TickMath.getTickAtSqrtRatio(state.sqrtPriceX96);
+        }
+
+        return (step.amountIn, step.amountOut);
+    }
+
     function quoteV3(
         IUniswapPool pool,
         bool zeroForOne,
@@ -194,9 +253,7 @@ library HelperV3Lib {
                     int128 liquidityNet = getTickLiquidityNet(pool, step.tickNext);
                     // if we're moving leftward, we interpret liquidityNet as the opposite sign
                     // safe because liquidityNet cannot be type(int128).min
-                    unchecked {
-                        if (zeroForOne) liquidityNet = -liquidityNet;
-                    }
+                    if (zeroForOne) liquidityNet = -liquidityNet;
 
                     state.liquidity = liquidityNet < 0
                         ? state.liquidity - uint128(-liquidityNet)

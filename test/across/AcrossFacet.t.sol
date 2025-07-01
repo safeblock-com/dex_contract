@@ -1,18 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {
-    BaseTest,
-    IERC20,
-    Solarray,
-    IMultiswapRouterFacet,
-    ITransferFacet,
-    AcrossFacet,
-    IAcrossFacet,
-    TransferHelper,
-    IEntryPoint,
-    TransferFacet
-} from "../BaseTest.t.sol";
+import "../BaseTest.t.sol";
 
 import { E18 } from "../../src/libraries/Constants.sol";
 
@@ -109,7 +98,7 @@ contract AcrossFacetTest is BaseTest {
 
         bytes memory message = _getMessage(optimismUniswapV3_USDC_OP_Pool, outputAmount);
 
-        vm.expectRevert(TransferHelper.TransferHelper_TransferFromError.selector);
+        vm.expectRevert(IErrors.TransferHelper_TransferFromError.selector);
         entryPoint.multicall({
             data: Solarray.bytess(
                 abi.encodeCall(

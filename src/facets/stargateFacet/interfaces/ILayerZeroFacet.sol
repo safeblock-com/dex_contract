@@ -6,18 +6,6 @@ import { UlnConfig, Origin } from "./ILayerZeroEndpointV2.sol";
 /// @title ILayerZeroFacet - LayerZeroFacet Interface
 interface ILayerZeroFacet {
     // =========================
-    // errors
-    // =========================
-
-    /// @dev Thrown when the lengths of input arrays do not match.
-    ///      Triggered in `setPeers` and `setGasLimit` if array lengths are unequal.
-    error LayerZeroFacet_LengthMismatch();
-
-    /// @dev Thrown when the contract’s native balance is insufficient to cover the messaging fee.
-    ///      Triggered in `sendDeposit` if the balance is less than the quoted fee.
-    error LayerZeroFacet_FeeNotMet();
-
-    // =========================
     // getters
     // =========================
 

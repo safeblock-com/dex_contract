@@ -9,7 +9,7 @@ import { Ownable2Step } from "../external/Ownable2Step.sol";
 import { IUniswapPool } from "../facets/multiswapRouterFacet/interfaces/IUniswapPool.sol";
 
 import { HelperV2Lib } from "./libraries/HelperV2Lib.sol";
-import { HelperV3Lib, TickMath } from "./libraries/HelperV3Lib.sol";
+import { HelperV3Lib, TickMath, Slot0, SwapCache, SwapState, FeeAndTickSpacing } from "./libraries/HelperV3Lib.sol";
 
 import { IMultiswapRouterFacet } from "../facets/multiswapRouterFacet/interfaces/IMultiswapRouterFacet.sol";
 
@@ -22,6 +22,8 @@ import { E18, UNISWAP_V3_MASK, ADDRESS_MASK, FEE_MASK, E6 } from "../libraries/C
 import { EfficientSwapAmount } from "./libraries/EfficientSwapAmount.sol";
 
 import { PoolHelper } from "../libraries/PoolHelper.sol";
+
+import { IErrors } from "../interfaces/IErrors.sol";
 
 /// @title Multiswap-Partswap Quoter contract
 contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
@@ -64,6 +66,39 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
     // =========================
     // main logic
     // =========================
+
+    function range(
+        bytes32 pair,
+        address tokenIn,
+        uint256 tickCrosses
+    )
+        external
+        view
+        returns (uint256 amountIn, uint256 amountOut)
+    {
+        (, IUniswapPool pool,,) = _getPoolInfo(pair);
+
+        (bool zeroForOne,) = PoolHelper.validateTokenInPair(pool, tokenIn);
+
+        Slot0 memory slot0Start;
+        SwapCache memory cache;
+        SwapState memory state;
+        FeeAndTickSpacing memory feeAndTickSpacing;
+
+        HelperV3Lib.getDataForSimulate(pool, slot0Start, cache, state, feeAndTickSpacing, 0);
+
+        for (uint256 i; i < tickCrosses; ++i) {
+            (uint256 _amountIn, uint256 _amountOut) = HelperV3Lib.quoteV3Range({
+                pool: pool,
+                zeroForOne: zeroForOne,
+                state: state,
+                feeAndTickSpacing: feeAndTickSpacing
+            });
+
+            amountIn += _amountIn;
+            amountOut += _amountOut;
+        }
+    }
 
     function efficientAmounts2(
         bytes32 pair,
@@ -207,7 +242,7 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
         {
             uint256 amountInPercentagesLength = data.amountInPercentages.length;
             if (amountInPercentagesLength == 0) {
-                revert IMultiswapRouterFacet.MultiswapRouterFacet_InvalidMultiswap2Calldata();
+                revert IErrors.MultiswapRouterFacet_InvalidMultiswap2Calldata();
             }
             tokensOut = new address[](amountInPercentagesLength);
             for (uint256 i; i < amountInPercentagesLength;) {

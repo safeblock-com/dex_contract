@@ -4,13 +4,6 @@ pragma solidity ^0.8.0;
 /// @title ITransferFacet - interface for TransferFacet
 interface ITransferFacet {
     // =========================
-    // errors
-    // =========================
-
-    /// @dev Thrown when a transfer via Permit2 fails to increase the contract's token balance.
-    error TransferFacet_TransferFromFailed();
-
-    // =========================
     // getters
     // =========================
 

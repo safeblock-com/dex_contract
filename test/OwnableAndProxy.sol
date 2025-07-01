@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-import { BaseTest, IOwnable2Step, IOwnable, EntryPoint, Initializable, IFeeContract } from "./BaseTest.t.sol";
+import "./BaseTest.t.sol";
 
 import { Proxy, InitialImplementation } from "../src/proxy/Proxy.sol";
 import { UUPSUpgradeable, ERC1967Utils } from "../src/proxy/UUPSUpgradeable.sol";
@@ -26,7 +26,8 @@ contract OwnableAndProxyTest is BaseTest {
     // =========================
 
     function test_entryPoint_disableInitializers(address newOwner) external {
-        EntryPoint entryPointImplementation = new EntryPoint({ facetsAndSelectors: bytes("") });
+        EntryPoint entryPointImplementation =
+            new EntryPoint({ facetsAndSelectors: bytes(""), entryPointAA_: contracts.entryPointAA });
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
         entryPointImplementation.initialize({ newOwner: newOwner });
@@ -44,7 +45,9 @@ contract OwnableAndProxyTest is BaseTest {
 
         EntryPoint _entryPoint = EntryPoint(payable(address(new Proxy({ initialOwner: owner }))));
         InitialImplementation(address(_entryPoint)).upgradeTo({
-            implementation: address(new EntryPoint({ facetsAndSelectors: bytes("") })),
+            implementation: address(
+                new EntryPoint({ facetsAndSelectors: bytes(""), entryPointAA_: contracts.entryPointAA })
+            ),
             data: abi.encodeCall(EntryPoint.initialize, (newOwner))
         });
         assertEq(_entryPoint.owner(), newOwner);
@@ -63,19 +66,19 @@ contract OwnableAndProxyTest is BaseTest {
 
         _resetPrank(notOwner);
 
-        vm.expectRevert(abi.encodeWithSelector(IOwnable.Ownable_SenderIsNotOwner.selector, notOwner));
+        vm.expectRevert(abi.encodeWithSelector(IErrors.Ownable_SenderIsNotOwner.selector, notOwner));
         entryPoint.renounceOwnership();
 
-        vm.expectRevert(abi.encodeWithSelector(IOwnable.Ownable_SenderIsNotOwner.selector, notOwner));
+        vm.expectRevert(abi.encodeWithSelector(IErrors.Ownable_SenderIsNotOwner.selector, notOwner));
         entryPoint.transferOwnership({ newOwner: notOwner });
 
-        vm.expectRevert(abi.encodeWithSelector(IOwnable.Ownable_SenderIsNotOwner.selector, notOwner));
+        vm.expectRevert(abi.encodeWithSelector(IErrors.Ownable_SenderIsNotOwner.selector, notOwner));
         entryPoint.setFeeContractAddressAndFee({ feeContractAddress: notOwner, fee: 300 });
 
-        vm.expectRevert(abi.encodeWithSelector(IOwnable.Ownable_SenderIsNotOwner.selector, notOwner));
+        vm.expectRevert(abi.encodeWithSelector(IErrors.Ownable_SenderIsNotOwner.selector, notOwner));
         feeContract.setRouter({ newRouter: notOwner });
 
-        vm.expectRevert(abi.encodeWithSelector(IOwnable.Ownable_SenderIsNotOwner.selector, notOwner));
+        vm.expectRevert(abi.encodeWithSelector(IErrors.Ownable_SenderIsNotOwner.selector, notOwner));
         feeContract.collectProtocolFees({ token: address(0), recipient: address(1), amount: 1 });
     }
 
@@ -94,7 +97,7 @@ contract OwnableAndProxyTest is BaseTest {
         assertEq(entryPoint.owner(), owner);
 
         _resetPrank(owner);
-        vm.expectRevert(IOwnable2Step.Ownable_NewOwnerCannotBeAddressZero.selector);
+        vm.expectRevert(IErrors.Ownable_NewOwnerCannotBeAddressZero.selector);
         entryPoint.transferOwnership({ newOwner: address(0) });
     }
 
@@ -134,7 +137,7 @@ contract OwnableAndProxyTest is BaseTest {
         assertEq(entryPoint.pendingOwner(), pendingOwner);
 
         _resetPrank(notPendingOwner);
-        vm.expectRevert(abi.encodeWithSelector(IOwnable2Step.Ownable_CallerIsNotTheNewOwner.selector, notPendingOwner));
+        vm.expectRevert(abi.encodeWithSelector(IErrors.Ownable_CallerIsNotTheNewOwner.selector, notPendingOwner));
         entryPoint.acceptOwnership();
     }
 
@@ -171,7 +174,7 @@ contract OwnableAndProxyTest is BaseTest {
         address impl = address(new NewImplementation());
 
         _resetPrank(notOwner);
-        vm.expectRevert(abi.encodeWithSelector(IOwnable.Ownable_SenderIsNotOwner.selector, notOwner));
+        vm.expectRevert(abi.encodeWithSelector(IErrors.Ownable_SenderIsNotOwner.selector, notOwner));
         entryPoint.upgradeTo({ newImplementation: impl });
     }
 

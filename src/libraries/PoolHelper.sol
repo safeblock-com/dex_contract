@@ -2,13 +2,339 @@
 pragma solidity ^0.8.0;
 
 import { IERC20 } from "forge-std/interfaces/IERC20.sol";
+import { IErrors } from "../interfaces/IErrors.sol";
 
-import { E6, E18 } from "./Constants.sol";
+import { HelperV2Lib } from "./HelperV2Lib.sol";
+import { Utils } from "./Utils.sol";
+import { TransferHelper } from "./TransferHelper.sol";
+import { TransientStorageFacetLibrary } from "./TransientStorageFacetLibrary.sol";
+import { StorageLibrary, MultiswapRouterFacetStorage } from "./StorageLibrary.sol";
+import {
+    ADDRESS_MASK,
+    FEE_MASK,
+    E6,
+    E18,
+    CAST_INT_CONSTANT,
+    MIN_SQRT_RATIO_PLUS_ONE,
+    MAX_SQRT_RATIO_MINUS_ONE
+} from "./Constants.sol";
 
 import { IUniswapPool } from "../facets/multiswapRouterFacet/interfaces/IUniswapPool.sol";
 
 /// @title PoolHelper
 library PoolHelper {
+    // =========================
+    // swap methods
+    // =========================
+
+    /// @dev Executes a Uniswap V3 swap with exact input tokens.
+    ///      Calls the Uniswap V3 pool's `swap` function, caches the pool address for the callback,
+    ///      and verifies the output amount if the destination is this contract.
+    /// @param amountIn The input amount for the swap.
+    /// @param tokenIn The input token for the swap.
+    /// @param _pool The encoded pool identifier (includes address and Uniswap V3 flag).
+    /// @param _destination The encoded destination for the output tokens.
+    /// @param destinationIsAddressThis Whether the destination is this contract.
+    /// @return amountOut The output amount from the swap.
+    /// @return tokenOut The output token from the swap.
+    function swapUniV3ExactIn(
+        address callbackAddress,
+        uint256 amountIn,
+        address tokenIn,
+        bytes32 _pool,
+        bytes32 _destination,
+        bool destinationIsAddressThis
+    )
+        internal
+        returns (uint256 amountOut, address tokenOut)
+    {
+        IUniswapPool pool;
+        address destination;
+        assembly ("memory-safe") {
+            pool := and(_pool, ADDRESS_MASK)
+            destination := and(_destination, ADDRESS_MASK)
+        }
+
+        bool zeroForOne;
+        (zeroForOne, tokenOut) = validateTokenInPair(pool, tokenIn);
+
+        Utils.checkIntCast({ amount: amountIn });
+
+        {
+            // caching the pool address and swapType in storage
+            MultiswapRouterFacetStorage storage s = StorageLibrary.getMultiswapRouterFacetStorage();
+            assembly ("memory-safe") {
+                sstore(s.slot, pool)
+            }
+            // caching the callback address
+            TransientStorageFacetLibrary.setCallbackAddress({ callbackAddress: callbackAddress });
+        }
+
+        uint256 balanceOutBeforeSwap;
+        if (destinationIsAddressThis) {
+            balanceOutBeforeSwap = TransferHelper.safeGetBalance({ token: tokenOut, account: address(this) });
+        }
+
+        pool.swap({
+            recipient: destination,
+            zeroForOne: zeroForOne,
+            amountSpecified: int256(amountIn),
+            sqrtPriceLimitX96: (zeroForOne ? MIN_SQRT_RATIO_PLUS_ONE : MAX_SQRT_RATIO_MINUS_ONE),
+            data: abi.encode(tokenIn)
+        });
+
+        if (destinationIsAddressThis) {
+            // return the exact amount of tokens as a result of the swap
+            amountOut = Utils.compareAmounts(
+                TransferHelper.safeGetBalance({ token: tokenOut, account: address(this) }), balanceOutBeforeSwap
+            );
+        }
+    }
+
+    /// @dev Executes a Uniswap V3 swap with exact output tokens.
+    ///      Calls the Uniswap V3 pool's `swap` function and caches the pool address for the callback.
+    /// @param amountOut The exact output amount for the swap.
+    /// @param tokenOut The output token for the swap.
+    /// @param _pool The encoded pool identifier (includes address and Uniswap V3 flag).
+    /// @param destination The destination for the output tokens.
+    function swapUniV3ExactOut(
+        address callbackAddress,
+        uint256 amountOut,
+        address tokenOut,
+        bytes32 _pool,
+        address destination,
+        bytes32[] memory path
+    )
+        internal
+    {
+        IUniswapPool pool;
+        assembly ("memory-safe") {
+            pool := and(_pool, ADDRESS_MASK)
+        }
+
+        (bool zeroForOne, address tokenIn) = validateTokenInPair(pool, tokenOut);
+
+        Utils.checkIntCast({ amount: amountOut });
+
+        {
+            // caching the pool address and swapType in storage
+            MultiswapRouterFacetStorage storage s = StorageLibrary.getMultiswapRouterFacetStorage();
+            assembly ("memory-safe") {
+                sstore(s.slot, add(shl(168, mload(path)), add(shl(160, 2), pool)))
+            }
+            // caching the callback address
+            TransientStorageFacetLibrary.setCallbackAddress({ callbackAddress: callbackAddress });
+        }
+
+        pool.swap({
+            recipient: destination,
+            zeroForOne: !zeroForOne,
+            amountSpecified: -int256(amountOut),
+            sqrtPriceLimitX96: (!zeroForOne ? MIN_SQRT_RATIO_PLUS_ONE : MAX_SQRT_RATIO_MINUS_ONE),
+            data: abi.encode(0, tokenIn, path)
+        });
+    }
+
+    /// @dev Executes a Uniswap V2 swap with exact input tokens.
+    ///      Transfers input tokens to the pair, calculates the output amount, and calls the pair’s swap function.
+    ///      Supports multiple swap function selectors and Solidly-style pairs.
+    ///      Reverts with `MultiswapRouterFacet_FailedV2Swap` if the swap fails.
+    /// @param _pair The encoded pair identifier (includes address, fee, and Solidly flag).
+    /// @param tokenIn The input token for the swap.
+    /// @param _destination The encoded destination for the output tokens.
+    /// @param destinationIsAddressThis Whether the destination is this contract.
+    /// @return amountOut The output amount from the swap.
+    /// @return tokenOut The output token from the swap.
+    function swapUniV2ExactIn(
+        bytes32 _pair,
+        address tokenIn,
+        bytes32 _destination,
+        bool destinationIsAddressThis
+    )
+        internal
+        returns (uint256 amountOut, address tokenOut)
+    {
+        IUniswapPool pair;
+        uint256 isSolidly;
+        address destination;
+        uint256 fee;
+        assembly ("memory-safe") {
+            pair := and(_pair, ADDRESS_MASK)
+            fee := and(shr(160, _pair), FEE_MASK)
+            destination := and(_destination, ADDRESS_MASK)
+            isSolidly := and(shr(184, _pair), 0xff)
+        }
+
+        bool tokenInIsToken0;
+        (tokenInIsToken0, tokenOut) = validateTokenInPair(pair, tokenIn);
+
+        uint256 amountInput;
+        // scope to avoid stack too deep errors
+        {
+            (uint256 reserveInput, uint256 reserveOutput, bool stableSwap) =
+                getReserves({ pair: pair, tokenInIsToken0: tokenInIsToken0, isSolidly: isSolidly > 0 });
+
+            // get the exact number of tokens that were sent to the pair
+            // underflow is impossible cause after token transfer via token contract
+            // reserves in the pair not updated yet
+            unchecked {
+                amountInput = Utils.compareAmounts(
+                    TransferHelper.safeGetBalance({ token: tokenIn, account: address(pair) }), reserveInput
+                );
+            }
+
+            if (stableSwap) {
+                amountOut = HelperV2Lib.stableAmountOut({
+                    tokenIn: tokenIn,
+                    tokenOut: tokenOut,
+                    amountIn: amountInput,
+                    reserveIn: reserveInput,
+                    reserveOut: reserveOutput,
+                    feeE6: fee
+                });
+            } else {
+                amountOut = HelperV2Lib.volatileAmountOut({
+                    amountIn: amountInput,
+                    reserveIn: reserveInput,
+                    reserveOut: reserveOutput,
+                    feeE6: fee
+                });
+            }
+        }
+
+        (uint256 amount0Out, uint256 amount1Out) = tokenInIsToken0 ? (uint256(0), amountOut) : (amountOut, uint256(0));
+
+        uint256 balanceOutBeforeSwap;
+        if (destinationIsAddressThis) {
+            balanceOutBeforeSwap = TransferHelper.safeGetBalance({ token: tokenOut, account: address(this) });
+        }
+
+        if (
+            // first do the swap via the most common swap function selector
+            // swap(uint256,uint256,address,bytes) selector
+            !Utils.makeCall(
+                address(pair), abi.encodeWithSelector(0x022c0d9f, amount0Out, amount1Out, destination, bytes(""))
+            )
+        ) {
+            if (
+                // if revert - try to swap through another selector
+                // swap(uint256,uint256,address) selector
+                !Utils.makeCall(address(pair), abi.encodeWithSelector(0x6d9a640a, amount0Out, amount1Out, destination))
+            ) {
+                revert IErrors.MultiswapRouterFacet_FailedV2Swap();
+            }
+        }
+
+        if (destinationIsAddressThis) {
+            // return the exact amount of tokens as a result of the swap
+            amountOut = Utils.compareAmounts(
+                TransferHelper.safeGetBalance({ token: tokenOut, account: address(this) }), balanceOutBeforeSwap
+            );
+        }
+    }
+
+    /// @dev Executes a Uniswap V2 swap with exact output tokens.
+    ///      Requests output tokens from the pair and starts the callback for iterates through the pairs.
+    ///      Supports Solidly-style pairs.
+    ///      Reverts with `MultiswapRouterFacet_FailedV2Swap` if the swap fails.
+    /// @param _pair The encoded pair identifier (includes address, fee, and Solidly flag).
+    /// @param tokenOut The output token for the swap.
+    /// @param amountOut The exact output amount for the swap.
+    /// @param destination The destination for the output tokens.
+    /// @param path The array of pool identifiers for the swap path.
+    function swapUniV2ExactOut(
+        address callbackAddress,
+        bytes32 _pair,
+        address tokenOut,
+        address destination,
+        uint256 amountOut,
+        bytes32[] memory path
+    )
+        internal
+    {
+        IUniswapPool pair;
+        uint256 amountIn;
+        address tokenIn;
+        uint256 amount0Out;
+        uint256 amount1Out;
+        {
+            bool tokenInIsToken0;
+            (pair, amountIn, tokenInIsToken0, tokenIn) = _getAmountIn(_pair, tokenOut, amountOut);
+
+            (amount0Out, amount1Out) = !tokenInIsToken0 ? (uint256(0), amountOut) : (amountOut, uint256(0));
+
+            // caching the pool address and swapType in storage
+            MultiswapRouterFacetStorage storage s = StorageLibrary.getMultiswapRouterFacetStorage();
+            assembly ("memory-safe") {
+                sstore(s.slot, add(shl(168, mload(path)), add(shl(160, 1), pair)))
+            }
+            // caching the callback address
+            TransientStorageFacetLibrary.setCallbackAddress({ callbackAddress: callbackAddress });
+        }
+
+        if (
+            // do the swap via the most common swap function selector
+            // swap(uint256,uint256,address,bytes) selector
+            !Utils.makeCall(
+                address(pair),
+                abi.encodeWithSelector(
+                    0x022c0d9f, amount0Out, amount1Out, destination, abi.encode(amountIn, tokenIn, path)
+                )
+            )
+        ) {
+            revert IErrors.MultiswapRouterFacet_FailedV2Swap();
+        }
+    }
+
+    /// @dev Helper function to get the input amount for a Uniswap V2 reverse swap.
+    /// @param _pair The encoded pair identifier (includes address, fee, and Solidly flag).
+    /// @param tokenOut The output token for the swap.
+    /// @param amountOut The exact output amount for the swap.
+    /// @return pair The pair for the swap.
+    /// @return amountIn The input amount for the swap.
+    /// @return tokenInIsToken1 Whether the input token is token1 in the pair.
+    /// @return tokenIn The input token for the swap.
+    function _getAmountIn(
+        bytes32 _pair,
+        address tokenOut,
+        uint256 amountOut
+    )
+        private
+        view
+        returns (IUniswapPool pair, uint256 amountIn, bool tokenInIsToken1, address tokenIn)
+    {
+        uint256 isSolidly;
+        uint256 fee;
+        assembly ("memory-safe") {
+            pair := and(_pair, ADDRESS_MASK)
+            fee := and(shr(160, _pair), FEE_MASK)
+            isSolidly := and(shr(184, _pair), 0xff)
+        }
+
+        (tokenInIsToken1, tokenIn) = validateTokenInPair(pair, tokenOut);
+
+        (uint256 reserveInput, uint256 reserveOutput, bool stableSwap) =
+            getReserves({ pair: pair, tokenInIsToken0: !tokenInIsToken1, isSolidly: isSolidly > 0 });
+
+        if (stableSwap) {
+            amountIn = HelperV2Lib.stableAmountIn({
+                tokenIn: tokenIn,
+                tokenOut: tokenOut,
+                amountOut: amountOut,
+                reserveIn: reserveInput,
+                reserveOut: reserveOutput,
+                feeE6: fee
+            });
+        } else {
+            amountIn = HelperV2Lib.volatileAmountIn({
+                amountOut: amountOut,
+                reserveIn: reserveInput,
+                reserveOut: reserveOutput,
+                feeE6: fee
+            });
+        }
+    }
+
     // =========================
     // helper methods
     // =========================

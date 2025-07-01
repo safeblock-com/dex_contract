@@ -4,11 +4,9 @@ pragma solidity ^0.8.0;
 import { PoolHelper } from "./PoolHelper.sol";
 import { E6, E18 } from "./Constants.sol";
 
-library HelperV2Lib {
-    error UniswapV2_InsufficientInputAmount();
-    error UniswapV2_InsufficientOutputAmount();
-    error UniswapV2_InsufficientLiquidity();
+import { IErrors } from "../interfaces/IErrors.sol";
 
+library HelperV2Lib {
     // ===========================
     // amountOut
     // ===========================
@@ -24,10 +22,10 @@ library HelperV2Lib {
         returns (uint256 amountOut)
     {
         if (amountIn == 0) {
-            revert UniswapV2_InsufficientInputAmount();
+            revert IErrors.UniswapV2_InsufficientInputAmount();
         }
         if (reserveIn == 0 || reserveOut == 0) {
-            revert UniswapV2_InsufficientLiquidity();
+            revert IErrors.UniswapV2_InsufficientLiquidity();
         }
 
         amountOut = PoolHelper.calculateVolatileAmountOut({
@@ -51,10 +49,10 @@ library HelperV2Lib {
         returns (uint256 amountOut)
     {
         if (amountIn == 0) {
-            revert UniswapV2_InsufficientInputAmount();
+            revert IErrors.UniswapV2_InsufficientInputAmount();
         }
         if (reserveIn == 0 || reserveOut == 0) {
-            revert UniswapV2_InsufficientLiquidity();
+            revert IErrors.UniswapV2_InsufficientLiquidity();
         }
 
         amountOut = PoolHelper.calculateStableAmountOut({
@@ -82,15 +80,15 @@ library HelperV2Lib {
         returns (uint256 amountIn)
     {
         if (amountOut == 0) {
-            revert UniswapV2_InsufficientOutputAmount();
+            revert IErrors.UniswapV2_InsufficientOutputAmount();
         }
 
         if (reserveIn == 0 || reserveOut == 0) {
-            revert UniswapV2_InsufficientLiquidity();
+            revert IErrors.UniswapV2_InsufficientLiquidity();
         }
 
         if (amountOut > reserveOut) {
-            revert UniswapV2_InsufficientOutputAmount();
+            revert IErrors.UniswapV2_InsufficientOutputAmount();
         }
 
         amountIn = PoolHelper.calculateVolatileAmountIn({
@@ -114,15 +112,15 @@ library HelperV2Lib {
         returns (uint256 amountIn)
     {
         if (amountOut == 0) {
-            revert UniswapV2_InsufficientOutputAmount();
+            revert IErrors.UniswapV2_InsufficientOutputAmount();
         }
 
         if (reserveIn == 0 || reserveOut == 0) {
-            revert UniswapV2_InsufficientLiquidity();
+            revert IErrors.UniswapV2_InsufficientLiquidity();
         }
 
         if (amountOut > reserveOut) {
-            revert UniswapV2_InsufficientOutputAmount();
+            revert IErrors.UniswapV2_InsufficientOutputAmount();
         }
 
         amountIn = PoolHelper.calculateStableAmountIn({

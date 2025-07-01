@@ -14,13 +14,6 @@ import { PoolHelper } from "../../libraries/PoolHelper.sol";
 
 library EfficientSwapAmount {
     // =========================
-    // errors
-    // =========================
-
-    /// @notice Throws if the target price is already reached
-    error EfficientSwapAmount_TargetPriceIsAlreadyReached();
-
-    // =========================
     // internal methods
     // =========================
 

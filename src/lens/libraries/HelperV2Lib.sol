@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { IUniswapPool } from "../../facets/multiswapRouterFacet/interfaces/IUniswapPool.sol";
 import { PoolHelper } from "../../libraries/PoolHelper.sol";
-
 import { E18, E6 } from "../../libraries/Constants.sol";
 
-library HelperV2Lib {
-    error UniswapV2_InsufficientInputAmount();
-    error UniswapV2_InsufficientOutputAmount();
+import { IUniswapPool } from "../../facets/multiswapRouterFacet/interfaces/IUniswapPool.sol";
+import { IErrors } from "../../interfaces/IErrors.sol";
 
+library HelperV2Lib {
     // ===========================
     // amountOut
     // ===========================
@@ -25,7 +23,7 @@ library HelperV2Lib {
         returns (uint256 amountOut)
     {
         if (amountIn == 0) {
-            revert UniswapV2_InsufficientInputAmount();
+            revert IErrors.UniswapV2_InsufficientInputAmount();
         }
 
         if (reserveIn == 0 || reserveOut == 0) {
@@ -53,7 +51,7 @@ library HelperV2Lib {
         returns (uint256 amountOut)
     {
         if (amountIn == 0) {
-            revert UniswapV2_InsufficientInputAmount();
+            revert IErrors.UniswapV2_InsufficientInputAmount();
         }
 
         amountOut = PoolHelper.calculateStableAmountOut({
@@ -81,7 +79,7 @@ library HelperV2Lib {
         returns (uint256 amountIn)
     {
         if (amountOut == 0) {
-            revert UniswapV2_InsufficientOutputAmount();
+            revert IErrors.UniswapV2_InsufficientOutputAmount();
         }
 
         if (reserveIn == 0 || reserveOut == 0) {
@@ -113,7 +111,7 @@ library HelperV2Lib {
         returns (uint256 amountIn)
     {
         if (amountOut == 0) {
-            revert UniswapV2_InsufficientOutputAmount();
+            revert IErrors.UniswapV2_InsufficientOutputAmount();
         }
 
         if (reserveIn == 0 || reserveOut == 0) {

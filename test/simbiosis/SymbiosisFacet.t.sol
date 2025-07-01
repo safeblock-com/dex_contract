@@ -1,19 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {
-    BaseTest,
-    IERC20,
-    Solarray,
-    IMultiswapRouterFacet,
-    ITransferFacet,
-    ISignatureTransfer,
-    SymbiosisFacet,
-    ISymbiosisFacet,
-    ISymbiosis,
-    IEntryPoint,
-    TransferHelper
-} from "../BaseTest.t.sol";
+import "../BaseTest.t.sol";
 
 import "../Helpers.t.sol";
 
@@ -363,7 +351,7 @@ contract SymbiosisFacetTest is BaseTest {
             )
         );
 
-        vm.expectRevert(TransferHelper.TransferHelper_TransferFromError.selector);
+        vm.expectRevert(IErrors.TransferHelper_TransferFromError.selector);
         entryPoint.multicall({
             data: Solarray.bytess(
                 abi.encodeCall(

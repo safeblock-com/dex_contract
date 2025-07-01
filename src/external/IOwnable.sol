@@ -14,14 +14,6 @@ interface IOwnable {
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     // =========================
-    // errors
-    // =========================
-
-    /// @notice Throws when the caller is not authorized to perform an operation.
-    /// @param sender The address of the sender trying to access a restricted function.
-    error Ownable_SenderIsNotOwner(address sender);
-
-    // =========================
     // getters
     // =========================
 

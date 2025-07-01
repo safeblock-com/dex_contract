@@ -5,34 +5,6 @@ pragma solidity ^0.8.0;
 /// @dev Multiswap Router interface
 interface IMultiswapRouterFacet {
     // =========================
-    // errors
-    // =========================
-
-    /// @dev Thrown when the output amount is less than the minimum expected amount.
-    error MultiswapRouterFacet_ValueLowerThanExpected(uint256 expectedGreaterValue, uint256 expectedLowerBalance);
-
-    /// @dev Thrown when a Uniswap V2 swap fails.
-    error MultiswapRouterFacet_FailedV2Swap();
-
-    /// @dev Thrown when the `pairs` array is empty.
-    error MultiswapRouterFacet_InvalidPairsArray();
-
-    /// @dev Thrown when the `Multiswap2Calldata` struct contains invalid data.
-    error MultiswapRouterFacet_InvalidMultiswap2Calldata();
-
-    /// @dev Thrown when a Uniswap V3 swap fails due to zero liquidity.
-    error MultiswapRouterFacet_FailedV3Swap();
-
-    /// @dev Thrown when the `msg.sender` in the fallback is not the cached Uniswap V3 pool.
-    error MultiswapRouterFacet_SenderMustBePool();
-
-    /// @dev Thrown when the input amount exceeds the maximum value for `int256`.
-    error MultiswapRouterFacet_InvalidIntCast();
-
-    /// @dev Thrown when the input amount is zero.
-    error MultiswapRouterFacet_InvalidAmountIn();
-
-    // =========================
     // main logic
     // =========================
 

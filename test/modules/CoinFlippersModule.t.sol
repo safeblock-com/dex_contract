@@ -1,15 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-import {
-    BaseTest,
-    CoinFlippersModule,
-    ICoinFlippersModule,
-    ICoinFlippersVault,
-    IMultiswapRouterFacet,
-    Solarray,
-    TransferHelper
-} from "../BaseTest.t.sol";
+import "../BaseTest.t.sol";
 
 contract CoinFlippersModuleTest is BaseTest {
     using TransferHelper for address;

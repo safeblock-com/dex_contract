@@ -1,18 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {
-    BaseTest,
-    IERC20,
-    Solarray,
-    IMultiswapRouterFacet,
-    ITransferFacet,
-    AcrossFacet,
-    IAcrossFacet,
-    TransferHelper,
-    IEntryPoint,
-    TransferFacet
-} from "../BaseTest.t.sol";
+import "../BaseTest.t.sol";
 
 import { E18 } from "../../src/libraries/Constants.sol";
 
@@ -50,7 +39,7 @@ contract AcrossFacetHandleTest is BaseTest {
 
         bytes memory message = _getMessage(optimismUniswapV3_USDC_OP_Pool, 1000e6, false);
 
-        vm.expectRevert(IAcrossFacet.AcrossFacet_NotSpokePool.selector);
+        vm.expectRevert(IErrors.AcrossFacet_NotSpokePool.selector);
         IAcrossFacet(address(entryPoint)).handleV3AcrossMessage({
             tokenSent: outputTokenUSDC,
             amount: 1000e6,
@@ -95,9 +84,7 @@ contract AcrossFacetHandleTest is BaseTest {
         vm.expectEmit();
         emit CallFailed({
             errorMessage: abi.encodeWithSelector(
-                IMultiswapRouterFacet.MultiswapRouterFacet_ValueLowerThanExpected.selector,
-                quoterAmountOut,
-                quoterAmountOut * 2
+                IErrors.ValueLowerThanExpected.selector, quoterAmountOut, quoterAmountOut * 2
             )
         });
         _expectERC20TransferCall(outputTokenUSDC, user, 1000e6);

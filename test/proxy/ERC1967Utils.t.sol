@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import { ERC1967Utils } from "../../src/proxy/libraries/ERC1967Utils.sol";
 
-import { BaseTest } from "../BaseTest.t.sol";
+import "../BaseTest.t.sol";
 
 contract Implementation { }
 

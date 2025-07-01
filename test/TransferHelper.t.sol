@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.19;
 
-import { BaseTest, TransferHelper } from "./BaseTest.t.sol";
+import "./BaseTest.t.sol";
 
 contract MockTransferHelper {
     using TransferHelper for address;
@@ -158,7 +158,7 @@ contract TransferHelperTest is BaseTest {
 
     function test_transferHelper_safeTransferFrom_shouldRevert() external {
         fakeToken.setFlagRevert({ value: true });
-        vm.expectRevert(TransferHelper.TransferHelper_TransferFromError.selector);
+        vm.expectRevert(IErrors.TransferHelper_TransferFromError.selector);
         mock.transferFrom({ token: address(fakeToken), from: address(this), to: address(1), value: 1 ether });
     }
 
@@ -175,7 +175,7 @@ contract TransferHelperTest is BaseTest {
 
     function test_transferHelper_safeTransfer_shouldRevert() external {
         fakeToken.setFlagRevert({ value: true });
-        vm.expectRevert(TransferHelper.TransferHelper_TransferError.selector);
+        vm.expectRevert(IErrors.TransferHelper_TransferError.selector);
         mock.transfer({ token: address(fakeToken), to: address(1), value: 1 ether });
     }
 
@@ -218,7 +218,7 @@ contract TransferHelperTest is BaseTest {
     function test_transferHelper_approve_shouldRevert() external {
         fakeToken.setFlagRevertBothCalls({ value: true });
 
-        vm.expectRevert(TransferHelper.TransferHelper_ApproveError.selector);
+        vm.expectRevert(IErrors.TransferHelper_ApproveError.selector);
         mock.approve({ token: address(fakeToken), to: address(1), value: 1 });
     }
 
@@ -231,7 +231,7 @@ contract TransferHelperTest is BaseTest {
     }
 
     function test_transferHelper_safeTransferNative_shouldRevert() external {
-        vm.expectRevert(TransferHelper.TransferHelper_TransferNativeError.selector);
+        vm.expectRevert(IErrors.TransferHelper_TransferNativeError.selector);
         mock.transferNative({ to: address(this), value: 1 ether });
     }
 
@@ -241,12 +241,12 @@ contract TransferHelperTest is BaseTest {
 
     function test_transferHelper_safeGetBalance_shouldRevert() external {
         fakeToken.setFlagReturnZero({ value: true });
-        vm.expectRevert(TransferHelper.TransferHelper_GetBalanceError.selector);
+        vm.expectRevert(IErrors.TransferHelper_GetBalanceError.selector);
         mock.getBalance({ token: address(fakeToken), account: address(1) });
 
         fakeToken.setFlagReturnZero({ value: false });
         fakeToken.setFlagRevert({ value: true });
-        vm.expectRevert(TransferHelper.TransferHelper_GetBalanceError.selector);
+        vm.expectRevert(IErrors.TransferHelper_GetBalanceError.selector);
         mock.getBalance({ token: address(fakeToken), account: address(1) });
     }
 }

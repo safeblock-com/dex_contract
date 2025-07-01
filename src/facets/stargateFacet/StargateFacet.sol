@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import { BaseOwnableFacet } from "../BaseOwnableFacet.sol";
-
+import { Utils } from "../../libraries/Utils.sol";
+import { OptionsBuilder } from "../../libraries/external/OptionsBuilder.sol";
+import { OFTComposeMsgCodec } from "../../libraries/external/OFTComposeMsgCodec.sol";
 import { TransferHelper } from "../../libraries/TransferHelper.sol";
-import { OFTComposeMsgCodec } from "../../libraries/OFTComposeMsgCodec.sol";
-import { OptionsBuilder } from "../../libraries/OptionsBuilder.sol";
 import { TransientStorageFacetLibrary } from "../../libraries/TransientStorageFacetLibrary.sol";
 import { FeeLibrary } from "../../libraries/FeeLibrary.sol";
 
+import { IErrors } from "../../interfaces/IErrors.sol";
 import { IStargate, SendParam, MessagingFee } from "./interfaces/IStargate.sol";
-import { OFTLimit, OFTFeeDetail, OFTReceipt } from "./interfaces/IOFT.sol";
+import { OFTReceipt } from "./interfaces/IOFT.sol";
 import { ILayerZeroComposer } from "./interfaces/ILayerZeroComposer.sol";
 
 import { IStargateFacet } from "./interfaces/IStargateFacet.sol";
@@ -19,8 +19,8 @@ import { IStargateFacet } from "./interfaces/IStargateFacet.sol";
 /// @notice A facet for cross-chain token bridging and messaging via the Stargate and LayerZero protocols
 ///         in a diamond-like proxy contract.
 /// @dev Supports sending tokens across chains, quoting fees, and handling LayerZero compose messages
-///      with callbacks. Inherits ownership controls from `BaseOwnableFacet`.
-contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
+///      with callbacks.
+contract StargateFacet is ILayerZeroComposer, IStargateFacet {
     using OptionsBuilder for bytes;
 
     // =========================
@@ -101,7 +101,7 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
                 amountLD = amount;
             }
         } else {
-            revert IStargateFacet.StargateFacet_UnsupportedAsset();
+            revert IErrors.StargateFacet_UnsupportedAsset();
         }
 
         unchecked {
@@ -116,7 +116,7 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
         (uint256 valueToSend, SendParam memory sendParam, MessagingFee memory messagingFee) =
             _quoteV2(poolAddress, token, dstEid, amountLD, receiver, composeMsg, composeGasLimit);
 
-        _validateNativeBalance(valueToSend);
+        Utils.compareAmounts(address(this).balance, valueToSend);
 
         TransferHelper.safeApprove({ token: token, spender: poolAddress, value: amountLD });
 
@@ -150,7 +150,7 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
         payable
     {
         if (msg.sender != _lzEndpointV2) {
-            revert IStargateFacet.StargateFacet_NotLZEndpoint();
+            revert IErrors.StargateFacet_NotLZEndpoint();
         }
 
         uint256 amountLD = OFTComposeMsgCodec.amountLD({ _msg: message });
@@ -200,15 +200,6 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
         }
     }
 
-    /// @notice Validates that the contract has sufficient native balance for the required fee.
-    /// @dev Reverts with `StargateFacet_InvalidNativeBalance` if the balance is insufficient.
-    /// @param value The required native currency amount.
-    function _validateNativeBalance(uint256 value) internal view {
-        if (address(this).balance < value) {
-            revert IStargateFacet.StargateFacet_InvalidNativeBalance();
-        }
-    }
-
     /// @notice Quotes the fee and parameters for a cross-chain token transfer.
     /// @dev Constructs a `SendParam` with optional compose message options, queries the Stargate pool for the minimum output (`quoteOFT`),
     ///      and calculates the native fee (`quoteSend`).
@@ -236,11 +227,7 @@ contract StargateFacet is BaseOwnableFacet, ILayerZeroComposer, IStargateFacet {
         returns (uint256 valueToSend, SendParam memory sendParam, MessagingFee memory messagingFee)
     {
         bytes memory extraOptions = composeMsg.length > 0
-            ? OptionsBuilder.newOptions().addExecutorLzComposeOption({
-                _index: 0,
-                _gas: composeGasLimit, // compose gas limit
-                _value: 0
-            })
+            ? OptionsBuilder.newOptions().addExecutorLzComposeOption({ _index: 0, _gas: composeGasLimit, _value: 0 })
             : bytes("");
 
         sendParam = SendParam({

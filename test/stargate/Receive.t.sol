@@ -1,17 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {
-    BaseTest,
-    Solarray,
-    IMultiswapRouterFacet,
-    ITransferFacet,
-    IStargateFacet,
-    ILayerZeroComposer,
-    OFTComposeMsgCodec,
-    TransferHelper,
-    IEntryPoint
-} from "../BaseTest.t.sol";
+import "../BaseTest.t.sol";
 
 import "../Helpers.t.sol";
 
@@ -65,7 +55,7 @@ contract ReceiveStargateFacetTest is BaseTest {
 
         _resetPrank(user);
 
-        vm.expectRevert(IStargateFacet.StargateFacet_NotLZEndpoint.selector);
+        vm.expectRevert(IErrors.StargateFacet_NotLZEndpoint.selector);
         ILayerZeroComposer(address(entryPoint)).lzCompose({
             _from: user,
             _guid: bytes32(uint256(1)),
@@ -172,9 +162,7 @@ contract ReceiveStargateFacetTest is BaseTest {
         vm.expectEmit();
         emit CallFailed({
             errorMessage: abi.encodeWithSelector(
-                IMultiswapRouterFacet.MultiswapRouterFacet_ValueLowerThanExpected.selector,
-                quoterAmountOut,
-                m2Data.minAmountsOut[0]
+                IErrors.ValueLowerThanExpected.selector, quoterAmountOut, m2Data.minAmountsOut[0]
             )
         });
         ILayerZeroComposer(address(entryPoint)).lzCompose({

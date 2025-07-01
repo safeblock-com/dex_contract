@@ -9,25 +9,6 @@ interface IEntryPoint {
     }
 
     // =========================
-    // errors
-    // =========================
-
-    /// @dev Thrown when a function selector is not registered in the EntryPoint.
-    /// @param selector The 4-byte function selector that does not exist.
-    error EntryPoint_FunctionDoesNotExist(bytes4 selector);
-
-    /// @dev Thrown when an invalid fee value is provided during fee configuration.
-    error EntryPoint_InvalidFeeValue();
-
-    /// @dev Thrown when attempting to add a module that is already registered.
-    /// @param methodSignature The 4-byte function signature of the module.
-    error EntryPoint_ModuleAlreadyAdded(bytes4 methodSignature);
-
-    /// @dev Thrown when attempting to update or remove a module that is not registered.
-    /// @param methodSignature The 4-byte function signature of the module.
-    error EntryPoint_ModuleNotAdded(bytes4 methodSignature);
-
-    // =========================
     // initializer
     // =========================
 

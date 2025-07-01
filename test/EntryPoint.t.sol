@@ -10,7 +10,7 @@ import { DeployEngine } from "../script/DeployEngine.sol";
 
 import { Initializable } from "../src/proxy/Initializable.sol";
 
-import { BaseTest, Solarray, FeeContract } from "./BaseTest.t.sol";
+import "./BaseTest.t.sol";
 
 contract Facet1 {
     struct FacetStorage {
@@ -106,7 +106,8 @@ contract EntryPointTest is BaseTest {
                     selectors: selectors,
                     addressIndexes: Solarray.uint256s(0, 0, 0, 1, 1, 1, 1),
                     facetAddresses: Solarray.addresses(facet1, facet2)
-                })
+                }),
+                entryPointAA_: contracts.entryPointAA
             })
         );
 
@@ -131,7 +132,8 @@ contract EntryPointTest is BaseTest {
 
         vm.expectEmit();
         emit Initialized({ version: 255 });
-        EntryPoint _entryPoint = new EntryPoint({ facetsAndSelectors: bytes("") });
+        EntryPoint _entryPoint =
+            new EntryPoint({ facetsAndSelectors: bytes(""), entryPointAA_: contracts.entryPointAA });
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
         _entryPoint.initialize({ newOwner: owner });
@@ -142,7 +144,8 @@ contract EntryPointTest is BaseTest {
     // =========================
 
     function test_entryPoint_shouldRevertIfNoFacetsAndSelectors() external {
-        address entryPointImplementation = address(new EntryPoint({ facetsAndSelectors: bytes("") }));
+        address entryPointImplementation =
+            address(new EntryPoint({ facetsAndSelectors: bytes(""), entryPointAA_: contracts.entryPointAA }));
 
         InitialImplementation proxy = InitialImplementation(payable(address(new Proxy({ initialOwner: owner }))));
 
@@ -154,11 +157,11 @@ contract EntryPointTest is BaseTest {
         });
 
         vm.expectRevert(
-            abi.encodeWithSelector(IEntryPoint.EntryPoint_FunctionDoesNotExist.selector, Facet1.setValue1.selector)
+            abi.encodeWithSelector(IErrors.EntryPoint_FunctionDoesNotExist.selector, Facet1.setValue1.selector)
         );
         Facet1(address(proxy)).setValue1({ value: 1 });
 
-        vm.expectRevert(abi.encodeWithSelector(IEntryPoint.EntryPoint_FunctionDoesNotExist.selector, bytes4(0x000000)));
+        vm.expectRevert(abi.encodeWithSelector(IErrors.EntryPoint_FunctionDoesNotExist.selector, bytes4(0x000000)));
         EntryPoint(payable(address(proxy))).multicall({
             data: Solarray.bytess(abi.encodeCall(Facet1.setValue1, (1)), abi.encodeCall(Facet2.setValue2, (2)))
         });
@@ -194,18 +197,14 @@ contract EntryPointTest is BaseTest {
     }
 
     function test_entryPoint_multicall_shouldRevertIfSelectorDoesNotExists() external {
-        vm.expectRevert(
-            abi.encodeWithSelector(IEntryPoint.EntryPoint_FunctionDoesNotExist.selector, bytes4(0x11223344))
-        );
+        vm.expectRevert(abi.encodeWithSelector(IErrors.EntryPoint_FunctionDoesNotExist.selector, bytes4(0x11223344)));
         entryPoint.multicall({
             data: Solarray.bytess(
                 abi.encodeWithSelector(Facet1.setValue1.selector, 1), abi.encodeWithSelector(0x11223344, 2)
             )
         });
 
-        vm.expectRevert(
-            abi.encodeWithSelector(IEntryPoint.EntryPoint_FunctionDoesNotExist.selector, bytes4(0x11223344))
-        );
+        vm.expectRevert(abi.encodeWithSelector(IErrors.EntryPoint_FunctionDoesNotExist.selector, bytes4(0x11223344)));
         entryPoint.multicall({
             data: Solarray.bytess(
                 abi.encodeWithSelector(0x11223344, 1), abi.encodeWithSelector(Facet2.setValue2.selector, 2)
@@ -236,7 +235,7 @@ contract EntryPointTest is BaseTest {
     function test_entryPoint_fallback_shouldRevertIfFacetDoesNotExists() external {
         vm.expectRevert(
             abi.encodeWithSelector(
-                IEntryPoint.EntryPoint_FunctionDoesNotExist.selector, InitialImplementation.upgradeTo.selector
+                IErrors.EntryPoint_FunctionDoesNotExist.selector, InitialImplementation.upgradeTo.selector
             )
         );
         InitialImplementation(address(entryPoint)).upgradeTo({ implementation: address(0), data: bytes("") });
@@ -299,7 +298,7 @@ contract EntryPointTest is BaseTest {
         assertEq(entryPoint.getModuleAddress(Facet1.moduleMethod1.selector), address(0));
 
         vm.expectRevert(
-            abi.encodeWithSelector(IEntryPoint.EntryPoint_FunctionDoesNotExist.selector, Facet1.moduleMethod1.selector)
+            abi.encodeWithSelector(IErrors.EntryPoint_FunctionDoesNotExist.selector, Facet1.moduleMethod1.selector)
         );
         entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(Facet1.moduleMethod1, ())) });
 
@@ -328,7 +327,7 @@ contract EntryPointTest is BaseTest {
         assertEq(modules[1].moduleAddress, address(facet1));
 
         vm.expectRevert(
-            abi.encodeWithSelector(IEntryPoint.EntryPoint_ModuleAlreadyAdded.selector, Facet1.moduleMethod1.selector)
+            abi.encodeWithSelector(IErrors.EntryPoint_ModuleAlreadyAdded.selector, Facet1.moduleMethod1.selector)
         );
         entryPoint.addModule({ moduleSignature: Facet2.moduleMethod1.selector, moduleAddress: address(facet2) });
     }
@@ -337,7 +336,7 @@ contract EntryPointTest is BaseTest {
         _resetPrank(owner);
 
         vm.expectRevert(
-            abi.encodeWithSelector(IEntryPoint.EntryPoint_ModuleNotAdded.selector, Facet1.moduleMethod2.selector)
+            abi.encodeWithSelector(IErrors.EntryPoint_ModuleNotAdded.selector, Facet1.moduleMethod2.selector)
         );
         entryPoint.updateModule({ moduleSignature: Facet1.moduleMethod2.selector, moduleAddress: address(facet1) });
 

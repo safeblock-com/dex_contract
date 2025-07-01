@@ -1,23 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {
-    BaseTest,
-    IERC20,
-    Solarray,
-    IOwnable,
-    TransferHelper,
-    MultiswapRouterFacet,
-    IMultiswapRouterFacet,
-    TransferFacet,
-    ITransferFacet,
-    console,
-    PoolHelper,
-    IUniswapPool,
-    HelperV3Lib,
-    TransientStorageFacetLibrary,
-    ISignatureTransfer
-} from "../BaseTest.t.sol";
+import "../BaseTest.t.sol";
 
 import "../Helpers.t.sol";
 
@@ -88,7 +72,7 @@ contract Multiswap2Test is BaseTest {
             })
         );
 
-        vm.expectRevert(ITransferFacet.TransferFacet_TransferFromFailed.selector);
+        vm.expectRevert(IErrors.TransferFacet_TransferFromFailed.selector);
         entryPoint.multicall({
             data: Solarray.bytess(
                 abi.encodeCall(TransferFacet.transferFromPermit2, (USDT, 0, nonce, block.timestamp, signature))
@@ -144,7 +128,7 @@ contract Multiswap2Test is BaseTest {
         _resetPrank(user);
         IERC20(USDT).approve({ spender: address(entryPoint), amount: 100e18 });
 
-        vm.expectRevert(TransientStorageFacetLibrary.TransientStorageFacetLibrary_InvalidSenderAddress.selector);
+        vm.expectRevert(IErrors.TransientStorageFacetLibrary_InvalidSenderAddress.selector);
         IMultiswapRouterFacet(address(entryPoint)).multiswap2({ data: m2Data });
     }
 
@@ -178,7 +162,7 @@ contract Multiswap2Test is BaseTest {
             })
         );
 
-        vm.expectRevert(TransientStorageFacetLibrary.TokenNotTransferredFromContract.selector);
+        vm.expectRevert(IErrors.TransientStorageFacetLibrary_TokenNotTransferredFromContract.selector);
         entryPoint.multicall({
             data: Solarray.bytess(
                 abi.encodeCall(TransferFacet.transferFromPermit2, (USDT, 100e18, nonce, block.timestamp, signature)),
@@ -203,24 +187,24 @@ contract Multiswap2Test is BaseTest {
         _resetPrank(user);
 
         // pairs array is empty
-        vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidPairsArray.selector);
+        vm.expectRevert(IErrors.MultiswapRouterFacet_InvalidPairsArray.selector);
         entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data))) });
 
         // amountInPercentages array length and pairs length are not equal
-        vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidMultiswap2Calldata.selector);
+        vm.expectRevert(IErrors.ValuesNotEqual.selector);
         m2Data.amountInPercentages = Solarray.uint256s(0.45e18, 0.55e18);
         m2Data.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(BUSD_USDT_UniV3_3000));
         entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data))) });
 
         // tokensOut length check
-        vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidMultiswap2Calldata.selector);
+        vm.expectRevert(IErrors.ValuesNotEqual.selector);
         m2Data.amountInPercentages = Solarray.uint256s(1e18);
         m2Data.tokensOut = Solarray.addresses(USDC);
         m2Data.minAmountsOut = Solarray.uint256s(1e18, 1e18);
         entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data))) });
 
         // fullAmountCheck
-        vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidMultiswap2Calldata.selector);
+        vm.expectRevert(IErrors.ValuesNotEqual.selector);
         m2Data.minAmountsOut = Solarray.uint256s(1e18);
         m2Data.pairs =
             Solarray.bytes32Arrays(Solarray.bytes32s(BUSD_USDT_UniV3_3000), Solarray.bytes32s(BUSD_USDT_UniV3_3000));
@@ -228,14 +212,14 @@ contract Multiswap2Test is BaseTest {
         entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data))) });
 
         // not approved
-        vm.expectRevert(TransferHelper.TransferHelper_TransferFromError.selector);
+        vm.expectRevert(IErrors.TransferHelper_TransferFromError.selector);
         m2Data.amountInPercentages = Solarray.uint256s(0.45e18, 0.55e18);
         entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data))) });
 
         // amountIn is 0
         USDT.safeApprove({ spender: address(entryPoint), value: 100e18 });
 
-        vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidAmountIn.selector);
+        vm.expectRevert(IErrors.MultiswapRouterFacet_InvalidAmountIn.selector);
         m2Data.pairs =
             Solarray.bytes32Arrays(Solarray.bytes32s(BUSD_USDT_UniV3_3000), Solarray.bytes32s(USDT_USDC_Biswap));
         m2Data.minAmountsOut = Solarray.uint256s(0, 0);
@@ -271,7 +255,7 @@ contract Multiswap2Test is BaseTest {
         _resetPrank(user);
         USDC.safeApprove({ spender: address(entryPoint), value: 100e18 });
 
-        vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_FailedV3Swap.selector);
+        vm.expectRevert(IErrors.MultiswapRouterFacet_FailedV3Swap.selector);
         entryPoint.multicall({
             data: Solarray.bytess(
                 abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data)),
@@ -305,7 +289,7 @@ contract Multiswap2Test is BaseTest {
             })
         );
 
-        vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_FailedV2Swap.selector);
+        vm.expectRevert(IErrors.MultiswapRouterFacet_FailedV2Swap.selector);
         entryPoint.multicall({
             data: Solarray.bytess(
                 abi.encodeCall(TransferFacet.transferFromPermit2, (USDT, 100e18, nonce, block.timestamp, signature)),
@@ -319,7 +303,7 @@ contract Multiswap2Test is BaseTest {
         (, bytes memory data) =
             contracts.multiswapRouterFacet.call(abi.encodeWithSelector(TransferFacet.transferToken.selector));
 
-        assertEq(bytes4(data), IMultiswapRouterFacet.MultiswapRouterFacet_SenderMustBePool.selector);
+        assertEq(bytes4(data), IErrors.MultiswapRouterFacet_SenderMustBePool.selector);
     }
 
     function test_multiswapRouterFacet_multiswap2_shouldSwapThroughAllUniswapV2Pairs()
@@ -412,7 +396,7 @@ contract Multiswap2Test is BaseTest {
 
         address[] memory tokensOut = Solarray.addresses(USDC);
 
-        vm.expectRevert(TransientStorageFacetLibrary.TokenNotTransferredFromContract.selector);
+        vm.expectRevert(IErrors.TransientStorageFacetLibrary_TokenNotTransferredFromContract.selector);
         entryPoint.multicall({
             data: Solarray.bytess(
                 abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data)),
@@ -447,11 +431,7 @@ contract Multiswap2Test is BaseTest {
         address[] memory tokensOut = Solarray.addresses(WBNB);
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IMultiswapRouterFacet.MultiswapRouterFacet_ValueLowerThanExpected.selector,
-                quoterAmountOut[0],
-                m2Data.minAmountsOut[0]
-            )
+            abi.encodeWithSelector(IErrors.ValueLowerThanExpected.selector, quoterAmountOut[0], m2Data.minAmountsOut[0])
         );
         entryPoint.multicall({
             data: Solarray.bytess(
@@ -601,7 +581,7 @@ contract Multiswap2Test is BaseTest {
         m2Data.minAmountsOut = Solarray.uint256s(0);
 
         _resetPrank(user);
-        vm.expectRevert(TransferHelper.TransferHelper_TransferFromError.selector);
+        vm.expectRevert(IErrors.TransferHelper_TransferFromError.selector);
         entryPoint.multicall({
             data: Solarray.bytess(
                 abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data)),
@@ -676,7 +656,7 @@ contract Multiswap2Test is BaseTest {
 
         IERC20(USDT).approve({ spender: address(entryPoint), amount: 1000e18 });
 
-        vm.expectRevert(TransientStorageFacetLibrary.TokenNotTransferredFromContract.selector);
+        vm.expectRevert(IErrors.TransientStorageFacetLibrary_TokenNotTransferredFromContract.selector);
         entryPoint.multicall({
             data: Solarray.bytess(
                 abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data)),
@@ -758,7 +738,7 @@ contract Multiswap2Test is BaseTest {
 
         IERC20(USDT).approve({ spender: address(entryPoint), amount: 1000e18 });
 
-        vm.expectRevert(TransientStorageFacetLibrary.TokenNotTransferredFromContract.selector);
+        vm.expectRevert(IErrors.TransientStorageFacetLibrary_TokenNotTransferredFromContract.selector);
         entryPoint.multicall({
             data: Solarray.bytess(
                 abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data)),
@@ -790,7 +770,7 @@ contract Multiswap2Test is BaseTest {
 
         IERC20(USDT).approve({ spender: address(entryPoint), amount: 1000e18 });
 
-        vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_InvalidMultiswap2Calldata.selector);
+        vm.expectRevert(IErrors.MultiswapRouterFacet_InvalidMultiswap2Calldata.selector);
         entryPoint.multicall({
             data: Solarray.bytess(
                 abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data)),

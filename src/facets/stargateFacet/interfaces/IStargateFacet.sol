@@ -13,22 +13,6 @@ interface IStargateFacet {
     event CallFailed(bytes errorMessage);
 
     // =========================
-    // errors
-    // =========================
-
-    /// @dev Thrown when the contract’s native balance is insufficient for the required fee.
-    ///      Triggered in `_validateNativeBalance` during `sendStargateV2`.
-    error StargateFacet_InvalidNativeBalance();
-
-    /// @dev Thrown when the caller of `lzCompose` is not the LayerZero endpoint.
-    ///      Triggered in `lzCompose` if `msg.sender` does not match `_lzEndpointV2`.
-    error StargateFacet_NotLZEndpoint();
-
-    /// @dev Thrown when the Stargate pool’s token is the native currency (address(0)).
-    ///      Triggered in `sendStargateV2` if the pool does not support ERC20 tokens.
-    error StargateFacet_UnsupportedAsset();
-
-    // =========================
     // getters
     // =========================
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import { IOwnable } from "../external/IOwnable.sol";
+import { IErrors } from "../interfaces/IErrors.sol";
 
 import { TransientStorageFacetLibrary } from "../libraries/TransientStorageFacetLibrary.sol";
 
@@ -23,7 +23,7 @@ abstract contract BaseOwnableFacet {
     // =========================
 
     /// @dev Restricts function access to the contract owner.
-    ///      Reverts with `IOwnable.Ownable_SenderIsNotOwner` if the caller or original sender is not the owner.
+    ///      Reverts with `IErrors.Ownable_SenderIsNotOwner` if the caller or original sender is not the owner.
     modifier onlyOwner() {
         _checkOwner();
         _;
@@ -35,13 +35,13 @@ abstract contract BaseOwnableFacet {
 
     /// @dev Verifies if the caller or original sender is the contract owner.
     ///      Checks `msg.sender` and the sender stored in `TransientStorageFacetLibrary` against `_owner`.
-    ///      Reverts with `IOwnable.Ownable_SenderIsNotOwner` if neither matches.
+    ///      Reverts with `IErrors.Ownable_SenderIsNotOwner` if neither matches.
     function _checkOwner() internal view {
         address owner = _owner;
         if (owner != msg.sender) {
             address sender = TransientStorageFacetLibrary.getSenderAddress();
             if (owner != sender) {
-                revert IOwnable.Ownable_SenderIsNotOwner({ sender: sender });
+                revert IErrors.Ownable_SenderIsNotOwner({ sender: sender });
             }
         }
     }

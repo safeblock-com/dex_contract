@@ -41,6 +41,8 @@ import { EfficientSwapAmount, IUniswapPool, HelperV3Lib } from "../src/lens/libr
 
 import { CoinFlippersModule, ICoinFlippersModule, ICoinFlippersVault } from "../src/modules/CoinFlippersModule.sol";
 
+import { IErrors } from "../src/interfaces/IErrors.sol";
+
 import { console2 } from "forge-std/console2.sol";
 
 contract BaseTest is Test {

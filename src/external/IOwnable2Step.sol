@@ -15,16 +15,6 @@ interface IOwnable2Step is IOwnable {
     event OwnershipTransferStarted(address indexed previousOwner, address indexed newOwner);
 
     // =========================
-    // errors
-    // =========================
-
-    /// @notice Throws when the new caller is not a pendingOwner.
-    error Ownable_CallerIsNotTheNewOwner(address caller);
-
-    /// @notice Throws when the new owner is not a valid owner account.
-    error Ownable_NewOwnerCannotBeAddressZero();
-
-    // =========================
     // getters
     // =========================
 

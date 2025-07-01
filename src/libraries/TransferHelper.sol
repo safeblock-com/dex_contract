@@ -2,30 +2,12 @@
 pragma solidity ^0.8.0;
 
 import { IERC20 } from "forge-std/interfaces/IERC20.sol";
+import { IErrors } from "../interfaces/IErrors.sol";
 
 /// @title TransferHelper
 /// @notice A helper library for safe transfers, approvals, and balance checks.
 /// @dev Provides safe functions for ERC20 token and native currency transfers.
 library TransferHelper {
-    // =========================
-    // errors
-    // =========================
-
-    /// @notice Thrown when `safeTransferFrom` fails.
-    error TransferHelper_TransferFromError();
-
-    /// @notice Thrown when `safeTransfer` fails.
-    error TransferHelper_TransferError();
-
-    /// @notice Thrown when `safeApprove` fails.
-    error TransferHelper_ApproveError();
-
-    /// @notice Thrown when `safeGetBalance` fails.
-    error TransferHelper_GetBalanceError();
-
-    /// @notice Thrown when `safeTransferNative` fails.
-    error TransferHelper_TransferNativeError();
-
     // =========================
     // functions
     // =========================
@@ -38,7 +20,7 @@ library TransferHelper {
     /// @param value Amount to transfer.
     function safeTransferFrom(address token, address from, uint256 value, address to) internal {
         if (!_makeCall(token, abi.encodeCall(IERC20.transferFrom, (from, to, value)))) {
-            revert TransferHelper_TransferFromError();
+            revert IErrors.TransferHelper_TransferFromError();
         }
     }
 
@@ -49,7 +31,7 @@ library TransferHelper {
     /// @param value Amount to transfer.
     function safeTransfer(address token, address to, uint256 value) internal {
         if (!_makeCall(token, abi.encodeCall(IERC20.transfer, (to, value)))) {
-            revert TransferHelper_TransferError();
+            revert IErrors.TransferHelper_TransferError();
         }
     }
 
@@ -64,7 +46,7 @@ library TransferHelper {
 
         if (!_makeCall(token, approvalCall)) {
             if (!_makeCall(token, abi.encodeCall(IERC20.approve, (spender, 0))) || !_makeCall(token, approvalCall)) {
-                revert TransferHelper_ApproveError();
+                revert IErrors.TransferHelper_ApproveError();
             }
         }
     }
@@ -77,7 +59,7 @@ library TransferHelper {
     function safeGetBalance(address token, address account) internal view returns (uint256) {
         (bool success, bytes memory data) = token.staticcall(abi.encodeWithSelector(IERC20.balanceOf.selector, account));
         if (!success || data.length == 0) {
-            revert TransferHelper_GetBalanceError();
+            revert IErrors.TransferHelper_GetBalanceError();
         }
         return abi.decode(data, (uint256));
     }
@@ -89,7 +71,7 @@ library TransferHelper {
     function safeTransferNative(address to, uint256 value) internal {
         assembly ("memory-safe") {
             if iszero(call(gas(), to, value, 0, 0, 0, 0)) {
-                // revert TransferHelper_TransferNativeError();
+                // revert IErrors.TransferHelper_TransferNativeError();
                 mstore(0, 0xb1a0fdf8)
                 revert(28, 4)
             }

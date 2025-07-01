@@ -4,6 +4,7 @@ pragma solidity 0.8.19;
 import { TransferHelper } from "../../libraries/TransferHelper.sol";
 import { TransientStorageFacetLibrary } from "../../libraries/TransientStorageFacetLibrary.sol";
 
+import { IErrors } from "../../interfaces/IErrors.sol";
 import { ISignatureTransfer } from "./interfaces/ISignatureTransfer.sol";
 import { IWrappedNative } from "../../interfaces/IWrappedNative.sol";
 
@@ -150,7 +151,7 @@ contract TransferFacet is ITransferFacet {
             uint256 balanceAfter = TransferHelper.safeGetBalance({ token: token, account: address(this) });
 
             if (balanceAfter <= balanceBefore) {
-                revert ITransferFacet.TransferFacet_TransferFromFailed();
+                revert IErrors.TransferFacet_TransferFromFailed();
             }
 
             balanceAfter = balanceAfter - balanceBefore;
