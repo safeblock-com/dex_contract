@@ -34,6 +34,7 @@ struct Contracts {
     address symbiosisPortal;
     address permit2;
     address acrossSpokePool;
+    address entryPointAA;
     //
     address multisig;
 }
@@ -67,6 +68,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             symbiosisPortal: 0xb8f275fBf7A959F4BCE59999A2EF122A099e81A8,
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
             acrossSpokePool: 0x5c7BCd6E7De5423a257D81B442095A1a6ced35C5,
+            entryPointAA: 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108,
             //
             multisig: multisig
         });
@@ -98,6 +100,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             symbiosisPortal: 0x5Aa5f7f84eD0E5db0a4a85C3947eA16B53352FD4,
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
             acrossSpokePool: address(0),
+            entryPointAA: 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108,
             //
             multisig: multisig
         });
@@ -129,6 +132,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             symbiosisPortal: 0xb8f275fBf7A959F4BCE59999A2EF122A099e81A8,
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
             acrossSpokePool: 0x9295ee1d8C5b022Be115A2AD3c30C72E34e7F096,
+            entryPointAA: 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108,
             //
             multisig: multisig
         });
@@ -160,6 +164,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             symbiosisPortal: 0xE75C7E85FE6ADd07077467064aD15847E6ba9877,
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
             acrossSpokePool: address(0),
+            entryPointAA: 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108,
             //
             multisig: multisig
         });
@@ -191,6 +196,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             symbiosisPortal: 0x292fC50e4eB66C3f6514b9E402dBc25961824D62,
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
             acrossSpokePool: 0x6f26Bf09B1C792e3228e5467807a900A503c0281,
+            entryPointAA: 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108,
             //
             multisig: multisig
         });
@@ -222,6 +228,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             symbiosisPortal: 0x01A3c8E513B758EBB011F7AFaf6C37616c9C24d9,
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
             acrossSpokePool: 0xe35e9842fceaCA96570B734083f4a58e8F7C5f2A,
+            entryPointAA: 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108,
             //
             multisig: multisig
         });
@@ -253,6 +260,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             symbiosisPortal: 0xEE981B2459331AD268cc63CE6167b446AF4161f8,
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
             acrossSpokePool: 0x09aea4b2242abC8bb4BB78D537A67a245A7bEC64,
+            entryPointAA: 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108,
             //
             multisig: multisig
         });
@@ -284,6 +292,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             symbiosisPortal: 0x5Aa5f7f84eD0E5db0a4a85C3947eA16B53352FD4,
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
             acrossSpokePool: 0x3baD7AD0728f9917d1Bf08af5782dCbD516cDd96,
+            entryPointAA: 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108,
             //
             multisig: multisig
         });
@@ -315,6 +324,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             symbiosisPortal: 0x292fC50e4eB66C3f6514b9E402dBc25961824D62,
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
             acrossSpokePool: address(0),
+            entryPointAA: 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108,
             //
             multisig: multisig
         });
@@ -346,6 +356,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             symbiosisPortal: 0xd83B5752b42856a08087748dE6095af0bE52d299,
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
             acrossSpokePool: 0x5c7BCd6E7De5423a257D81B442095A1a6ced35C5,
+            entryPointAA: 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108,
             //
             multisig: multisig
         });
@@ -467,7 +478,8 @@ library DeployEngine {
                     selectors: selectors,
                     addressIndexes: addressIndexes,
                     facetAddresses: facetAddresses
-                })
+                }),
+                entryPointAA_: contracts.entryPointAA
             })
         );
     }

@@ -2,6 +2,7 @@
 pragma solidity 0.8.19;
 
 import { Ownable2Step } from "./external/Ownable2Step.sol";
+import { ECDSA } from "./external/ECDSA.sol";
 
 import { Initializable } from "./proxy/Initializable.sol";
 import { UUPSUpgradeable } from "./proxy/UUPSUpgradeable.sol";
@@ -12,14 +13,25 @@ import { TransientStorageFacetLibrary } from "./libraries/TransientStorageFacetL
 import { FeeLibrary } from "./libraries/FeeLibrary.sol";
 import { ADDRESS_MASK } from "./libraries/Constants.sol";
 
+import { IErrors } from "./interfaces/IErrors.sol";
+import { PackedUserOperation, IAccount } from "./interfaces/IAccount.sol";
+import { IEntryPoint as IEntryPointAA } from "./interfaces/IEntryPointAA.sol";
 import { IEntryPoint } from "./interfaces/IEntryPoint.sol";
 
 /// @title EntryPoint
 /// @notice A proxy contract for dynamic function execution using a diamond-like architecture.
 /// @dev Maps function selectors to facet contracts, storing data with SSTORE2 and supporting module management.
-contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint {
+contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IAccount, IEntryPoint {
+    using ECDSA for bytes32;
+
     /// @dev Address where facet and selector bytes are stored using SSTORE2.
     address private immutable _facetsAndSelectorsAddress;
+
+    // AA immutable storage
+    IEntryPointAA private immutable _entryPointAA;
+
+    uint256 private constant SIG_VALIDATION_FAILED = 1;
+    uint256 private constant SIG_VALIDATION_SUCCESS = 0;
 
     /// @dev Mapping of module function signatures to their addresses and indices.
     mapping(bytes4 => bytes32) private _moduleSignatureToAddress;
@@ -34,7 +46,9 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
     /// @notice Initializes the EntryPoint contract with facet and selector data.
     /// @dev Stores the provided data using SSTORE2 and disables initializers to prevent reinitialization.
     /// @param facetsAndSelectors Bytes array containing function selectors and facet addresses.
-    constructor(bytes memory facetsAndSelectors) {
+    constructor(bytes memory facetsAndSelectors, address entryPointAA_) {
+        _entryPointAA = IEntryPointAA(entryPointAA_);
+
         _disableInitializers();
         _facetsAndSelectorsAddress = SSTORE2.write({ data: facetsAndSelectors });
     }
@@ -46,6 +60,25 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
     /// @inheritdoc IEntryPoint
     function initialize(address newOwner) external initializer {
         _transferOwnership(newOwner);
+    }
+
+    // =========================
+    // modifiers
+    // =========================
+
+    /// @dev Reverts if the caller is not the EntryPointAA.
+    modifier onlyEntryPointAA() {
+        IEntryPointAA entryPointAA_ = _entryPointAA;
+        assembly ("memory-safe") {
+            // if caller != entryPointAA
+            if sub(caller(), entryPointAA_) {
+                // IErrors.EntryPoint_CallerIsNotEntryPointAA()
+                mstore(0, 0xdbdf55d3)
+                revert(28, 4)
+            }
+        }
+
+        _;
     }
 
     // =========================
@@ -73,7 +106,8 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
             let mappingSlot := keccak256(0, 64)
 
             if sload(mappingSlot) {
-                mstore(0, 0xefd5d8e4) // IEntryPoint.EntryPoint_ModuleAlreadyAdded
+                // IErrors.EntryPoint_ModuleAlreadyAdded
+                mstore(0, 0xefd5d8e4)
                 mstore(32, moduleSignature)
                 revert(28, 36)
             }
@@ -105,7 +139,8 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
             let currentValue := sload(mappingSlot)
 
             if iszero(currentValue) {
-                mstore(0, 0xeac1ef32) // IEntryPoint.EntryPoint_ModuleNotAdded
+                // IErrors.EntryPoint_ModuleNotAdded
+                mstore(0, 0xeac1ef32)
                 mstore(32, moduleSignature)
                 revert(28, 36)
             }
@@ -174,12 +209,102 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
     }
 
     // =========================
+    // account abstraction methods
+    // =========================
+
+    // / @inheritdoc IAccountAbstractionLogic
+    function entryPointAA() external view returns (address) {
+        return address(_entryPointAA);
+    }
+
+    // @inheritdoc IAccount
+    function validateUserOp(
+        PackedUserOperation calldata userOp,
+        bytes32 userOpHash,
+        uint256 missingAccountFunds
+    )
+        external
+        onlyEntryPointAA
+        returns (uint256 validationData)
+    {
+        address signer = userOpHash.toEthSignedMessageHash().tryRecoverCalldata(userOp.signature);
+
+        address sender;
+        bytes calldata data = userOp.callData;
+        assembly ("memory-safe") {
+            sender := shr(96, calldataload(data.offset))
+
+            // if signer != sender
+            if sub(signer, sender) {
+                // IErrors.EntryPoint_InvalidSignatureForAACall()
+                mstore(0, 0x2687899a)
+                revert(28, 4)
+            }
+
+            validationData := SIG_VALIDATION_SUCCESS
+        }
+
+        _pay(missingAccountFunds, userOp.paymasterAndData, sender);
+    }
+
+    struct Data {
+        bytes[] data;
+    }
+
+    function _pay(uint256 missingAccountFunds, bytes calldata data, address sender) private {
+        TransientStorageFacetLibrary.setSenderAddress({ senderAddress: sender });
+        if (missingAccountFunds > 0) {
+            Data calldata _data;
+            assembly ("memory-safe") {
+                _data := data.offset
+            }
+
+            _multicall(_data.data);
+
+            assembly ("memory-safe") {
+                pop(call(gas(), caller(), missingAccountFunds, 0, 0, 0, 0))
+            }
+        }
+    }
+
+    // / @inheritdoc IAccountAbstractionLogic
+    function getNonceAA(address user) external view returns (uint256) {
+        uint192 key;
+        assembly ("memory-safe") {
+            key := user
+        }
+
+        return _entryPointAA.getNonce(address(this), key);
+    }
+
+    // / @inheritdoc IAccountAbstractionLogic
+    function getDepositAA() external view returns (uint256) {
+        return _entryPointAA.balanceOf(address(this));
+    }
+
+    // / @inheritdoc IAccountAbstractionLogic
+    function executeUserOp(bytes calldata data) external onlyEntryPointAA {
+        assembly ("memory-safe") {
+            let length := sub(data.length, 20)
+            calldatacopy(0, add(data.offset, 20), length)
+
+            let success := call(gas(), address(), 0, 0, length, 0, 0)
+            returndatacopy(0, 0, returndatasize())
+
+            if success { return(0, returndatasize()) }
+            revert(0, returndatasize())
+        }
+    }
+
+    // =========================
     // fallback functions
     // =========================
 
     /// @inheritdoc IEntryPoint
     function multicall(bytes[] calldata data) external payable {
+        TransientStorageFacetLibrary.setSenderAddress({ senderAddress: msg.sender });
         _multicall(data);
+        TransientStorageFacetLibrary.setSenderAddress({ senderAddress: address(0) });
     }
 
     /// @notice Handles incoming calls by delegating to the appropriate facet or callback address.
@@ -192,7 +317,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
             facet = _getAddress(msg.sig);
 
             if (facet == address(0)) {
-                revert IEntryPoint.EntryPoint_FunctionDoesNotExist({ selector: msg.sig });
+                revert IErrors.EntryPoint_FunctionDoesNotExist({ selector: msg.sig });
             }
         }
 
@@ -268,15 +393,14 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
     /// @param data Array of calldata for each function call.
     function _multicall(bytes[] calldata data) internal {
         address[] memory _facets = _getAddresses(data);
-        TransientStorageFacetLibrary.setSenderAddress({ senderAddress: msg.sender });
 
         assembly ("memory-safe") {
             for {
                 let length := data.length
                 let memoryOffset := add(_facets, 32)
                 let ptr := mload(64)
-                let cDataStart := 68
-                let cDataOffset := 68
+                let cDataStart := data.offset
+                let cDataOffset := data.offset
                 let facet
             } length {
                 length := sub(length, 1)
@@ -295,7 +419,8 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
                     mstore(32, _moduleSignatureToAddress.slot)
                     facet := and(sload(keccak256(0, 64)), ADDRESS_MASK)
                     if iszero(facet) {
-                        mstore(0, 0x9365f537) // IEntryPoint.EntryPoint_FunctionDoesNotExist
+                        // IErrors.EntryPoint_FunctionDoesNotExist
+                        mstore(0, 0x9365f537)
                         mstore(32, sig)
                         revert(28, 36)
                     }
@@ -308,8 +433,6 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
                 }
             }
         }
-
-        TransientStorageFacetLibrary.setSenderAddress({ senderAddress: address(0) });
     }
 
     /// @dev Retrieves the facet address for a given function selector using binary search.
@@ -318,7 +441,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
     function _getAddress(bytes4 selector) internal view returns (address facet) {
         bytes memory facetsAndSelectors = SSTORE2.read(_facetsAndSelectorsAddress);
         if (facetsAndSelectors.length < 24) {
-            revert IEntryPoint.EntryPoint_FunctionDoesNotExist({ selector: selector });
+            revert IErrors.EntryPoint_FunctionDoesNotExist({ selector: selector });
         }
         uint256 selectorsLength;
         uint256 addressesOffset;
@@ -344,16 +467,17 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
         _facets = new address[](length);
         bytes memory facetsAndSelectors = SSTORE2.read(_facetsAndSelectorsAddress);
         if (facetsAndSelectors.length < 24) {
-            revert IEntryPoint.EntryPoint_FunctionDoesNotExist({ selector: 0x00000000 });
+            revert IErrors.EntryPoint_FunctionDoesNotExist({ selector: 0x00000000 });
         }
+
         uint256 cDataStart;
         uint256 offset;
         uint256 selectorsLength;
         uint256 addressesOffset;
         assembly ("memory-safe") {
-            offset := add(68, cDataStart)
-            cDataStart := add(68, cDataStart)
-            let value := shr(224, mload(add(32, facetsAndSelectors)))
+            offset := datas.offset
+            cDataStart := datas.offset
+            let value := shr(224, mload(add(facetsAndSelectors, 32)))
             selectorsLength := shr(16, value)
             addressesOffset := and(value, 0xffff)
         }
@@ -459,8 +583,8 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
         }
     }
 
-    /// @dev Function that should revert IEntryPoint.when `msg.sender` is not authorized to upgrade the contract. Called by
-    /// {upgradeTo} and {upgradeToAndCall}.
+    /// @dev Function that should revert `IErrors.Ownable_Unauthorized` when `msg.sender` is not authorized to upgrade the contract.
+    /// Called by {upgradeTo} and {upgradeToAndCall}.
     ///
     /// Normally, this function will use an xref:access.adoc[access control] modifier such as {Ownable-onlyOwner}.
     ///
