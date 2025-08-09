@@ -2,11 +2,14 @@
 pragma solidity ^0.8.0;
 
 /// @title IStargateFacet - StargateFacet interface
+/// @notice Interface for the Stargate facet functionality
+/// @dev This interface provides functions for interacting with the Stargate protocol for cross-chain transfers
 interface IStargateFacet {
     // =========================
     // events
     // =========================
 
+    /// @notice Emitted when a cross-chain callback execution fails
     /// @dev Emitted when a cross-chain callback execution fails.
     ///      Includes the error message from the failed call, used in `_sendCallback`.
     /// @param errorMessage The return data from the failed callback execution.
@@ -16,7 +19,7 @@ interface IStargateFacet {
     // getters
     // =========================
 
-    /// @notice Retrieves the address of the LayerZero V2 endpoint contract.
+    /// @notice Retrieves the address of the LayerZero V2 endpoint contract
     /// @dev Returns the immutable `_lzEndpointV2` address.
     /// @return The address of the LayerZero V2 endpoint contract.
     function lzEndpoint() external view returns (address);
@@ -25,11 +28,11 @@ interface IStargateFacet {
     // quoter
     // =========================
 
-    /// @notice Quotes the native fee and destination amount for a cross-chain token transfer.
+    /// @notice Quotes the native fee and destination amount for a cross-chain token transfer
     /// @dev Constructs a `SendParam` struct and queries the Stargate pool for the fee and minimum output amount
     ///      using `quoteOFT` and `quoteSend`.
     /// @param poolAddress The address of the Stargate pool contract.
-    /// @param dstEid The destination chain’s LayerZero endpoint ID.
+    /// @param dstEid The destination chain's LayerZero endpoint ID.
     /// @param amountLD The amount of tokens to send (in local decimals).
     /// @param receiver The recipient address on the destination chain.
     /// @param composeMsg The optional compose message for cross-chain execution.
@@ -52,24 +55,24 @@ interface IStargateFacet {
     // send
     // =========================
 
-    /// @notice Sends tokens across chains via the Stargate protocol.
+    /// @notice Sends tokens across chains via the Stargate protocol
     /// @dev Transfers tokens from the sender (or uses pre-transferred tokens), applies protocol fees,
     ///      approves the Stargate pool, and initiates the cross-chain transfer.
     ///      Reverts with `StargateFacet_UnsupportedAsset` for native tokens or `StargateFacet_InvalidNativeBalance`
     ///      for insufficient native balance.
     /// @param poolAddress The address of the Stargate pool contract.
-    /// @param dstEid The destination chain’s LayerZero endpoint ID.
-    /// @param amountLD The amount of tokens to send (in local decimals).
+    /// @param dstEid The destination chain's LayerZero endpoint ID.
     /// @param receiver The recipient address on the destination chain.
     /// @param composeGasLimit The gas limit for the compose message execution.
     /// @param composeMsg The optional compose message for cross-chain execution.
+    /// @return tokensAndAmounts Array of token and amount pairs
     function sendStargateV2(
         address poolAddress,
         uint32 dstEid,
-        uint256 amountLD,
         address receiver,
         uint128 composeGasLimit,
         bytes memory composeMsg
     )
-        external;
+        external
+        returns (bytes32[] memory tokensAndAmounts);
 }

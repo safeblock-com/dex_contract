@@ -7,12 +7,15 @@ import { Initializable } from "./proxy/Initializable.sol";
 import { UUPSUpgradeable } from "./proxy/UUPSUpgradeable.sol";
 
 import { TransferHelper } from "./libraries/TransferHelper.sol";
-import { FEE_MAX } from "./libraries/Constants.sol";
+import { E6 } from "./libraries/Constants.sol";
 
 import { IFeeContract } from "./interfaces/IFeeContract.sol";
 import { IEntryPoint } from "./interfaces/IEntryPoint.sol";
 
 /// @title FeeContract
+/// @notice Contract responsible for handling fee collection and distribution in the DEX protocol.
+/// @dev This contract manages protocol fees, collects them from the router, and allows the owner to withdraw them.
+///      It uses the UUPS upgradeable pattern for future upgrades.
 contract FeeContract is Ownable2Step, UUPSUpgradeable, Initializable, IFeeContract {
     using TransferHelper for address;
 
@@ -29,10 +32,16 @@ contract FeeContract is Ownable2Step, UUPSUpgradeable, Initializable, IFeeContra
     // constructor
     // =========================
 
+    /// @notice Disables initializers to prevent implementation contract misuse
+    /// @dev This constructor ensures that the implementation contract cannot be initialized
     constructor() {
         _disableInitializers();
     }
 
+    /// @notice Initializes the FeeContract with an owner and router address
+    /// @dev Sets the initial owner and router address for the contract
+    /// @param newOwner The address that will become the owner of the contract
+    /// @param newRouter The address of the router contract that will interact with this fee contract
     function initialize(address newOwner, address newRouter) external initializer {
         _transferOwnership(newOwner);
 
@@ -78,6 +87,10 @@ contract FeeContract is Ownable2Step, UUPSUpgradeable, Initializable, IFeeContra
         }
     }
 
+    /// @notice Calculates the protocol fee for a given amount based on the current fee configuration.
+    /// @dev Only callable by the router contract. Calculates fees as a percentage of the amount.
+    /// @param amount The amount to calculate fees for.
+    /// @return fee The calculated protocol fee.
     function writeFees(address, uint256 amount) external view returns (uint256 fee) {
         if (msg.sender != _router) {
             revert IFeeContract.FeeContract_InvalidSender({ sender: msg.sender });
@@ -86,25 +99,22 @@ contract FeeContract is Ownable2Step, UUPSUpgradeable, Initializable, IFeeContra
         (, uint256 protocolFee) = IEntryPoint(_router).getFeeContractAddressAndFee();
         if (protocolFee > 0) {
             unchecked {
-                fee = (amount * protocolFee) / FEE_MAX;
+                fee = (amount * protocolFee) / E6;
             }
         }
     }
 
     /// @notice Function to receive Native currency.
+    /// @dev Allows the contract to receive native currency (e.g., ETH)
     receive() external payable { }
 
     // =========================
     // internal methods
     // =========================
 
-    /// @dev Function that should revert IEntryPoint.when `msg.sender` is not authorized to upgrade the contract. Called by
-    /// {upgradeTo} and {upgradeToAndCall}.
-    ///
-    /// Normally, this function will use an xref:access.adoc[access control] modifier such as {Ownable-onlyOwner}.
-    ///
-    /// ```solidity
-    /// function _authorizeUpgrade(address) internal override onlyOwner {}
-    /// ```
+    /// @notice Authorizes contract upgrades
+    /// @dev Only the owner can authorize upgrades to prevent unauthorized changes.
+    ///      This function is called by {upgradeTo} and {upgradeToAndCall} functions.
+    /// @param newImplementation The address of the new implementation contract
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner { }
 }

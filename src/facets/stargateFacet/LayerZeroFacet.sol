@@ -5,7 +5,8 @@ import { BaseOwnableFacet } from "../BaseOwnableFacet.sol";
 
 import { Utils } from "../../libraries/Utils.sol";
 import { StorageLibrary, LayerZeroFacetStorage } from "../../libraries/StorageLibrary.sol";
-import { TransientStorageFacetLibrary } from "../../libraries/TransientStorageFacetLibrary.sol";
+import { TransientStorageLibrary } from "../../libraries/TransientStorageLibrary.sol";
+import { Utils } from "../../libraries/Utils.sol";
 
 import {
     ILayerZeroEndpointV2,
@@ -22,6 +23,8 @@ import { ILayerZeroFacet } from "./interfaces/ILayerZeroFacet.sol";
 /// @title LayerZeroFacet
 /// @notice A facet for cross-chain messaging via the LayerZero V2 protocol in a diamond-like proxy contract.
 /// @dev Supports sending native drop messages, configuring trusted peers, gas limits, and ULN configurations.
+///      This facet is part of the diamond proxy pattern and provides functionality for cross-chain messaging
+///      using the LayerZero V2 protocol. It integrates with the EntryPoint contract to route calls appropriately.
 contract LayerZeroFacet is BaseOwnableFacet, ILayerZeroFacet {
     // =========================
     // storage
@@ -192,8 +195,16 @@ contract LayerZeroFacet is BaseOwnableFacet, ILayerZeroFacet {
     // =========================
 
     /// @inheritdoc ILayerZeroFacet
-    function sendDeposit(uint32 remoteEid, uint128 nativeDrop, address to) external payable {
-        address sender = TransientStorageFacetLibrary.getSenderAddress();
+    function sendDeposit(
+        uint32 remoteEid,
+        uint128 nativeDrop,
+        address to
+    )
+        external
+        payable
+        returns (bytes32[] memory)
+    {
+        address sender = TransientStorageLibrary.getSenderAddress();
 
         bytes memory options = _createNativeDropOption(remoteEid, nativeDrop, to > address(0) ? to : sender);
 
@@ -211,6 +222,8 @@ contract LayerZeroFacet is BaseOwnableFacet, ILayerZeroFacet {
             }),
             refundAddress: sender
         });
+
+        return Utils.decodeTokensAndAmountsArray();
     }
 
     // =========================

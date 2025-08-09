@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import { TransferHelper } from "../libraries/TransferHelper.sol";
-import { TransientStorageFacetLibrary } from "../libraries/TransientStorageFacetLibrary.sol";
+import { Utils } from "../libraries/Utils.sol";
 
 import { ICoinFlippersVault } from "./interfaces/ICoinFlippersVault.sol";
 
@@ -45,8 +45,10 @@ contract CoinFlippersModule is ICoinFlippersModule {
         bytes calldata signature
     )
         external
+        returns (bytes32[] memory tokensAndAmounts)
     {
-        uint256 amount = TransientStorageFacetLibrary.getAmountForToken({ token: tokenAddress });
+        tokensAndAmounts = Utils.decodeTokensAndAmountsArray();
+        uint256 amount = Utils.getAmountFromArrayAndDelete({ tokensAndAmounts: tokensAndAmounts, token: tokenAddress });
 
         if (amount > 0) {
             tokenAddress.safeApprove({ spender: _coinFlippersVault, value: amount });

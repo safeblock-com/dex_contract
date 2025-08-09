@@ -1,46 +1,50 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+/// @title IErrors
+/// @notice Centralized error definitions for EntryPoint and all related facets and libraries.
+/// @dev This interface defines custom errors used throughout the protocol for gas-efficient reverts.
 interface IErrors {
     // =========================
     // EntryPoint errors
     // =========================
 
-    /// @dev Thrown when a function selector is not registered in the EntryPoint.
-    /// @param selector The 4-byte function selector that does not exist.
+    /// @dev Thrown when the function selector is not found in any facet or module.
+    /// @param selector The 4-byte function selector that was not matched.
     error EntryPoint_FunctionDoesNotExist(bytes4 selector);
 
     /// @dev Thrown when attempting to add a module that is already registered.
-    /// @param methodSignature The 4-byte function signature of the module.
+    /// @param methodSignature The 4-byte signature of the module that is already added.
     error EntryPoint_ModuleAlreadyAdded(bytes4 methodSignature);
 
-    /// @dev Thrown when attempting to update or remove a module that is not registered.
-    /// @param methodSignature The 4-byte function signature of the module.
+    /// @dev Thrown when trying to update or remove a module that was never added.
+    /// @param methodSignature The 4-byte signature of the missing module.
     error EntryPoint_ModuleNotAdded(bytes4 methodSignature);
 
-    error EntryPoint_CallerIsNotEntryPointAA();
-
-    error EntryPoint_InvalidSignatureForAACall();
+    /// @dev Thrown when a function is called externally but is restricted to internal delegation.
+    error EntryPoint_OnlySelfCall();
 
     // =========================
     // Ownable errors
     // =========================
 
-    /// @notice Throws when the sender is not the owner.
+    /// @dev Thrown when the caller is not the current contract owner.
+    /// @param sender The address attempting the restricted action.
     error Ownable_SenderIsNotOwner(address sender);
 
-    /// @notice Throws when the new caller is not a pendingOwner.
+    /// @dev Thrown when the caller is not the pending new owner in a two-step ownership transfer.
+    /// @param caller The address attempting to accept ownership.
     error Ownable_CallerIsNotTheNewOwner(address caller);
 
-    /// @notice Throws when the new owner is not a valid owner account.
+    /// @dev Thrown when trying to set the new owner to the zero address.
     error Ownable_NewOwnerCannotBeAddressZero();
 
     // =========================
     // AcrossFacet errors
     // =========================
 
-    /// @dev Thrown when the caller of `handleV3AcrossMessage` is not the SpokePool.
-    ///      Triggered if `msg.sender` does not match `_spokePool`.
+    /// @dev Thrown when `handleV3AcrossMessage` is called by an address other than the SpokePool.
+    /// @dev Ensures only the designated SpokePool can trigger the message handler.
     error AcrossFacet_NotSpokePool();
 
     // =========================
@@ -50,91 +54,73 @@ interface IErrors {
     /// @dev Thrown when a Uniswap V2 swap fails.
     error MultiswapRouterFacet_FailedV2Swap();
 
-    /// @dev Thrown when the `pairs` array is empty.
-    error MultiswapRouterFacet_InvalidPairsArray();
-
-    /// @dev Thrown when the `Multiswap2Calldata` struct contains invalid data.
+    /// @dev Thrown when the provided `Multiswap2Calldata` is invalid or malformed.
     error MultiswapRouterFacet_InvalidMultiswap2Calldata();
 
-    /// @dev Thrown when a Uniswap V3 swap fails due to zero liquidity.
+    /// @dev Thrown when a Uniswap V3 swap fails, typically due to insufficient liquidity.
     error MultiswapRouterFacet_FailedV3Swap();
 
-    /// @dev Thrown when the `msg.sender` in the fallback is not the cached Uniswap V3 pool.
+    /// @dev Thrown when the sender in the fallback function is not the expected Uniswap V3 pool.
     error MultiswapRouterFacet_SenderMustBePool();
-
-    /// @dev Thrown when the input amount is zero.
-    error MultiswapRouterFacet_InvalidAmountIn();
 
     // =========================
     // StargateFacet errors
     // =========================
 
-    /// @dev Thrown when the contract’s native balance is insufficient for the required fee.
-    ///      Triggered in `_validateNativeBalance` during `sendStargateV2`.
-    error StargateFacet_InvalidNativeBalance();
-
-    /// @dev Thrown when the caller of `lzCompose` is not the LayerZero endpoint.
-    ///      Triggered in `lzCompose` if `msg.sender` does not match `_lzEndpointV2`.
+    /// @dev Thrown when `lzCompose` is called by an address other than the configured LayerZero endpoint.
     error StargateFacet_NotLZEndpoint();
 
-    /// @dev Thrown when the Stargate pool’s token is the native currency (address(0)).
-    ///      Triggered in `sendStargateV2` if the pool does not support ERC20 tokens.
+    /// @dev Thrown when attempting to use Stargate with an unsupported native asset.
+    /// @dev Stargate supports only ERC20 tokens; native tokens are not allowed.
     error StargateFacet_UnsupportedAsset();
-
-    // =========================
-    // TransferFacet errors
-    // =========================
-
-    /// @dev Thrown when a transfer via Permit2 fails to increase the contract's token balance.
-    error TransferFacet_TransferFromFailed();
 
     // =========================
     // TransferHelper errors
     // =========================
 
-    /// @notice Thrown when `safeTransferFrom` fails.
+    /// @dev Thrown when `safeTransferFrom` fails to execute.
     error TransferHelper_TransferFromError();
 
-    /// @notice Thrown when `safeTransfer` fails.
+    /// @dev Thrown when `safeTransfer` fails to execute.
     error TransferHelper_TransferError();
 
-    /// @notice Thrown when `safeApprove` fails.
+    /// @dev Thrown when `safeApprove` fails to update allowance.
     error TransferHelper_ApproveError();
 
-    /// @notice Thrown when `safeGetBalance` fails.
+    /// @dev Thrown when `safeGetBalance` fails to read the token balance.
     error TransferHelper_GetBalanceError();
 
-    /// @notice Thrown when `safeTransferNative` fails.
+    /// @dev Thrown when attempting to transfer native tokens and the operation fails.
     error TransferHelper_TransferNativeError();
-
-    // =========================
-    // TransientStorageFacetLibrary errors
-    // =========================
-
-    /// @dev Thrown when a token is not transferred from the contract after a call.
-    error TransientStorageFacetLibrary_TokenNotTransferredFromContract();
-
-    /// @dev Thrown when the sender address is zero during retrieval.
-    error TransientStorageFacetLibrary_InvalidSenderAddress();
 
     // =========================
     // HelperV2 errors
     // =========================
 
+    /// @dev Thrown when the input amount is less than the required minimum in Uniswap V2-style pools.
     error UniswapV2_InsufficientInputAmount();
+
+    /// @dev Thrown when the output amount is less than the required minimum in Uniswap V2-style pools.
     error UniswapV2_InsufficientOutputAmount();
+
+    /// @dev Thrown when there's not enough liquidity in a Uniswap V2-style pool to execute the swap.
     error UniswapV2_InsufficientLiquidity();
 
     // =========================
     // Utils errors
     // =========================
 
-    /// @dev Thrown when the amount exceeds the maximum value for `int256`.
+    /// @dev Thrown when a uint256 value cannot be safely cast to int256.
     error InvalidIntCast();
 
-    /// @dev Thrown when the expected greater value is less than the expected lower balance.
+    /// @dev Thrown when an expected greater value is actually lower than the comparison value.
+    /// @param expectedGreaterValue The value that was expected to be larger.
+    /// @param expectedLowerBalance The value that was expected to be smaller.
     error ValueLowerThanExpected(uint256 expectedGreaterValue, uint256 expectedLowerBalance);
 
-    /// @dev Thrown when the values are not equal.
+    /// @dev Thrown when two values that were expected to match do not.
     error ValuesNotEqual();
+
+    /// @dev Thrown when duplicate tokens are detected in an array that must be unique.
+    error DuplicateToken();
 }

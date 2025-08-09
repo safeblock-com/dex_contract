@@ -7,6 +7,7 @@ import { IErrors } from "../interfaces/IErrors.sol";
 /// @title TransferHelper
 /// @notice A helper library for safe transfers, approvals, and balance checks.
 /// @dev Provides safe functions for ERC20 token and native currency transfers.
+///      This library is used throughout the protocol to handle token operations safely.
 library TransferHelper {
     // =========================
     // functions
@@ -16,8 +17,8 @@ library TransferHelper {
     /// @dev Uses low-level call to ensure proper error handling.
     /// @param token Address of the ERC20 token to transfer.
     /// @param from Address of the sender.
-    /// @param to Address of the recipient.
     /// @param value Amount to transfer.
+    /// @param to Address of the recipient.
     function safeTransferFrom(address token, address from, uint256 value, address to) internal {
         if (!_makeCall(token, abi.encodeCall(IERC20.transferFrom, (from, to, value)))) {
             revert IErrors.TransferHelper_TransferFromError();
@@ -88,7 +89,6 @@ library TransferHelper {
 
     /// @dev Helper function to make a low-level call for token methods.
     /// @dev Ensures correct return value and decodes it.
-    ///
     /// @param token Address to make the call on.
     /// @param data Calldata for the low-level call.
     /// @return True if the call succeeded, false otherwise.

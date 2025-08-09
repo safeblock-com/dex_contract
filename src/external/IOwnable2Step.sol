@@ -4,6 +4,8 @@ pragma solidity ^0.8.0;
 import { IOwnable } from "./IOwnable.sol";
 
 /// @title IOwnable2Step - Ownable2Step Interface
+/// @notice Interface for two-step ownership transfer functionality
+/// @dev Extends IOwnable to provide a safer ownership transfer mechanism
 interface IOwnable2Step is IOwnable {
     // =========================
     // events
@@ -29,9 +31,11 @@ interface IOwnable2Step is IOwnable {
     /// @notice Starts the ownership transfer of the contract to a new account.
     /// @dev Replaces the pending transfer if there is one.
     /// Can only be called by the current owner.
+    /// @param newOwner The address of the new owner.
     function transferOwnership(address newOwner) external;
 
     /// @notice The new owner accepts the ownership transfer.
+    /// @dev Can only be called by the pending owner.
     function acceptOwnership() external;
 
     /// @notice Leaves the contract without an owner. It will not be possible to call

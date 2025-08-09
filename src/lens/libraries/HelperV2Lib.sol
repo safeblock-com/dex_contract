@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { PoolHelper } from "../../libraries/PoolHelper.sol";
+import { HelperV2Lib as Math } from "../../libraries/HelperV2Lib.sol";
 import { E18, E6 } from "../../libraries/Constants.sol";
 
-import { IUniswapPool } from "../../facets/multiswapRouterFacet/interfaces/IUniswapPool.sol";
+import { IUniswapPool } from "../../interfaces/IUniswapPool.sol";
 import { IErrors } from "../../interfaces/IErrors.sol";
 
 library HelperV2Lib {
@@ -30,7 +30,7 @@ library HelperV2Lib {
             return 0;
         }
 
-        amountOut = PoolHelper.calculateVolatileAmountOut({
+        amountOut = Math.calculateVolatileAmountOut({
             amountIn: amountIn,
             reserveIn: reserveIn,
             reserveOut: reserveOut,
@@ -54,7 +54,7 @@ library HelperV2Lib {
             revert IErrors.UniswapV2_InsufficientInputAmount();
         }
 
-        amountOut = PoolHelper.calculateStableAmountOut({
+        amountOut = Math.calculateStableAmountOut({
             tokenIn: tokenIn,
             tokenOut: tokenOut,
             amountIn: amountIn,
@@ -90,7 +90,7 @@ library HelperV2Lib {
             return type(uint256).max;
         }
 
-        amountIn = PoolHelper.calculateVolatileAmountIn({
+        amountIn = Math.calculateVolatileAmountIn({
             amountOut: amountOut,
             reserveIn: reserveIn,
             reserveOut: reserveOut,
@@ -122,7 +122,7 @@ library HelperV2Lib {
             return type(uint256).max;
         }
 
-        amountIn = PoolHelper.calculateStableAmountIn({
+        amountIn = Math.calculateStableAmountIn({
             tokenIn: tokenIn,
             tokenOut: tokenOut,
             amountOut: amountOut,

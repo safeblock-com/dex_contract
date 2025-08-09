@@ -5,6 +5,7 @@ import { IErrors } from "../interfaces/IErrors.sol";
 import { IOwnable } from "./IOwnable.sol";
 
 /// @title Ownable
+/// @notice Contract module which provides a basic access control mechanism
 /// @dev Contract module which provides a basic access control mechanism, where
 /// there is an account (an owner) that can be granted exclusive access to
 /// specific functions.
@@ -25,6 +26,7 @@ abstract contract Ownable is IOwnable {
     // =========================
 
     /// @dev Throws if called by any account other than the owner.
+    /// @notice Restricts function access to the contract owner only
     modifier onlyOwner() {
         _checkOwner();
         _;
@@ -44,8 +46,8 @@ abstract contract Ownable is IOwnable {
     // =========================
 
     /// @dev Internal function to verify if the caller is the owner of the contract.
-    /// Errors:
-    /// - Thrown `IErrors.Ownable_SenderIsNotOwner` if the caller is not the owner.
+    /// @dev Checks if the caller is the contract owner
+    /// @dev Reverts with `IErrors.Ownable_SenderIsNotOwner` if the caller is not the owner
     function _checkOwner() internal view {
         if (_owner != msg.sender) {
             revert IErrors.Ownable_SenderIsNotOwner(msg.sender);
@@ -53,7 +55,9 @@ abstract contract Ownable is IOwnable {
     }
 
     /// @dev Transfers ownership of the contract to a new account (`newOwner`).
+    /// @dev Transfers ownership of the contract to a new account
     /// @dev Emits an {OwnershipTransferred} event.
+    /// @param newOwner The address of the new owner
     function _transferOwnership(address newOwner) internal virtual {
         address oldOwner = _owner;
         _owner = newOwner;

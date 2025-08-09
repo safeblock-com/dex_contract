@@ -11,7 +11,7 @@ optimizer_runs = 1000
 
 [rpc_endpoints]
 optimism_public = "https://optimism-rpc.publicnode.com"
-bsc_public = "https://bsc-dataseed1.ninicoin.io"
+bsc_public = "https://bsc-dataseed2.ninicoin.io"
 ethereum_public = "https://ethereum-rpc.publicnode.com"
 ethereum = "${ETH_RPC_URL}"
 bsc = "${BSC_RPC_URL}"
@@ -25,6 +25,7 @@ scroll = "${SCROLL_RPC_URL}"
 gnosis = "${GNOSIS_RPC_URL}"
 tron = "${TRON_RPC_URL}"
 trontest = "${TRON_TESTNET_RPC_URL}"
+unit = "${UNIT_ZERO_RPC_URL}"
 
 [etherscan]
 mainnet = { key = "${ETH_API_KEY}", chainid = 1 }

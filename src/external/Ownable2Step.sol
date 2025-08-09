@@ -5,6 +5,7 @@ import { IOwnable2Step } from "./IOwnable2Step.sol";
 import { Ownable, IErrors } from "./Ownable.sol";
 
 /// @title Ownable2Step
+/// @notice Contract module which provides a two-step access control mechanism
 /// @dev Contract module which provides access control mechanism, where
 /// there is an account (an owner) that can be granted exclusive access to
 /// specific functions.
@@ -63,6 +64,8 @@ abstract contract Ownable2Step is Ownable, IOwnable2Step {
     // =========================
 
     /// @dev Internal function to verify if the account is not the address zero.
+    /// @dev Checks if the account is not the zero address
+    /// @param account The address to check
     function _checkIsNotAddressZero(address account) internal pure {
         if (account == address(0)) {
             revert IErrors.Ownable_NewOwnerCannotBeAddressZero();
@@ -70,8 +73,10 @@ abstract contract Ownable2Step is Ownable, IOwnable2Step {
     }
 
     /// @dev Transfers ownership of the contract to a new account (`newOwner`) and deletes any pending owner.
-    /// Internal function without access restriction.
+    /// @dev Transfers ownership of the contract to a new account
+    /// @dev Internal function without access restriction
     /// Emits an {OwnershipTransferred} event.
+    /// @param newOwner The address of the new owner
     function _transferOwnership(address newOwner) internal override {
         delete _pendingOwner;
 

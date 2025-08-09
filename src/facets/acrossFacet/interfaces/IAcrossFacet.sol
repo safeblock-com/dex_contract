@@ -2,6 +2,8 @@
 pragma solidity ^0.8.0;
 
 /// @title IAcrossFacet - AcrossFacet interface
+/// @notice Interface for the AcrossFacet contract for cross-chain token bridging
+/// @dev This interface defines the functions and structures for interacting with the Across V3 protocol
 interface IAcrossFacet {
     /// @notice Parameters for an Across V3 cross-chain deposit.
     /// @dev Specifies the tokens, amounts, and metadata for bridging tokens to a destination chain.
@@ -27,7 +29,7 @@ interface IAcrossFacet {
         uint32 quoteTimestamp;
         /// @notice The deadline for filling the deposit on the destination chain.
         uint32 fillDeadline;
-        /// @notice The deadline for the exclusive relayer’s exclusivity period.
+        /// @notice The deadline for the exclusive relayer's exclusivity period.
         uint32 exclusivityDeadline;
         /// @notice The optional message to send with the deposit.
         bytes message;
@@ -46,28 +48,26 @@ interface IAcrossFacet {
     // getters
     // =========================
 
-    /// @notice Retrieves the address of the Across V3 SpokePool contract.
-    /// @dev Returns the immutable `_spokePool` address.
-    /// @return The address of the SpokePool contract.
+    /// @notice Returns the address of the Across V3 SpokePool contract
+    /// @return The address of the Across V3 SpokePool contract
     function spokePool() external view returns (address);
 
     // =========================
     // main logic
     // =========================
 
-    /// @notice Initiates a cross-chain token deposit via the Across V3 protocol.
-    /// @dev Transfers tokens from the sender (or uses pre-transferred tokens), approves the SpokePool, and calls `depositV3` on the SpokePool.
-    ///      Supports native currency deposits by using `_wrappedNative`.
-    ///      Uses assembly for the low-level call to `depositV3`.
-    /// @param acrossDepositParams The parameters for the cross-chain deposit.
-    function sendAcrossDepositV3(IAcrossFacet.V3AcrossDepositParams calldata acrossDepositParams) external;
+    /// @notice Sends a cross-chain deposit via Across V3 protocol
+    /// @dev Deposits tokens for cross-chain transfer and handles the callback mechanism
+    /// @param acrossDepositParams The deposit parameters for the cross-chain transfer
+    /// @return tokensAndAmounts Array of token addresses and amounts used in the transaction
+    function sendAcrossDepositV3(IAcrossFacet.V3AcrossDepositParams calldata acrossDepositParams)
+        external
+        returns (bytes32[] memory tokensAndAmounts);
 
-    /// @notice Handles incoming Across V3 messages with optional callbacks.
-    /// @dev Validates the caller as the SpokePool, records the token amount in transient storage, and executes a callback from the message payload.
-    ///      If the callback fails, emits `CallFailed` and transfers tokens to the fallback address.
-    /// @param tokenSent The address of the token received.
-    /// @param amount The amount of tokens received.
-    /// @param relayer The relayer address (ignored, provided for interface compatibility).
-    /// @param message The message payload containing the fallback address and callback data.
+    /// @notice Handles incoming messages from Across V3 protocol
+    /// @dev Processes messages received from the Across V3 SpokePool contract
+    /// @param tokenSent The token that was sent across chains
+    /// @param amount The amount of tokens sent
+    /// @param message The message data containing fallback address and payload
     function handleV3AcrossMessage(address tokenSent, uint256 amount, address relayer, bytes memory message) external;
 }

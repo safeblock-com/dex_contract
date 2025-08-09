@@ -1,66 +1,79 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-/// @dev Storage struct for the MultiswapRouterFacet.
-///      Contains a cached pool address for Uniswap V3 swap callbacks.
+/// @title MultiswapRouterFacetStorage
+/// @notice Storage layout for `MultiswapRouterFacet`.
+/// @dev Contains temporary state during multiswap operations, including Uniswap V3 callback context.
+///      This struct is used to manage storage for the MultiswapRouterFacet in a diamond proxy pattern.
 struct MultiswapRouterFacetStorage {
-    /// @dev Cached pool address for Uniswap V3 swap callbacks.
-    ///      Set in `_swapUniV3ExactIn` and cleared in the `fallback` function after validation.
+    /// @notice Cached pool address for swap callback validation.
     address poolAddressCache;
-    ///
-    uint8 swapType; // 0 - multiswap, 1 - reverse multiswap
-    ///
+    /// @notice Type of swap operation.
+    /// @dev 0 = multiswap (standard forward swap), 1 = reverse multiswap.
+    uint8 swapType;
+    /// @notice Cached length of the pairs array used in a reverse multiswap.
     uint8 pairsLength;
+    /// @notice Cached input token and amount for current swap path.
+    /// @dev Packed as bytes32 for efficient passing between internal functions.
+    bytes32 tokenAndAmount;
 }
 
-/// @notice Storage struct for the LayerZeroFacet.
-/// @dev Stores trusted peers, gas limits, and default gas limit to manage cross-chain messaging.
+/// @title LayerZeroFacetStorage
+/// @notice Storage layout for `LayerZeroFacet` used in cross-chain messaging.
+/// @dev Manages trusted peers and gas configurations for each endpoint ID.
+///      This struct is used to manage storage for the LayerZeroFacet in a diamond proxy pattern.
 struct LayerZeroFacetStorage {
-    /// @notice Mapping of destination endpoint IDs to trusted peer addresses.
-    /// @dev Stores the trusted peer (bytes32) for each remote chain’s endpoint ID. Defaults to `address(this)` if unset.
+    /// @notice Mapping of LayerZero endpoint IDs to trusted peer addresses.
+    /// @dev Each peer is stored as `bytes32` (typically address left-padded).
+    ///      Defaults to `address(this)` if no trusted peer is explicitly set.
     mapping(uint32 eid => bytes32 peer) peers;
-    /// @notice Mapping of destination endpoint IDs to gas limits.
-    /// @dev Stores the gas limit for messages sent to each remote chain. Falls back to `defaultGasLimit` if unset.
+    /// @notice Gas limits per LayerZero endpoint.
+    /// @dev If `gasLimitLookup[eid]` is unset, fallback to `defaultGasLimit`.
     mapping(uint32 eid => uint128 gasLimit) gasLimitLookup;
-    /// @notice The default gas limit for cross-chain messages.
-    /// @dev Used when no specific gas limit is set for a destination endpoint ID.
+    /// @notice Fallback gas limit for endpoint IDs without a specific override.
+    /// @dev Used in message dispatch to unknown or rarely used chains.
     uint128 defaultGasLimit;
 }
 
+/// @title StorageLibrary
+/// @notice Provides access to unique storage slots for facets in a diamond architecture.
+/// @dev Uses inline assembly to bind user-defined storage structs to fixed keccak256-based slots.
+///      This library is used to manage storage in a diamond proxy pattern, ensuring each facet
+///      has its own unique storage slot to prevent storage collisions.
 library StorageLibrary {
     // =========================
-    // storage slots
+    // Storage slot constants
     // =========================
 
-    /// @dev Storage slot for the MultiswapRouterFacet to avoid collisions.
-    ///      Computed as "uint256(keccak256("multiswap.router.storage")) - 1" to ensure a unique storage position.
+    /// @dev Unique storage slot for `MultiswapRouterFacetStorage`.
+    ///      Calculated as `uint256(keccak256("multiswap.router.storage")) - 1`.
     bytes32 private constant MULTISWAP_ROUTER_FACET_STORAGE =
         0x73a3a170c596aa083fa5166abc0f3239e53b41143f45c8bd25a602694c09d734;
 
-    /// @dev Storage slot for the LayerZeroFacet to avoid collisions.
-    ///      Computed as keccak256("layerZero.storage") to ensure a unique storage position.
-    bytes32 private constant LAYERZERO_FACET_STORAGE =
+    /// @dev Unique storage slot for `LayerZeroFacetStorage`.
+    ///      Calculated as `keccak256("layerZero.storage")`.
+    bytes32 private constant LAYER_ZERO_FACET_STORAGE =
         0x7f8156d470b4ca2c59b150cce6693dce9d231528b9e476a0fbfb17f10e0dab09;
 
     // =========================
-    // storage getters
+    // Storage accessors
     // =========================
 
-    /// @dev Retrieves the storage slot for the MultiswapRouterFacet.
-    ///      Uses inline assembly to access the `MULTISWAP_ROUTER_FACET_STORAGE` slot.
-    /// @return s The storage slot pointer for the MultiswapRouterFacet.
+    /// @notice Returns a pointer to `MultiswapRouterFacetStorage`.
+    /// @dev Performs an inline assembly assignment to access the predefined storage slot.
+    /// @return s Storage reference to `MultiswapRouterFacetStorage`.
     function getMultiswapRouterFacetStorage() internal pure returns (MultiswapRouterFacetStorage storage s) {
         assembly ("memory-safe") {
             s.slot := MULTISWAP_ROUTER_FACET_STORAGE
         }
     }
 
-    /// @dev Retrieves the storage slot for the LayerZeroFacet.
-    ///      Uses inline assembly to access the `LAYERZERO_FACET_STORAGE` slot.
-    /// @return s The storage slot pointer for the LayerZeroFacet.
+    /// @notice Returns a pointer to `LayerZeroFacetStorage`.
+    /// @dev Performs an inline assembly assignment to access the predefined storage slot.
+    /// @return s Storage reference to `LayerZeroFacetStorage`.
     function getLayerZeroFacetStorage() internal pure returns (LayerZeroFacetStorage storage s) {
         assembly ("memory-safe") {
-            s.slot := LAYERZERO_FACET_STORAGE
+            s.slot := LAYER_ZERO_FACET_STORAGE
         }
     }
 }

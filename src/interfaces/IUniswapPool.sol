@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.0;
 
+/// @title IUniswapPool
+/// @notice Interface for Uniswap V2 and V3 pools
+/// @dev This interface combines functionality for both Uniswap V2 and V3 pools
 interface IUniswapPool {
     // ================================================
     // ============ IUniswapV3Pool ============
@@ -18,7 +21,7 @@ interface IUniswapPool {
     /// @return feeProtocol The protocol fee for both tokens of the pool.
     /// Encoded as two 4 bit values, where the protocol fee of token1 is shifted 4 bits and the protocol fee of token0
     /// is the lower 4 bits. Used as the denominator of a fraction of the swap fee, e.g. 4 means 1/4th of the swap fee.
-    /// unlocked Whether the pool is currently locked to reentrancy
+    /// @return unlocked Whether the pool is currently locked to reentrancy
     function slot0()
         external
         view
@@ -37,12 +40,18 @@ interface IUniswapPool {
     /// @return The liquidity at the current price of the pool
     function liquidity() external view returns (uint128);
 
+    /// @notice The boosted liquidity available to the pool
+    /// @return The boosted liquidity
     function boostedLiquidity() external view returns (uint128);
 
     /// @notice Returns 256 packed tick initialized boolean values. See TickBitmap for more information
+    /// @param wordPosition The word position in the tick bitmap
+    /// @return The 256 packed tick initialized boolean values
     function tickBitmap(int16 wordPosition) external view returns (uint256);
 
     /// @notice Returns 256 packed tick initialized boolean values. See TickBitmap for more information
+    /// @param wordPosition The word position in the tick table
+    /// @return The 256 packed tick initialized boolean values
     function tickTable(int16 wordPosition) external view returns (uint256);
 
     /// @notice The contract that deployed the pool, which must adhere to the IUniswapV3Factory interface
@@ -144,6 +153,16 @@ interface IUniswapPool {
     // ============ ISolidlyV3Pool ============
     // ================================================
 
+    /// @notice Quotes the result of a swap
+    /// @param zeroForOne The direction of the swap, true for token0 to token1, false for token1 to token0
+    /// @param amountSpecified The amount of the swap, which implicitly configures the swap as exact input (positive), or exact output (negative)
+    /// @param sqrtPriceLimitX96 The Q64.96 sqrt price limit. If zero for one, the price cannot be less than this
+    /// value after the swap. If one for zero, the price cannot be greater than this value after the swap
+    /// @return amount0 The delta of the balance of token0 of the pool
+    /// @return amount1 The delta of the balance of token1 of the pool
+    /// @return sqrtPriceX96After The sqrt price after the swap
+    /// @return tickAfter The tick after the swap
+    /// @return liquidityAfter The liquidity after the swap
     function quoteSwap(
         bool zeroForOne,
         int256 amountSpecified,
@@ -173,6 +192,7 @@ interface IUniswapPool {
     /// @notice Returns the current reserves of the pair in token0 and token1
     /// @return reserve0 The amount of token0 in the pair
     /// @return reserve1 The amount of token1 in the pair
+    /// @return blockTimestampLast The timestamp of the last reserve update
     function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
 
     /// @notice Returns the amount of token that can be received for a given amount of other token
@@ -182,10 +202,20 @@ interface IUniswapPool {
     /// @return amountOut The amount of token that can be received
     function getAmountOut(uint256 amountIn, address tokenIn) external view returns (uint256);
 
+    /// @notice Returns metadata about the pair
+    /// @return dec0 The decimals of token0
+    /// @return dec1 The decimals of token1
+    /// @return r0 The reserve of token0
+    /// @return r1 The reserve of token1
+    /// @return st Whether the pair is stable
+    /// @return t0 The address of token0
+    /// @return t1 The address of token1
     function metadata()
         external
         view
         returns (uint256 dec0, uint256 dec1, uint256 r0, uint256 r1, bool st, address t0, address t1);
 
+    /// @notice Returns whether the pair is a stable swap pair
+    /// @return Whether the pair is stable
     function stableSwap() external view returns (bool);
 }

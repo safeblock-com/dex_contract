@@ -2,6 +2,8 @@
 pragma solidity ^0.8.0;
 
 /// @title IOwnable - Ownable Interface
+/// @notice Interface for ownership management in contracts
+/// @dev This interface defines the standard functions for ownership control
 interface IOwnable {
     // =========================
     // events

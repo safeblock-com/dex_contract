@@ -5,8 +5,7 @@ import { Utils } from "../../libraries/Utils.sol";
 import { OptionsBuilder } from "../../libraries/external/OptionsBuilder.sol";
 import { OFTComposeMsgCodec } from "../../libraries/external/OFTComposeMsgCodec.sol";
 import { TransferHelper } from "../../libraries/TransferHelper.sol";
-import { TransientStorageFacetLibrary } from "../../libraries/TransientStorageFacetLibrary.sol";
-import { FeeLibrary } from "../../libraries/FeeLibrary.sol";
+import { TransientStorageLibrary } from "../../libraries/TransientStorageLibrary.sol";
 
 import { IErrors } from "../../interfaces/IErrors.sol";
 import { IStargate, SendParam, MessagingFee } from "./interfaces/IStargate.sol";
@@ -20,6 +19,8 @@ import { IStargateFacet } from "./interfaces/IStargateFacet.sol";
 ///         in a diamond-like proxy contract.
 /// @dev Supports sending tokens across chains, quoting fees, and handling LayerZero compose messages
 ///      with callbacks.
+///      This facet is part of the diamond proxy pattern and provides functionality for cross-chain token bridging
+///      using the Stargate and LayerZero protocols. It integrates with the EntryPoint contract to route calls appropriately.
 contract StargateFacet is ILayerZeroComposer, IStargateFacet {
     using OptionsBuilder for bytes;
 
@@ -83,35 +84,25 @@ contract StargateFacet is ILayerZeroComposer, IStargateFacet {
     function sendStargateV2(
         address poolAddress,
         uint32 dstEid,
-        uint256 amountLD,
         address receiver,
         uint128 composeGasLimit,
         bytes memory composeMsg
     )
         external
+        returns (bytes32[] memory tokensAndAmounts)
     {
         address token = IStargate(poolAddress).token();
-        address sender = TransientStorageFacetLibrary.getSenderAddress();
+        uint256 amountLD;
 
+        tokensAndAmounts = Utils.decodeTokensAndAmountsArray();
         if (token > address(0)) {
-            uint256 amount = TransientStorageFacetLibrary.getAmountForToken({ token: token });
-            if (amount == 0) {
-                TransferHelper.safeTransferFrom({ token: token, from: sender, to: address(this), value: amountLD });
-            } else {
-                amountLD = amount;
-            }
+            amountLD = Utils.getAmountFromArrayAndDelete({ tokensAndAmounts: tokensAndAmounts, token: token });
+            Utils.strictCompareAmounts({ greaterValue: amountLD, lowerValue: 0 });
         } else {
             revert IErrors.StargateFacet_UnsupportedAsset();
         }
 
-        unchecked {
-            amountLD -= FeeLibrary.payFee({ token: token, amount: amountLD });
-        }
-
-        uint256 balanceBefore;
-        if (token > address(0)) {
-            balanceBefore = TransferHelper.safeGetBalance({ token: token, account: address(this) });
-        }
+        uint256 balanceBefore = TransferHelper.safeGetBalance({ token: token, account: address(this) });
 
         (uint256 valueToSend, SendParam memory sendParam, MessagingFee memory messagingFee) =
             _quoteV2(poolAddress, token, dstEid, amountLD, receiver, composeMsg, composeGasLimit);
@@ -123,14 +114,19 @@ contract StargateFacet is ILayerZeroComposer, IStargateFacet {
         IStargate(poolAddress).sendToken{ value: valueToSend }({
             sendParam: sendParam,
             fee: messagingFee,
-            refundAddress: sender
+            refundAddress: TransientStorageLibrary.getSenderAddress()
         });
 
         unchecked {
             uint256 balanceAfter =
                 amountLD - (balanceBefore - TransferHelper.safeGetBalance({ token: token, account: address(this) }));
 
-            TransientStorageFacetLibrary.setAmountForToken({ token: token, amount: balanceAfter, record: true });
+            if (balanceAfter > 0) {
+                Utils.addElementToArrayOrAddAmount({
+                    tokensAndAmounts: tokensAndAmounts,
+                    element: Utils.encodeTokenAndAmount({ token: token, amount: balanceAfter })
+                });
+            }
         }
     }
 
@@ -166,7 +162,7 @@ contract StargateFacet is ILayerZeroComposer, IStargateFacet {
     // internal
     // =========================
 
-    /// @notice Executes a cross-chain callback or transfers tokens to a fallback address on failure.
+    /// @dev Executes a cross-chain callback or transfers tokens to a fallback address on failure.
     /// @dev Records the token amount in transient storage, attempts a low-level call with the payload,
     ///      and handles failures by emitting `CallFailed` and transferring tokens to `fallbackAddress`.
     /// @param asset The address of the token received (or address(0) for native currency).
@@ -175,11 +171,15 @@ contract StargateFacet is ILayerZeroComposer, IStargateFacet {
     /// @param payload The encoded callback data to execute.
     function _sendCallback(address asset, uint256 amountLD, address fallbackAddress, bytes memory payload) internal {
         if (asset > address(0)) {
-            TransientStorageFacetLibrary.setAmountForToken({ token: asset, amount: amountLD, record: false });
-
             bool successfulCall;
             assembly ("memory-safe") {
-                successfulCall := call(gas(), address(), 0, add(payload, 32), mload(payload), 0, 0)
+                let length := mload(payload)
+                let offset := add(payload, add(32, length))
+                mstore(offset, add(shl(160, amountLD), asset))
+                mstore(add(offset, 32), 1)
+                length := add(length, 64)
+
+                successfulCall := call(gas(), address(), 0, add(payload, 32), length, 0, 0)
 
                 if iszero(successfulCall) {
                     returndatacopy(add(payload, 32), 0, returndatasize())
@@ -188,9 +188,6 @@ contract StargateFacet is ILayerZeroComposer, IStargateFacet {
             }
 
             if (!successfulCall) {
-                // zero the temporary value in storage
-                amountLD = TransientStorageFacetLibrary.getAmountForToken({ token: asset });
-
                 emit IStargateFacet.CallFailed({ errorMessage: payload });
 
                 TransferHelper.safeTransfer({ token: asset, to: fallbackAddress, value: amountLD });
@@ -200,7 +197,7 @@ contract StargateFacet is ILayerZeroComposer, IStargateFacet {
         }
     }
 
-    /// @notice Quotes the fee and parameters for a cross-chain token transfer.
+    /// @dev Quotes the fee and parameters for a cross-chain token transfer.
     /// @dev Constructs a `SendParam` with optional compose message options, queries the Stargate pool for the minimum output (`quoteOFT`),
     ///      and calculates the native fee (`quoteSend`).
     /// @param poolAddress The address of the Stargate pool contract.
