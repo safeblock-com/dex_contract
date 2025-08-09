@@ -94,7 +94,7 @@ contract LayerZeroFacetTest is BaseTest {
     uint32 remoteEidV2 = 30_101;
     address stargatePool = 0x138EB30f73BC423c6455C53df6D89CB01d9eBc63;
 
-    function test_layerZeroFacet_sendDeposit_shoudRevertIfFeeNotMet() external {
+    function test_layerZeroFacet_sendDeposit_shouldRevertIfFeeNotEnough() external {
         uint128 nativeTransferCap = ILayerZeroFacet(address(entryPoint)).getNativeSendCap({ remoteEid: remoteEidV2 });
 
         uint256 fee = ILayerZeroFacet(address(entryPoint)).estimateFee({
@@ -112,11 +112,15 @@ contract LayerZeroFacetTest is BaseTest {
 
         vm.expectRevert(abi.encodeWithSelector(IErrors.ValueLowerThanExpected.selector, fee >> 1, fee));
         entryPoint.multicall{ value: fee >> 1 }({
+            tokenTransfers: IEntryPoint.TokenTransfers({
+                tokens: Solarray.addresses(USDT),
+                amounts: Solarray.uint256s(1000e18)
+            }),
             data: Solarray.bytess(abi.encodeCall(ILayerZeroFacet.sendDeposit, (remoteEidV2, nativeTransferCap, user)))
         });
     }
 
-    function test_layerZeroFacet_sendDeposit_shoudSendDeposit() external {
+    function test_layerZeroFacet_sendDeposit_shouldSendDeposit() external {
         uint128 nativeTransferCap = ILayerZeroFacet(address(entryPoint)).getNativeSendCap({ remoteEid: remoteEidV2 });
 
         uint256 fee = ILayerZeroFacet(address(entryPoint)).estimateFee({
@@ -142,8 +146,12 @@ contract LayerZeroFacetTest is BaseTest {
         });
 
         entryPoint.multicall{ value: fee + _fee }({
+            tokenTransfers: IEntryPoint.TokenTransfers({
+                tokens: Solarray.addresses(USDT),
+                amounts: Solarray.uint256s(1000e18)
+            }),
             data: Solarray.bytess(
-                abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool, remoteEidV2, 1000e18, user, 0, bytes(""))),
+                abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool, remoteEidV2, user, 0, bytes(""))),
                 abi.encodeCall(ILayerZeroFacet.sendDeposit, (remoteEidV2, nativeTransferCap, user))
             )
         });

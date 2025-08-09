@@ -12,17 +12,21 @@ import { Proxy, InitialImplementation } from "../src/proxy/Proxy.sol";
 import { IOwnable2Step, IOwnable } from "../src/external/IOwnable2Step.sol";
 import { Ownable } from "../src/external/Ownable.sol";
 import { TransferHelper } from "../src/libraries/TransferHelper.sol";
-import { PoolHelper } from "../src/libraries/PoolHelper.sol";
+import { RouterHelper } from "../src/libraries/RouterHelper.sol";
 
 import { Quoter } from "../src/lens/Quoter.sol";
 
 import { EntryPoint, IEntryPoint, Initializable } from "../src/EntryPoint.sol";
 import { FeeContract, IFeeContract } from "../src/FeeContract.sol";
 
+import { Utils } from "../src/libraries/Utils.sol";
+
+import { ISignatureTransfer } from "../src/interfaces/ISignatureTransfer.sol";
+
 import {
     MultiswapRouterFacet, IMultiswapRouterFacet
 } from "../src/facets/multiswapRouterFacet/MultiswapRouterFacet.sol";
-import { TransferFacet, ITransferFacet, ISignatureTransfer } from "../src/facets/transferFacet/TransferFacet.sol";
+import { TransferFacet, ITransferFacet } from "../src/facets/transferFacet/TransferFacet.sol";
 
 import {
     StargateFacet,
@@ -35,13 +39,15 @@ import { LayerZeroFacet, ILayerZeroFacet } from "../src/facets/stargateFacet/Lay
 import { SymbiosisFacet, ISymbiosisFacet, ISymbiosis } from "../src/facets/symbiosisFacet/SymbiosisFacet.sol";
 import { AcrossFacet, IAcrossFacet } from "../src/facets/acrossFacet/AcrossFacet.sol";
 
-import { TransientStorageFacetLibrary } from "../src/libraries/TransientStorageFacetLibrary.sol";
+import { TransientStorageLibrary } from "../src/libraries/TransientStorageLibrary.sol";
 
-import { EfficientSwapAmount, IUniswapPool, HelperV3Lib } from "../src/lens/libraries/EfficientSwapAmount.sol";
+import { IUniswapPool, HelperV3Lib } from "../src/lens/libraries/HelperV3Lib.sol";
 
 import { CoinFlippersModule, ICoinFlippersModule, ICoinFlippersVault } from "../src/modules/CoinFlippersModule.sol";
 
 import { IErrors } from "../src/interfaces/IErrors.sol";
+
+import { CrossCurveFacet, ICrossCurveRouter } from "../src/facets/crossCurveFacet/CrossCurveFacet.sol";
 
 import { console2 } from "forge-std/console2.sol";
 
@@ -128,34 +134,114 @@ contract BaseTest is Test {
         vm.expectCall(token, abi.encodeCall(IERC20.transferFrom, (from, to, amount)));
     }
 
+    function _encodePercentageInPool(bytes32 pool, uint256 percentage) internal pure returns (bytes32 result) {
+        assembly ("memory-safe") {
+            result := add(shl(192, percentage), pool)
+        }
+    }
+
     bytes32 public constant _TOKEN_PERMISSIONS_TYPEHASH = keccak256("TokenPermissions(address token,uint256 amount)");
 
-    bytes32 public constant _PERMIT_TRANSFER_FROM_TYPEHASH = keccak256(
-        "PermitTransferFrom(TokenPermissions permitted,address spender,uint256 nonce,uint256 deadline)TokenPermissions(address token,uint256 amount)"
+    bytes32 public constant _PERMIT_BATCH_TRANSFER_FROM_TYPEHASH = keccak256(
+        "PermitBatchTransferFrom(TokenPermissions[] permitted,address spender,uint256 nonce,uint256 deadline)TokenPermissions(address token,uint256 amount)"
     );
+
+    string public constant _PERMIT_BATCH_WITNESS_TRANSFER_FROM_TYPEHASH_STUB =
+        "PermitBatchWitnessTransferFrom(TokenPermissions[] permitted,address spender,uint256 nonce,uint256 deadline,";
+
+    // Permit2 Witness for meta transactions
+    string internal constant DATA_SENDER_AND_FEE_DETAILS_TYPE =
+        "DataSenderAndFeeDetails(bytes[] data,address sender,address feeToken,uint256 feeAmount)";
+    string internal constant TOKEN_PERMISSIONS_TYPE = "TokenPermissions(address token,uint256 amount)";
+
+    function hash(ISignatureTransfer.PermitBatchTransferFrom memory permit) internal view returns (bytes32) {
+        uint256 numPermitted = permit.permitted.length;
+        bytes32[] memory tokenPermissionHashes = new bytes32[](numPermitted);
+
+        for (uint256 i = 0; i < numPermitted; ++i) {
+            tokenPermissionHashes[i] = _hashTokenPermissions(permit.permitted[i]);
+        }
+
+        return keccak256(
+            abi.encode(
+                _PERMIT_BATCH_TRANSFER_FROM_TYPEHASH,
+                keccak256(abi.encodePacked(tokenPermissionHashes)),
+                address(entryPoint),
+                permit.nonce,
+                permit.deadline
+            )
+        );
+    }
+
+    function hashWithWitness(
+        ISignatureTransfer.PermitBatchTransferFrom memory permit,
+        bytes32 witness
+    )
+        internal
+        view
+        returns (bytes32)
+    {
+        bytes32 typeHash = keccak256(
+            abi.encodePacked(
+                _PERMIT_BATCH_WITNESS_TRANSFER_FROM_TYPEHASH_STUB,
+                abi.encodePacked(
+                    "DataSenderAndFeeDetails dataSenderAndFeeDetails)",
+                    DATA_SENDER_AND_FEE_DETAILS_TYPE,
+                    TOKEN_PERMISSIONS_TYPE
+                )
+            )
+        );
+
+        uint256 numPermitted = permit.permitted.length;
+        bytes32[] memory tokenPermissionHashes = new bytes32[](numPermitted);
+
+        for (uint256 i = 0; i < numPermitted; ++i) {
+            tokenPermissionHashes[i] = _hashTokenPermissions(permit.permitted[i]);
+        }
+
+        return keccak256(
+            abi.encode(
+                typeHash,
+                keccak256(abi.encodePacked(tokenPermissionHashes)),
+                address(entryPoint),
+                permit.nonce,
+                permit.deadline,
+                witness
+            )
+        );
+    }
+
+    function _hashTokenPermissions(ISignatureTransfer.TokenPermissions memory permitted)
+        private
+        pure
+        returns (bytes32)
+    {
+        return keccak256(abi.encode(_TOKEN_PERMISSIONS_TYPEHASH, permitted));
+    }
 
     function _permit2Sign(
         uint256 pk,
-        ISignatureTransfer.PermitTransferFrom memory permit
+        address[] memory tokens,
+        uint256[] memory amounts,
+        uint256 nonce,
+        uint256 deadline,
+        bytes32 witness
     )
         internal
         view
         returns (bytes memory sig)
     {
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-            pk,
-            _hashTypedData(
-                keccak256(
-                    abi.encode(
-                        _PERMIT_TRANSFER_FROM_TYPEHASH,
-                        keccak256(abi.encode(_TOKEN_PERMISSIONS_TYPEHASH, permit.permitted)),
-                        address(entryPoint),
-                        permit.nonce,
-                        permit.deadline
-                    )
-                )
-            )
-        );
+        ISignatureTransfer.TokenPermissions[] memory permitted =
+            new ISignatureTransfer.TokenPermissions[](tokens.length);
+        for (uint256 i; i < tokens.length; ++i) {
+            permitted[i] = ISignatureTransfer.TokenPermissions({ token: tokens[i], amount: amounts[i] });
+        }
+
+        ISignatureTransfer.PermitBatchTransferFrom memory permit =
+            ISignatureTransfer.PermitBatchTransferFrom({ permitted: permitted, nonce: nonce, deadline: deadline });
+
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(pk, _hashTypedData(witness > bytes32(0) ? hashWithWitness(permit, witness) : hash(permit)));
 
         sig = new bytes(64);
         assembly ("memory-safe") {
@@ -190,7 +276,21 @@ contract BaseTest is Test {
         assertTrue(contains);
     }
 
-    modifier checkTokenStorage(address[] memory tokens) {
+    function hash(
+        bytes[] calldata data,
+        address sender,
+        address feeToken,
+        uint256 feeAmount
+    )
+        external
+        pure
+        returns (bytes32)
+    {
+        return
+            Utils.hashDataSenderAndFeeDetails({ data: data, sender: sender, feeToken: feeToken, feeAmount: feeAmount });
+    }
+
+    modifier checkStorage() {
         _;
 
         // CALLBACK
@@ -198,17 +298,9 @@ contract BaseTest is Test {
             vm.load(address(entryPoint), 0x1248b983d56fa782b7a88ee11066fc0746058888ea550df970b9eea952d65dd1), bytes32(0)
         );
 
-        for (uint256 i; i < tokens.length; ++i) {
-            assertEq(vm.load(address(entryPoint), bytes32(uint256(uint160(tokens[i])))), bytes32(0));
-        }
-
         // SENDER
         assertEq(
             vm.load(address(entryPoint), 0x289cc669fe96ce33e95427b15b06e5cf0e5e79eb9894ad468d456975ce05c198), bytes32(0)
-        );
-
-        assertEq(
-            vm.load(address(entryPoint), 0xc0abc52de3d4e570867f700eb5dfe2c039750b7f48720ee0d6152f3aa8676374), bytes32(0)
         );
     }
 }

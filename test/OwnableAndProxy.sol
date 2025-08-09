@@ -26,8 +26,11 @@ contract OwnableAndProxyTest is BaseTest {
     // =========================
 
     function test_entryPoint_disableInitializers(address newOwner) external {
-        EntryPoint entryPointImplementation =
-            new EntryPoint({ facetsAndSelectors: bytes(""), entryPointAA_: contracts.entryPointAA });
+        EntryPoint entryPointImplementation = new EntryPoint({
+            facetsAndSelectors: bytes(""),
+            permit2Address: contracts.permit2,
+            wrappedNativeAddress: contracts.wrappedNative
+        });
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
         entryPointImplementation.initialize({ newOwner: newOwner });
@@ -46,7 +49,11 @@ contract OwnableAndProxyTest is BaseTest {
         EntryPoint _entryPoint = EntryPoint(payable(address(new Proxy({ initialOwner: owner }))));
         InitialImplementation(address(_entryPoint)).upgradeTo({
             implementation: address(
-                new EntryPoint({ facetsAndSelectors: bytes(""), entryPointAA_: contracts.entryPointAA })
+                new EntryPoint({
+                    facetsAndSelectors: bytes(""),
+                    permit2Address: contracts.permit2,
+                    wrappedNativeAddress: contracts.wrappedNative
+                })
             ),
             data: abi.encodeCall(EntryPoint.initialize, (newOwner))
         });

@@ -14,16 +14,13 @@ contract MultiswapSolidlyTest is BaseTest {
         _resetPrank(owner);
 
         deployForTest();
-
-        entryPoint.setFeeContractAddressAndFee({ feeContractAddress: address(feeContract), fee: 300 });
-        quoter.setRouter({ router: address(entryPoint) });
     }
 
     // =========================
     // multiswap
     // =========================
 
-    function test_multiswapRouterFacet_multiswap2_solidlyPairs() external {
+    function test_multiswapRouterFacet_multiswap_solidlyPairs() external {
         _resetPrank(user);
 
         bytes32 pair = bytes32(uint256(uint160(address(SOLIDLY_PAIR3))));
@@ -37,26 +34,31 @@ contract MultiswapSolidlyTest is BaseTest {
         address tokenIn = SOLIDLY_PAIR3.token1();
         address tokenOut = SOLIDLY_PAIR3.token0();
 
-        IMultiswapRouterFacet.Multiswap2Calldata memory m2Data;
+        uint256 amount = 100 * 10 ** IERC20(tokenIn).decimals();
 
-        m2Data.tokenIn = tokenIn;
-        m2Data.fullAmount = 100 * 10 ** IERC20(tokenIn).decimals();
-        m2Data.amountInPercentages = Solarray.uint256s(1e18);
-        m2Data.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(pair));
-        m2Data.tokensOut = Solarray.addresses(tokenOut);
+        deal({ token: tokenIn, to: user, give: amount });
 
-        m2Data.minAmountsOut = quoter.multiswap2({ data: m2Data });
+        IMultiswapRouterFacet.MultiswapCalldata memory mData;
 
-        deal({ token: tokenIn, to: user, give: m2Data.fullAmount });
+        mData.tokensIn = Solarray.bytes32s(Utils.encodeTokenAndAmount({ token: tokenIn, amount: 1 }));
+        mData.pairs =
+            Solarray.bytes32Arrays(Solarray.bytes32s(_encodePercentageInPool({ pool: pair, percentage: 1e18 })));
+        mData.tokensOut = Solarray.addresses(tokenOut);
 
-        IERC20(tokenIn).approve({ spender: address(entryPoint), amount: m2Data.fullAmount });
+        IEntryPoint.TokenTransfers memory tokenTransfers =
+            IEntryPoint.TokenTransfers({ tokens: Solarray.addresses(tokenIn), amounts: Solarray.uint256s(amount) });
 
-        _expectERC20TransferFromCall(tokenIn, user, address(entryPoint), m2Data.fullAmount);
-        _expectERC20TransferCall(m2Data.tokensOut[0], user, m2Data.minAmountsOut[0]);
+        mData.minAmountsOut = quoter.multiswap({ tokenTransfers: tokenTransfers, data: mData });
+
+        IERC20(tokenIn).approve({ spender: address(entryPoint), amount: amount });
+
+        _expectERC20TransferFromCall(tokenIn, user, address(entryPoint), amount);
+        _expectERC20TransferCall(mData.tokensOut[0], user, mData.minAmountsOut[0]);
         entryPoint.multicall({
+            tokenTransfers: tokenTransfers,
             data: Solarray.bytess(
-                abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data)),
-                abi.encodeCall(TransferFacet.transferToken, (user, m2Data.tokensOut))
+                abi.encodeCall(MultiswapRouterFacet.multiswap, (mData)),
+                abi.encodeCall(TransferFacet.transferToken, (user, mData.tokensOut))
             )
         });
 
@@ -65,30 +67,34 @@ contract MultiswapSolidlyTest is BaseTest {
         tokenIn = SOLIDLY_PAIR2.token0();
         tokenOut = SOLIDLY_PAIR2.token1();
 
+        amount = 1000 * 10 ** IERC20(tokenIn).decimals();
+        deal({ token: tokenIn, to: user, give: amount });
+
         pair = bytes32(uint256(uint160(address(SOLIDLY_PAIR2))));
         fee = quoter.getPoolFee({ pair: address(SOLIDLY_PAIR2) });
         assembly {
             pair := add(pair, add(shl(160, fee), shl(184, 1)))
         }
 
-        m2Data.tokenIn = tokenIn;
-        m2Data.fullAmount = 100 * 10 ** IERC20(tokenIn).decimals();
-        m2Data.amountInPercentages = Solarray.uint256s(1e18);
-        m2Data.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(pair));
-        m2Data.tokensOut = Solarray.addresses(tokenOut);
+        mData.tokensIn = Solarray.bytes32s(Utils.encodeTokenAndAmount({ token: tokenIn, amount: 1 }));
+        mData.pairs =
+            Solarray.bytes32Arrays(Solarray.bytes32s(_encodePercentageInPool({ pool: pair, percentage: 1e18 })));
+        mData.tokensOut = Solarray.addresses(tokenOut);
 
-        m2Data.minAmountsOut = quoter.multiswap2({ data: m2Data });
+        tokenTransfers =
+            IEntryPoint.TokenTransfers({ tokens: Solarray.addresses(tokenIn), amounts: Solarray.uint256s(amount) });
 
-        deal({ token: tokenIn, to: user, give: m2Data.fullAmount });
+        mData.minAmountsOut = quoter.multiswap({ tokenTransfers: tokenTransfers, data: mData });
 
-        IERC20(tokenIn).approve({ spender: address(entryPoint), amount: m2Data.fullAmount });
+        IERC20(tokenIn).approve({ spender: address(entryPoint), amount: amount });
 
-        _expectERC20TransferFromCall(tokenIn, user, address(entryPoint), m2Data.fullAmount);
-        _expectERC20TransferCall(m2Data.tokensOut[0], user, m2Data.minAmountsOut[0]);
+        _expectERC20TransferFromCall(tokenIn, user, address(entryPoint), amount);
+        _expectERC20TransferCall(mData.tokensOut[0], user, mData.minAmountsOut[0]);
         entryPoint.multicall({
+            tokenTransfers: tokenTransfers,
             data: Solarray.bytess(
-                abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data)),
-                abi.encodeCall(TransferFacet.transferToken, (user, m2Data.tokensOut))
+                abi.encodeCall(MultiswapRouterFacet.multiswap, (mData)),
+                abi.encodeCall(TransferFacet.transferToken, (user, mData.tokensOut))
             )
         });
 
@@ -97,30 +103,34 @@ contract MultiswapSolidlyTest is BaseTest {
         tokenIn = SOLIDLY_PAIR1.token0();
         tokenOut = SOLIDLY_PAIR1.token1();
 
+        amount = 100 * 10 ** IERC20(tokenIn).decimals();
+        deal({ token: tokenIn, to: user, give: amount });
+
         pair = bytes32(uint256(uint160(address(SOLIDLY_PAIR1))));
         fee = quoter.getPoolFee({ pair: address(SOLIDLY_PAIR1) });
         assembly {
             pair := add(pair, add(shl(160, fee), shl(184, 1)))
         }
 
-        m2Data.tokenIn = tokenIn;
-        m2Data.fullAmount = 100 * 10 ** IERC20(tokenIn).decimals();
-        m2Data.amountInPercentages = Solarray.uint256s(1e18);
-        m2Data.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(pair));
-        m2Data.tokensOut = Solarray.addresses(tokenOut);
+        mData.tokensIn = Solarray.bytes32s(Utils.encodeTokenAndAmount({ token: tokenIn, amount: 1 }));
+        mData.pairs =
+            Solarray.bytes32Arrays(Solarray.bytes32s(_encodePercentageInPool({ pool: pair, percentage: 1e18 })));
+        mData.tokensOut = Solarray.addresses(tokenOut);
 
-        m2Data.minAmountsOut = quoter.multiswap2({ data: m2Data });
+        tokenTransfers =
+            IEntryPoint.TokenTransfers({ tokens: Solarray.addresses(tokenIn), amounts: Solarray.uint256s(amount) });
 
-        deal({ token: tokenIn, to: user, give: m2Data.fullAmount });
+        mData.minAmountsOut = quoter.multiswap({ tokenTransfers: tokenTransfers, data: mData });
 
-        IERC20(tokenIn).approve({ spender: address(entryPoint), amount: m2Data.fullAmount });
+        IERC20(tokenIn).approve({ spender: address(entryPoint), amount: amount });
 
-        _expectERC20TransferFromCall(tokenIn, user, address(entryPoint), m2Data.fullAmount);
-        _expectERC20TransferCall(m2Data.tokensOut[0], user, m2Data.minAmountsOut[0]);
+        _expectERC20TransferFromCall(tokenIn, user, address(entryPoint), amount);
+        _expectERC20TransferCall(mData.tokensOut[0], user, mData.minAmountsOut[0]);
         entryPoint.multicall({
+            tokenTransfers: tokenTransfers,
             data: Solarray.bytess(
-                abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data)),
-                abi.encodeCall(TransferFacet.transferToken, (user, m2Data.tokensOut))
+                abi.encodeCall(MultiswapRouterFacet.multiswap, (mData)),
+                abi.encodeCall(TransferFacet.transferToken, (user, mData.tokensOut))
             )
         });
     }
@@ -129,7 +139,7 @@ contract MultiswapSolidlyTest is BaseTest {
     // multiswapReverse
     // =========================
 
-    function test_multiswapRouterFacet_multiswap2Reverse_solidlyPairs() external {
+    function test_multiswapRouterFacet_multiswapReverse_solidlyPairs() external {
         _resetPrank(user);
 
         bytes32 pair = bytes32(uint256(uint160(address(SOLIDLY_PAIR3))));
@@ -142,33 +152,33 @@ contract MultiswapSolidlyTest is BaseTest {
         address tokenIn = SOLIDLY_PAIR3.token1();
         address tokenOut = SOLIDLY_PAIR3.token0();
 
-        IMultiswapRouterFacet.Multiswap2Calldata memory m2Data;
+        IMultiswapRouterFacet.MultiswapReverseCalldata memory mRData;
 
-        m2Data.tokenIn = tokenIn;
-        m2Data.minAmountsOut = Solarray.uint256s(10 ** IERC20(tokenOut).decimals());
-        m2Data.amountInPercentages = Solarray.uint256s(uint256(uint160(tokenOut)));
-        m2Data.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(pair));
-        m2Data.tokensOut = Solarray.addresses(tokenOut);
+        mRData.tokensIn = Solarray.addresses(tokenIn);
+        mRData.amountsOut = Solarray.uint256s(10 ** IERC20(tokenOut).decimals());
+        mRData.tokensOut = Solarray.addresses(tokenOut);
+        mRData.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(pair));
 
-        m2Data.fullAmount = quoter.multiswap2Reverse({ data: m2Data });
+        (address[] memory tokensIn, uint256[] memory amountsIn) = quoter.multiswapReverse({ data: mRData });
 
-        deal({ token: tokenIn, to: user, give: m2Data.fullAmount });
+        IEntryPoint.TokenTransfers memory tokenTransfers =
+            IEntryPoint.TokenTransfers({ tokens: tokensIn, amounts: amountsIn });
 
-        IERC20(tokenIn).approve({ spender: address(entryPoint), amount: m2Data.fullAmount });
+        deal({ token: tokenIn, to: user, give: amountsIn[0] });
 
-        _expectERC20TransferFromCall(tokenIn, user, address(entryPoint), m2Data.fullAmount);
-        _expectERC20TransferCall(m2Data.tokensOut[0], user, m2Data.minAmountsOut[0]);
+        IERC20(tokenIn).approve({ spender: address(entryPoint), amount: amountsIn[0] });
+
+        _expectERC20TransferFromCall(tokenIn, user, address(entryPoint), amountsIn[0]);
+        _expectERC20TransferCall(mRData.tokensOut[0], user, mRData.amountsOut[0]);
         entryPoint.multicall({
+            tokenTransfers: tokenTransfers,
             data: Solarray.bytess(
-                abi.encodeCall(IMultiswapRouterFacet.multiswap2Reverse, (m2Data)),
-                abi.encodeCall(TransferFacet.transferToken, (user, m2Data.tokensOut))
+                abi.encodeCall(MultiswapRouterFacet.multiswapReverse, (mRData)),
+                abi.encodeCall(TransferFacet.transferToken, (user, mRData.tokensOut))
             )
         });
 
         // ================================================================================
-
-        tokenIn = SOLIDLY_PAIR2.token0();
-        tokenOut = SOLIDLY_PAIR2.token1();
 
         pair = bytes32(uint256(uint160(address(SOLIDLY_PAIR2))));
         fee = quoter.getPoolFee({ pair: address(SOLIDLY_PAIR2) });
@@ -176,38 +186,33 @@ contract MultiswapSolidlyTest is BaseTest {
             pair := add(pair, add(shl(160, fee), shl(184, 1)))
         }
 
-        m2Data.tokenIn = tokenIn;
-        m2Data.minAmountsOut = Solarray.uint256s(10 ** IERC20(tokenOut).decimals());
-        m2Data.amountInPercentages = Solarray.uint256s(uint256(uint160(tokenOut)));
-        m2Data.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(pair));
-        m2Data.tokensOut = Solarray.addresses(tokenOut);
+        tokenIn = SOLIDLY_PAIR2.token0();
+        tokenOut = SOLIDLY_PAIR2.token1();
 
-        m2Data.fullAmount = quoter.multiswap2Reverse({ data: m2Data });
+        mRData.tokensIn = Solarray.addresses(tokenIn);
+        mRData.amountsOut = Solarray.uint256s(10 ** IERC20(tokenOut).decimals());
+        mRData.tokensOut = Solarray.addresses(tokenOut);
+        mRData.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(pair));
 
-        (, bytes memory data) = address(SOLIDLY_PAIR2).staticcall(
-            abi.encodeWithSignature(
-                "getAmountOut(uint256,address)", m2Data.fullAmount - m2Data.fullAmount * 300 / 1e6, tokenIn
-            )
-        );
-        console2.log("exactAmountIn", abi.decode(data, (uint256)));
+        (tokensIn, amountsIn) = quoter.multiswapReverse({ data: mRData });
 
-        deal({ token: tokenIn, to: user, give: m2Data.fullAmount });
+        tokenTransfers = IEntryPoint.TokenTransfers({ tokens: tokensIn, amounts: amountsIn });
 
-        IERC20(tokenIn).approve({ spender: address(entryPoint), amount: m2Data.fullAmount });
+        deal({ token: tokenIn, to: user, give: amountsIn[0] });
 
-        _expectERC20TransferFromCall(tokenIn, user, address(entryPoint), m2Data.fullAmount);
-        _expectERC20TransferCall(m2Data.tokensOut[0], user, m2Data.minAmountsOut[0]);
+        IERC20(tokenIn).approve({ spender: address(entryPoint), amount: amountsIn[0] });
+
+        _expectERC20TransferFromCall(tokenIn, user, address(entryPoint), amountsIn[0]);
+        _expectERC20TransferCall(mRData.tokensOut[0], user, mRData.amountsOut[0]);
         entryPoint.multicall({
+            tokenTransfers: tokenTransfers,
             data: Solarray.bytess(
-                abi.encodeCall(IMultiswapRouterFacet.multiswap2Reverse, (m2Data)),
-                abi.encodeCall(TransferFacet.transferToken, (user, m2Data.tokensOut))
+                abi.encodeCall(MultiswapRouterFacet.multiswapReverse, (mRData)),
+                abi.encodeCall(TransferFacet.transferToken, (user, mRData.tokensOut))
             )
         });
 
         // ================================================================================
-
-        tokenIn = SOLIDLY_PAIR1.token0();
-        tokenOut = SOLIDLY_PAIR1.token1();
 
         pair = bytes32(uint256(uint160(address(SOLIDLY_PAIR1))));
         fee = quoter.getPoolFee({ pair: address(SOLIDLY_PAIR1) });
@@ -215,24 +220,29 @@ contract MultiswapSolidlyTest is BaseTest {
             pair := add(pair, add(shl(160, fee), shl(184, 1)))
         }
 
-        m2Data.tokenIn = tokenIn;
-        m2Data.minAmountsOut = Solarray.uint256s(10 ** IERC20(tokenOut).decimals());
-        m2Data.amountInPercentages = Solarray.uint256s(uint256(uint160(tokenOut)));
-        m2Data.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(pair));
-        m2Data.tokensOut = Solarray.addresses(tokenOut);
+        tokenIn = SOLIDLY_PAIR1.token0();
+        tokenOut = SOLIDLY_PAIR1.token1();
 
-        m2Data.fullAmount = quoter.multiswap2Reverse({ data: m2Data });
+        mRData.tokensIn = Solarray.addresses(tokenIn);
+        mRData.amountsOut = Solarray.uint256s(10 ** IERC20(tokenOut).decimals());
+        mRData.tokensOut = Solarray.addresses(tokenOut);
+        mRData.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(pair));
 
-        deal({ token: tokenIn, to: user, give: m2Data.fullAmount });
+        (tokensIn, amountsIn) = quoter.multiswapReverse({ data: mRData });
 
-        IERC20(tokenIn).approve({ spender: address(entryPoint), amount: m2Data.fullAmount });
+        tokenTransfers = IEntryPoint.TokenTransfers({ tokens: tokensIn, amounts: amountsIn });
 
-        _expectERC20TransferFromCall(tokenIn, user, address(entryPoint), m2Data.fullAmount);
-        _expectERC20TransferCall(m2Data.tokensOut[0], user, m2Data.minAmountsOut[0]);
+        deal({ token: tokenIn, to: user, give: amountsIn[0] });
+
+        IERC20(tokenIn).approve({ spender: address(entryPoint), amount: amountsIn[0] });
+
+        _expectERC20TransferFromCall(tokenIn, user, address(entryPoint), amountsIn[0]);
+        _expectERC20TransferCall(mRData.tokensOut[0], user, mRData.amountsOut[0]);
         entryPoint.multicall({
+            tokenTransfers: tokenTransfers,
             data: Solarray.bytess(
-                abi.encodeCall(IMultiswapRouterFacet.multiswap2Reverse, (m2Data)),
-                abi.encodeCall(TransferFacet.transferToken, (user, m2Data.tokensOut))
+                abi.encodeCall(MultiswapRouterFacet.multiswapReverse, (mRData)),
+                abi.encodeCall(TransferFacet.transferToken, (user, mRData.tokensOut))
             )
         });
     }

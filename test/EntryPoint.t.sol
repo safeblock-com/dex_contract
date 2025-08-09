@@ -1,16 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "forge-std/Test.sol";
-
-import { Proxy, InitialImplementation } from "../src/proxy/Proxy.sol";
-import { EntryPoint, IEntryPoint } from "../src/EntryPoint.sol";
-
-import { DeployEngine } from "../script/DeployEngine.sol";
+import { DeployEngine, getContracts } from "../script/DeployEngine.sol";
 
 import { Initializable } from "../src/proxy/Initializable.sol";
 
 import "./BaseTest.t.sol";
+import "./Helpers.t.sol";
 
 contract Facet1 {
     struct FacetStorage {
@@ -30,8 +26,10 @@ contract Facet1 {
         return _getLocalStorage().value;
     }
 
-    function setValue1(uint256 value) external {
+    function setValue1(uint256 value) external returns (bytes32[] memory) {
         _getLocalStorage().value = value;
+
+        return Utils.decodeTokensAndAmountsArray();
     }
 
     function revertMethod() external pure {
@@ -62,16 +60,20 @@ contract Facet2 {
         return _getLocalStorage().value;
     }
 
-    function setValue2(uint256 value) external {
+    function setValue2(uint256 value) external returns (bytes32[] memory) {
         _getLocalStorage().value = value;
+
+        return Utils.decodeTokensAndAmountsArray();
     }
 
     function getValue3() external view returns (uint256) {
         return _getLocalStorage().value2;
     }
 
-    function setValue3(uint256 value) external {
+    function setValue3(uint256 value) external returns (bytes32[] memory) {
         _getLocalStorage().value2 = value;
+
+        return new bytes32[](0);
     }
 
     function moduleMethod1() external pure { }
@@ -85,6 +87,8 @@ contract EntryPointTest is BaseTest {
         vm.createSelectFork(vm.rpcUrl("bsc_public"));
 
         _createUsers();
+
+        contracts = getContracts({ chainId: block.chainid });
 
         _resetPrank(owner);
 
@@ -107,13 +111,12 @@ contract EntryPointTest is BaseTest {
                     addressIndexes: Solarray.uint256s(0, 0, 0, 1, 1, 1, 1),
                     facetAddresses: Solarray.addresses(facet1, facet2)
                 }),
-                entryPointAA_: contracts.entryPointAA
+                permit2Address: contracts.permit2,
+                wrappedNativeAddress: contracts.wrappedNative
             })
         );
 
         entryPoint = EntryPoint(payable(address(new Proxy({ initialOwner: owner }))));
-
-        feeContract = FeeContract(payable(makeAddr("feeContract")));
 
         InitialImplementation(address(entryPoint)).upgradeTo({
             implementation: entryPointImplementation,
@@ -127,13 +130,16 @@ contract EntryPointTest is BaseTest {
 
     event Initialized(uint8 version);
 
-    function test_entryPoint_constructor_shouldDisavbleInitializers() external {
+    function test_entryPoint_constructor_shouldDeployAndDisableInitializers() external {
         _resetPrank(owner);
 
         vm.expectEmit();
         emit Initialized({ version: 255 });
-        EntryPoint _entryPoint =
-            new EntryPoint({ facetsAndSelectors: bytes(""), entryPointAA_: contracts.entryPointAA });
+        EntryPoint _entryPoint = new EntryPoint({
+            facetsAndSelectors: bytes(""),
+            permit2Address: contracts.permit2,
+            wrappedNativeAddress: contracts.wrappedNative
+        });
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
         _entryPoint.initialize({ newOwner: owner });
@@ -143,9 +149,14 @@ contract EntryPointTest is BaseTest {
     // empty facets and selectors
     // =========================
 
-    function test_entryPoint_shouldRevertIfNoFacetsAndSelectors() external {
-        address entryPointImplementation =
-            address(new EntryPoint({ facetsAndSelectors: bytes(""), entryPointAA_: contracts.entryPointAA }));
+    function test_entryPoint_shouldRevertIfFacetsAndSelectorsLengthLessThan29Bytes() external {
+        address entryPointImplementation = address(
+            new EntryPoint({
+                facetsAndSelectors: bytes(""),
+                permit2Address: contracts.permit2,
+                wrappedNativeAddress: contracts.wrappedNative
+            })
+        );
 
         InitialImplementation proxy = InitialImplementation(payable(address(new Proxy({ initialOwner: owner }))));
 
@@ -161,8 +172,11 @@ contract EntryPointTest is BaseTest {
         );
         Facet1(address(proxy)).setValue1({ value: 1 });
 
-        vm.expectRevert(abi.encodeWithSelector(IErrors.EntryPoint_FunctionDoesNotExist.selector, bytes4(0x000000)));
+        IEntryPoint.TokenTransfers memory tokenTransfers;
+
+        vm.expectRevert(abi.encodeWithSelector(IErrors.EntryPoint_FunctionDoesNotExist.selector, bytes4(0x00000000)));
         EntryPoint(payable(address(proxy))).multicall({
+            tokenTransfers: tokenTransfers,
             data: Solarray.bytess(abi.encodeCall(Facet1.setValue1, (1)), abi.encodeCall(Facet2.setValue2, (2)))
         });
     }
@@ -171,25 +185,180 @@ contract EntryPointTest is BaseTest {
     // setFeeContractAddress
     // =========================
 
-    function test_entryPoint_setFeeContractAddress_shouldSetFeeContractAddress() external {
-        (address feeContract, uint256 fee) = entryPoint.getFeeContractAddressAndFee();
-        assertEq(feeContract, address(0));
-        assertEq(fee, 0);
+    function test_entryPoint_setFeeContractAddress_shouldSetFeeContractAddressAndFee(
+        address feeContractAddress,
+        uint256 fee
+    )
+        external
+    {
+        assumeNotZeroAddress({ addr: feeContractAddress });
+        fee = bound(fee, 1, type(uint96).max);
 
-        entryPoint.setFeeContractAddressAndFee({ feeContractAddress: address(feeContract), fee: 300 });
+        (address feeContractCurrent, uint256 feeCurrent) = entryPoint.getFeeContractAddressAndFee();
+        assertEq(feeContractCurrent, address(0));
+        assertEq(feeCurrent, 0);
 
-        (feeContract, fee) = entryPoint.getFeeContractAddressAndFee();
-        assertEq(feeContract, address(feeContract));
-        assertEq(fee, 300);
+        entryPoint.setFeeContractAddressAndFee({ feeContractAddress: feeContractAddress, fee: fee });
+
+        (feeContractCurrent, feeCurrent) = entryPoint.getFeeContractAddressAndFee();
+        assertEq(feeContractCurrent, feeContractAddress);
+        assertEq(feeCurrent, fee);
+    }
+
+    // =========================
+    // modules
+    // =========================
+
+    function test_entryPoint_addModule_shouldAddModule(bytes4 moduleSignature, address moduleAddress) external {
+        assumeNotZeroAddress({ addr: moduleAddress });
+        vm.assume(moduleSignature != bytes4(0));
+
+        _resetPrank(owner);
+
+        assertEq(entryPoint.getModuleAddress({ moduleSignature: moduleSignature }), address(0));
+
+        entryPoint.addModule({ moduleSignature: moduleSignature, moduleAddress: moduleAddress });
+
+        assertEq(entryPoint.getModuleAddress({ moduleSignature: moduleSignature }), moduleAddress);
+
+        IEntryPoint.ModuleInfo[] memory modules = entryPoint.getModules();
+
+        assertEq(modules.length, 1);
+        assertEq(modules[0].moduleSignature, moduleSignature);
+        assertEq(modules[0].moduleAddress, moduleAddress);
+    }
+
+    function test_entryPoint_addModule_shouldRevertIfModuleAlreadyAdded(
+        bytes4 moduleSignature,
+        address moduleAddress
+    )
+        external
+    {
+        assumeNotZeroAddress({ addr: moduleAddress });
+        vm.assume(moduleSignature != bytes4(0));
+
+        _resetPrank(owner);
+
+        entryPoint.addModule({ moduleSignature: moduleSignature, moduleAddress: moduleAddress });
+
+        assertEq(entryPoint.getModuleAddress({ moduleSignature: moduleSignature }), moduleAddress);
+
+        vm.expectRevert(abi.encodeWithSelector(IErrors.EntryPoint_ModuleAlreadyAdded.selector, moduleSignature));
+        entryPoint.addModule({ moduleSignature: moduleSignature, moduleAddress: moduleAddress });
+    }
+
+    function test_entryPoint_updateModule_shouldUpdateModule(
+        bytes4 moduleSignature,
+        address[2] memory moduleAddresses
+    )
+        external
+    {
+        assumeNotZeroAddress({ addr: moduleAddresses[0] });
+        assumeNotZeroAddress({ addr: moduleAddresses[1] });
+        vm.assume(moduleAddresses[0] != moduleAddresses[1]);
+        vm.assume(moduleSignature != bytes4(0));
+
+        _resetPrank(owner);
+
+        entryPoint.addModule({ moduleSignature: moduleSignature, moduleAddress: moduleAddresses[0] });
+
+        assertEq(entryPoint.getModuleAddress({ moduleSignature: moduleSignature }), moduleAddresses[0]);
+
+        entryPoint.updateModule({ moduleSignature: moduleSignature, moduleAddress: moduleAddresses[1] });
+
+        assertEq(entryPoint.getModuleAddress({ moduleSignature: moduleSignature }), moduleAddresses[1]);
+
+        IEntryPoint.ModuleInfo[] memory modules = entryPoint.getModules();
+
+        assertEq(modules.length, 1);
+        assertEq(modules[0].moduleSignature, moduleSignature);
+        assertEq(modules[0].moduleAddress, moduleAddresses[1]);
+    }
+
+    function test_entryPoint_updateModule_shouldRevertIfModuleNotAdded(
+        bytes4 moduleSignature,
+        address moduleAddress
+    )
+        external
+    {
+        assumeNotZeroAddress({ addr: moduleAddress });
+        vm.assume(moduleSignature != bytes4(0));
+
+        _resetPrank(owner);
+
+        assertEq(entryPoint.getModuleAddress({ moduleSignature: moduleSignature }), address(0));
+
+        vm.expectRevert(abi.encodeWithSelector(IErrors.EntryPoint_ModuleNotAdded.selector, moduleSignature));
+        entryPoint.updateModule({ moduleSignature: moduleSignature, moduleAddress: moduleAddress });
+    }
+
+    function test_entryPoint_updateModule_shouldDeleteModule(
+        bytes4[2] memory moduleSignatures,
+        address moduleAddress
+    )
+        external
+    {
+        assumeNotZeroAddress({ addr: moduleAddress });
+        vm.assume(moduleSignatures[0] != bytes4(0));
+        vm.assume(moduleSignatures[1] != bytes4(0));
+        vm.assume(moduleSignatures[0] != moduleSignatures[1]);
+
+        _resetPrank(owner);
+
+        entryPoint.addModule({ moduleSignature: moduleSignatures[0], moduleAddress: moduleAddress });
+        entryPoint.addModule({ moduleSignature: moduleSignatures[1], moduleAddress: moduleAddress });
+
+        assertEq(entryPoint.getModuleAddress({ moduleSignature: moduleSignatures[0] }), moduleAddress);
+        assertEq(entryPoint.getModuleAddress({ moduleSignature: moduleSignatures[1] }), moduleAddress);
+
+        IEntryPoint.ModuleInfo[] memory modules = entryPoint.getModules();
+
+        assertEq(modules.length, 2);
+        assertEq(modules[0].moduleSignature, moduleSignatures[0]);
+        assertEq(modules[0].moduleAddress, moduleAddress);
+        assertEq(modules[1].moduleSignature, moduleSignatures[1]);
+        assertEq(modules[1].moduleAddress, moduleAddress);
+
+        entryPoint.updateModule({ moduleSignature: moduleSignatures[1], moduleAddress: address(0) });
+
+        assertEq(entryPoint.getModuleAddress({ moduleSignature: moduleSignatures[0] }), moduleAddress);
+        assertEq(entryPoint.getModuleAddress({ moduleSignature: moduleSignatures[1] }), address(0));
+
+        modules = entryPoint.getModules();
+
+        assertEq(modules.length, 1);
+        assertEq(modules[0].moduleSignature, moduleSignatures[0]);
+        assertEq(modules[0].moduleAddress, moduleAddress);
     }
 
     // =========================
     // multicall
     // =========================
 
-    function test_entryPoint_multicall_shouldCallSeveralMethodsInOneTx(uint256 value1, uint256 value2) external {
-        entryPoint.multicall({
-            data: Solarray.bytess(abi.encodeCall(Facet1.setValue1, (value1)), abi.encodeCall(Facet2.setValue2, (value2)))
+    function test_entryPoint_multicall_shouldCallSeveralMethodsInOneTransaction(
+        uint256 value1,
+        uint256 value2
+    )
+        external
+    {
+        deal({ token: USDT, to: user, give: 1000e18 });
+        deal({ to: user, give: 1000e18 });
+
+        _resetPrank(user);
+        TransferHelper.safeApprove({ token: USDT, spender: address(entryPoint), value: 1000e18 });
+
+        EntryPoint.TokenTransfers memory tokenTransfers = IEntryPoint.TokenTransfers({
+            tokens: Solarray.addresses(USDT, address(0)),
+            amounts: Solarray.uint256s(1000e18, 1000e18)
+        });
+
+        entryPoint.multicall{ value: 1000e18 }({
+            tokenTransfers: tokenTransfers,
+            data: Solarray.bytess(
+                abi.encodeCall(Facet1.setValue1, (value1)),
+                abi.encodeCall(Facet2.setValue2, (value2)),
+                abi.encodeCall(Facet2.setValue3, (value2))
+            )
         });
 
         assertEq(Facet1(address(entryPoint)).getValue1(), value1);
@@ -197,8 +366,13 @@ contract EntryPointTest is BaseTest {
     }
 
     function test_entryPoint_multicall_shouldRevertIfSelectorDoesNotExists() external {
+        _resetPrank(user);
+
+        IEntryPoint.TokenTransfers memory tokenTransfers;
+
         vm.expectRevert(abi.encodeWithSelector(IErrors.EntryPoint_FunctionDoesNotExist.selector, bytes4(0x11223344)));
         entryPoint.multicall({
+            tokenTransfers: tokenTransfers,
             data: Solarray.bytess(
                 abi.encodeWithSelector(Facet1.setValue1.selector, 1), abi.encodeWithSelector(0x11223344, 2)
             )
@@ -206,15 +380,83 @@ contract EntryPointTest is BaseTest {
 
         vm.expectRevert(abi.encodeWithSelector(IErrors.EntryPoint_FunctionDoesNotExist.selector, bytes4(0x11223344)));
         entryPoint.multicall({
+            tokenTransfers: tokenTransfers,
             data: Solarray.bytess(
                 abi.encodeWithSelector(0x11223344, 1), abi.encodeWithSelector(Facet2.setValue2.selector, 2)
             )
         });
     }
 
+    function test_entryPoint_multicall_shouldRevertIfTokensArrayNotUnique() external {
+        _resetPrank(user);
+
+        IEntryPoint.TokenTransfers memory tokenTransfers = IEntryPoint.TokenTransfers({
+            tokens: Solarray.addresses(USDT, USDT),
+            amounts: Solarray.uint256s(1000e18, 1000e18)
+        });
+
+        vm.expectRevert(IErrors.DuplicateToken.selector);
+        entryPoint.multicall({
+            tokenTransfers: tokenTransfers,
+            data: Solarray.bytess(abi.encodeWithSelector(Facet1.setValue1.selector, 1))
+        });
+    }
+
+    function test_entryPoint_multicall_shouldRevertIfInAmountsArrayExistsZero() external {
+        deal({ token: USDT, to: user, give: 1000e18 });
+        deal({ token: USDC, to: user, give: 1000e18 });
+
+        _resetPrank(user);
+
+        TransferHelper.safeApprove({ token: USDT, spender: address(entryPoint), value: 1000e18 });
+        TransferHelper.safeApprove({ token: USDC, spender: address(entryPoint), value: 1000e18 });
+
+        IEntryPoint.TokenTransfers memory tokenTransfers = IEntryPoint.TokenTransfers({
+            tokens: Solarray.addresses(USDT, USDC),
+            amounts: Solarray.uint256s(1000e18, 0)
+        });
+
+        vm.expectRevert(abi.encodeWithSelector(IErrors.ValueLowerThanExpected.selector, 0, 0));
+        entryPoint.multicall({
+            tokenTransfers: tokenTransfers,
+            data: Solarray.bytess(abi.encodeWithSelector(Facet1.setValue1.selector, 1))
+        });
+
+        tokenTransfers = IEntryPoint.TokenTransfers({
+            tokens: Solarray.addresses(USDT, USDC),
+            amounts: Solarray.uint256s(0, 1000e18)
+        });
+
+        vm.expectRevert(abi.encodeWithSelector(IErrors.ValueLowerThanExpected.selector, 0, 0));
+        entryPoint.multicall({
+            tokenTransfers: tokenTransfers,
+            data: Solarray.bytess(abi.encodeWithSelector(Facet1.setValue1.selector, 1))
+        });
+    }
+
+    function test_entryPoint_multicall_shouldRevertIfTokensArrayAfterAllCallsNotEmpty() external {
+        deal({ token: USDT, to: user, give: 1000e18 });
+
+        _resetPrank(user);
+
+        TransferHelper.safeApprove({ token: USDT, spender: address(entryPoint), value: 1000e18 });
+
+        IEntryPoint.TokenTransfers memory tokenTransfers =
+            IEntryPoint.TokenTransfers({ tokens: Solarray.addresses(USDT), amounts: Solarray.uint256s(1000e18) });
+
+        vm.expectRevert(IErrors.ValuesNotEqual.selector);
+        entryPoint.multicall({
+            tokenTransfers: tokenTransfers,
+            data: Solarray.bytess(abi.encodeWithSelector(Facet1.setValue1.selector, 1))
+        });
+    }
+
     function test_entryPoint_multicall_shouldRevertIfOneMethodReverts() external {
+        IEntryPoint.TokenTransfers memory tokenTransfers;
+
         vm.expectRevert("revert method");
         entryPoint.multicall({
+            tokenTransfers: tokenTransfers,
             data: Solarray.bytess(
                 abi.encodeWithSelector(Facet1.revertMethod.selector), abi.encodeWithSelector(Facet1.setValue1.selector, 1)
             )
@@ -222,6 +464,7 @@ contract EntryPointTest is BaseTest {
 
         vm.expectRevert("revert method");
         entryPoint.multicall({
+            tokenTransfers: tokenTransfers,
             data: Solarray.bytess(
                 abi.encodeWithSelector(Facet1.setValue1.selector, 1), abi.encodeWithSelector(Facet1.revertMethod.selector)
             )
@@ -286,93 +529,5 @@ contract EntryPointTest is BaseTest {
         for (uint256 i; i < facets[1].functionSelectors.length; ++i) {
             _assertEqual(facets[1].functionSelectors[i], facet2FunctionSelectorsExpected);
         }
-    }
-
-    // =========================
-    // modules
-    // =========================
-
-    function test_entryPoint_modules_shouldAddModule() external {
-        _resetPrank(owner);
-
-        assertEq(entryPoint.getModuleAddress(Facet1.moduleMethod1.selector), address(0));
-
-        vm.expectRevert(
-            abi.encodeWithSelector(IErrors.EntryPoint_FunctionDoesNotExist.selector, Facet1.moduleMethod1.selector)
-        );
-        entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(Facet1.moduleMethod1, ())) });
-
-        entryPoint.addModule({ moduleSignature: Facet1.moduleMethod1.selector, moduleAddress: address(facet1) });
-
-        assertEq(entryPoint.getModuleAddress(Facet1.moduleMethod1.selector), address(facet1));
-
-        IEntryPoint.ModuleInfo[] memory modules = entryPoint.getModules();
-
-        assertEq(modules.length, 1);
-        assertEq(modules[0].moduleSignature, Facet1.moduleMethod1.selector);
-        assertEq(modules[0].moduleAddress, address(facet1));
-
-        entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(Facet1.moduleMethod1, ())) });
-
-        entryPoint.addModule({ moduleSignature: Facet1.moduleMethod2.selector, moduleAddress: address(facet1) });
-
-        entryPoint.multicall({
-            data: Solarray.bytess(abi.encodeCall(Facet1.moduleMethod1, ()), abi.encodeCall(Facet1.moduleMethod2, ()))
-        });
-
-        modules = entryPoint.getModules();
-
-        assertEq(modules.length, 2);
-        assertEq(modules[1].moduleSignature, Facet1.moduleMethod2.selector);
-        assertEq(modules[1].moduleAddress, address(facet1));
-
-        vm.expectRevert(
-            abi.encodeWithSelector(IErrors.EntryPoint_ModuleAlreadyAdded.selector, Facet1.moduleMethod1.selector)
-        );
-        entryPoint.addModule({ moduleSignature: Facet2.moduleMethod1.selector, moduleAddress: address(facet2) });
-    }
-
-    function test_entryPoint_modules_shouldUpdateOrDeleteModule() external {
-        _resetPrank(owner);
-
-        vm.expectRevert(
-            abi.encodeWithSelector(IErrors.EntryPoint_ModuleNotAdded.selector, Facet1.moduleMethod2.selector)
-        );
-        entryPoint.updateModule({ moduleSignature: Facet1.moduleMethod2.selector, moduleAddress: address(facet1) });
-
-        entryPoint.addModule({ moduleSignature: Facet1.moduleMethod2.selector, moduleAddress: address(facet1) });
-        entryPoint.addModule({ moduleSignature: Facet1.moduleMethod1.selector, moduleAddress: address(facet1) });
-
-        IEntryPoint.ModuleInfo[] memory modules = entryPoint.getModules();
-
-        assertEq(modules.length, 2);
-        assertEq(modules[0].moduleSignature, Facet1.moduleMethod2.selector);
-        assertEq(modules[0].moduleAddress, address(facet1));
-        assertEq(modules[1].moduleSignature, Facet1.moduleMethod1.selector);
-        assertEq(modules[1].moduleAddress, address(facet1));
-
-        entryPoint.multicall({ data: Solarray.bytess(abi.encodeCall(Facet1.moduleMethod1, ())) });
-
-        entryPoint.updateModule({ moduleSignature: Facet2.moduleMethod1.selector, moduleAddress: address(facet2) });
-
-        assertEq(entryPoint.getModuleAddress(Facet2.moduleMethod1.selector), address(facet2));
-
-        modules = entryPoint.getModules();
-
-        assertEq(modules.length, 2);
-        assertEq(modules[0].moduleSignature, Facet1.moduleMethod2.selector);
-        assertEq(modules[0].moduleAddress, address(facet1));
-        assertEq(modules[1].moduleSignature, Facet2.moduleMethod1.selector);
-        assertEq(modules[1].moduleAddress, address(facet2));
-
-        entryPoint.updateModule({ moduleSignature: Facet1.moduleMethod2.selector, moduleAddress: address(0) });
-
-        assertEq(entryPoint.getModuleAddress(Facet1.moduleMethod2.selector), address(0));
-
-        modules = entryPoint.getModules();
-
-        assertEq(modules.length, 1);
-        assertEq(modules[0].moduleSignature, Facet1.moduleMethod1.selector);
-        assertEq(modules[0].moduleAddress, address(facet2));
     }
 }
