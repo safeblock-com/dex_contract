@@ -76,10 +76,6 @@ library TransferHelper {
                 mstore(0, 0xb1a0fdf8)
                 revert(28, 4)
             }
-
-            // send anonymous event with the `to` address
-            mstore(0, to)
-            log0(0, 32)
         }
     }
 

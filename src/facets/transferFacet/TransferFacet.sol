@@ -143,6 +143,7 @@ contract TransferFacet is ITransferFacet {
 
             if (amount > 0) {
                 TransferHelper.safeTransfer({ token: token, to: to, value: amount });
+                _sendEvent(to, token, amount);
             }
         }
     }
@@ -156,6 +157,28 @@ contract TransferFacet is ITransferFacet {
             _wrappedNative.withdraw({ wad: amount });
 
             TransferHelper.safeTransferNative({ to: to, value: amount });
+            _sendEvent(to, address(0), amount);
+        }
+    }
+
+    // =========================
+    // helper
+    // =========================
+
+    /// @dev Sends an anonymous event with the `to` address, `token` address and `amount`
+    /// @param to Address of the recipient.
+    /// @param token Address of the token.
+    /// @param amount Amount to transfer.
+    function _sendEvent(address to, address token, uint256 amount) internal {
+        assembly ("memory-safe") {
+            let ptr := mload(64)
+
+            mstore(0, to)
+            mstore(32, token)
+            mstore(64, amount)
+            log0(0, 96)
+
+            mstore(64, ptr)
         }
     }
 }
