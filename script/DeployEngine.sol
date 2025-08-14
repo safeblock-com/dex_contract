@@ -48,21 +48,21 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // ethereum
     if (chainId == 1) {
         return Contracts({
-            multiswapRouterFacet: 0x6B3f7569B9366E64066085818d6E61426a0A5f5F,
-            transferFacet: 0xE846Bc68EC2cE2BC813eBDEB315f24cC46cdf4de,
-            stargateFacet: 0xc5a484e1A30032e3af1794c595814680644dffe4,
-            layerZeroFacet: 0x5fB4C069790315D5183963A4d82A54C07ed1BcC1,
+            multiswapRouterFacet: 0x64BF7D769F1f8470FF42734f69e056d2A492397C,
+            transferFacet: 0x22c9F7E674d52C71b9f00F6e637bd66A6c83D41A,
+            stargateFacet: 0xD9Aa9C211ca25d46e04d40dA04A6965bBDe4246A,
+            layerZeroFacet: 0x8318AEB7Dfc6990A2Ec80e0a97F43906a502547a,
             symbiosisFacet: address(1),
-            acrossFacet: 0x09D517Fb8050283a335628BB6B2806bE29ceA372,
+            acrossFacet: 0x17bC5E1A8DC29C702F4af5DC939a06c339ccc23e,
             crossCurveFacet: address(1),
             //
-            quoter: address(0),
+            quoter: 0x7F17EA00590d1A1b6384717058f3C29a06391967,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
             feeContract: 0x453B60E247108B92C3B413bF944853A43da9b850,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0x464A62404E5FC95a2a04217f822ee1BC1b7Eb94a,
+            prodEntryPoint: 0xa51280B52900e808AF87d9BA758066c10a3dFa2a,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -82,21 +82,21 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // bnb
     if (chainId == 56) {
         return Contracts({
-            multiswapRouterFacet: 0xf63D279E925EABF0329603D7a702aa8e86D22eea,
-            transferFacet: 0xc96aa6EC19aE1f79E57075Dd2Fc28B0e81565CdA,
-            stargateFacet: 0x17bD505Fb3aD9cB00c057ddf29E7790Ef9997809,
-            layerZeroFacet: 0xf86214eA0bc7ea26a7aEaB0ce0723a580Ed7a5CA,
+            multiswapRouterFacet: 0x4f42804cc5c268919c410c3dAD701f1ac28dEE95,
+            transferFacet: 0xC69A50AEd37f7c08fe6C602f92922Cffd7E7045A,
+            stargateFacet: 0x13095C9AFF4cC68953414eb9b2e85D7a330A1433,
+            layerZeroFacet: 0x3368e0aA3400227D915A0f4511648c290aAB5529,
             symbiosisFacet: address(1),
             acrossFacet: address(1),
             crossCurveFacet: address(1),
             //
-            quoter: 0x38Ec59De5a9d2a57135901539A9E11B908B1aB6F,
+            quoter: 0xD27CDB55E82b1FbF69E64C57e1D1D43FdA3854d9,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
             feeContract: 0xd36f8CC82EA004B4d0c15BdCf584D19aaD775209,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0x1A0AbcE7343170E34600d5701e3DA43eE206a9d8,
+            prodEntryPoint: 0x4F7fe6A778d87F4dEE5bB665A4f275C4E0B32368,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -116,21 +116,21 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // polygon
     if (chainId == 137) {
         return Contracts({
-            multiswapRouterFacet: 0x7D1e68b7A5A68dEE988af82cf11562B040bDF05E,
-            transferFacet: 0x6829a3c7bAeCB3eEE4072C9BB6f5d4ccac9dbf03,
-            stargateFacet: 0x81CD5B260462a06b705Da1C35d16ACF7f37798F5,
-            layerZeroFacet: 0x046684C98C88E940B7321F175972C37A5E1862f5,
+            multiswapRouterFacet: 0x565358F34ecaE13b8E9D97C12b0baE84b87bE476,
+            transferFacet: 0x5bd810757d09FD3CD139379c7A8d4321F50C4505,
+            stargateFacet: 0x47A75CD6226570d038443c399181a0E95ADd25B3,
+            layerZeroFacet: 0x991AC2Fa8E194118e6FF0681E558564E0446A08C,
             symbiosisFacet: address(1),
-            acrossFacet: 0xB98f5d653d22E98999263F63C857cf33a3A7b5f8,
+            acrossFacet: 0xd4D07c5cd66390833b0bA9E5f6d2c93b83E511c4,
             crossCurveFacet: address(1),
             //
-            quoter: 0xDF34E00fE0EB9f8a5255E843a83fBa8f43eD62d6,
+            quoter: 0x311621eAAea04955ab96F6F2F17DB705c108e8b0,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
             feeContract: 0x85Db0f7aBEA9A1232e7617bE69d7988a3221EF15,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0xc0C67E98d41E44cE4838cd8F8084246c513Eb12e,
+            prodEntryPoint: 0xC962F4A886153E1C01F1a7fD634B9131eF7818ea,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -150,21 +150,21 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // avalanche
     if (chainId == 43_114) {
         return Contracts({
-            multiswapRouterFacet: 0x1291EF9Fde55e8783faFfBe117F3D30613F85055,
-            transferFacet: 0xb2651fB158c2eFeAE836B5445E7dBDe45d21b72f,
-            stargateFacet: 0xF7FE08DF80E53687F998Db8dDCaF7Be3cBf17362,
-            layerZeroFacet: 0xfb6b52cEbBe47D81c36caDF4049A42BFb1BBe1c5,
+            multiswapRouterFacet: 0xBc351C0ECc28ab7ec8126365E6c9C51d5c572BEF,
+            transferFacet: 0x4bEdfe5B9f35C258376fDDb46D1b2Db2b85ebC00,
+            stargateFacet: 0xe9ccF0993b6593bFF94d68c10cE469BF52d00677,
+            layerZeroFacet: 0x9FC94bed2FF68cC279070C4bBE86Bb3F3C42E14B,
             symbiosisFacet: address(1),
             acrossFacet: address(1),
             crossCurveFacet: address(1),
             //
-            quoter: 0x4bBD5280C414db8b439E150Ad8178e500B95413A,
+            quoter: 0xcEECc58e3d1A2dBc39ad3EDa5F62775966971952,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
             feeContract: 0x595EeaA4E8A8643bE5E2462f109C94012A472774,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0xeCA1098Cd369E957DA00519a8a790fd6d4c042b6,
+            prodEntryPoint: 0x633AbbcE954Fc3fcB3D2e2D27E86B75dE6650d66,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -184,21 +184,21 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // optimism
     if (chainId == 10) {
         return Contracts({
-            multiswapRouterFacet: 0x443e430a87d68e285E56FBD76cB4ef60DA0bCe9f,
-            transferFacet: 0x29D52Db7bD87F825f22a56533E6A4C4B17220507,
-            stargateFacet: 0xD22Ef25cdF638188D2abA4205865E4d65C5f46EB,
-            layerZeroFacet: 0x422b28F886AC3D0a4AF792DC75077CE44305ABda,
+            multiswapRouterFacet: 0x526Cfaef82c25Bc42b1403Da389fCf5bCe0B8854,
+            transferFacet: 0x50E4D4a7385992a415A6F27294658B1017cF8701,
+            stargateFacet: 0xdb7Dbf34EBFAE345e69e848FD58b8cBA0252Fca9,
+            layerZeroFacet: 0x9876C5c806E1A97634E0A5df7817e0E2f5fBE109,
             symbiosisFacet: address(1),
-            acrossFacet: 0x4bBD5280C414db8b439E150Ad8178e500B95413A,
+            acrossFacet: 0xF6B31e6DD18C81d10fD292691E0014Be03420A1c,
             crossCurveFacet: address(1),
             //
-            quoter: 0xa1cF9Aa16071F97BcF9AAB75A5A6D79CB53DFb9C,
+            quoter: 0x5c12c5160697a129AF51fBc94C2BE50eBFD2bF53,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
             feeContract: 0xE846Bc68EC2cE2BC813eBDEB315f24cC46cdf4de,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0x166dac13450D1B5E24676D3E8c204a3D3da98B37,
+            prodEntryPoint: 0x30A46f018C7D7d8eb42098Ec658B123B34E93F68,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -218,21 +218,21 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // arbitrum
     if (chainId == 42_161) {
         return Contracts({
-            multiswapRouterFacet: 0xF7FE08DF80E53687F998Db8dDCaF7Be3cBf17362,
-            transferFacet: 0xfb6b52cEbBe47D81c36caDF4049A42BFb1BBe1c5,
-            stargateFacet: 0xeCA1098Cd369E957DA00519a8a790fd6d4c042b6,
-            layerZeroFacet: 0xe1115E14970f96682AF8eA6FC7fB3e7910EB7a10,
+            multiswapRouterFacet: 0x9FC94bed2FF68cC279070C4bBE86Bb3F3C42E14B,
+            transferFacet: 0x633AbbcE954Fc3fcB3D2e2D27E86B75dE6650d66,
+            stargateFacet: 0xa1cF9Aa16071F97BcF9AAB75A5A6D79CB53DFb9C,
+            layerZeroFacet: 0x64D225f5a87E01CF015770815de34f03fe59fE13,
             symbiosisFacet: address(1),
-            acrossFacet: 0x3cbF4319cBf6d998c203EE8cFcd3EB6165100d75,
+            acrossFacet: 0x5c12c5160697a129AF51fBc94C2BE50eBFD2bF53,
             crossCurveFacet: address(1),
             //
-            quoter: 0x5C2c0886625fD61E747C93EdF57F2d3dcb00E399,
+            quoter: 0x4bEdfe5B9f35C258376fDDb46D1b2Db2b85ebC00,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
             feeContract: 0x7E9bF77656C1FB73813e725153c70300C502e56f,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0x34D597654179d34eDFE865994577FAf387b53487,
+            prodEntryPoint: 0xDf7621CA6cA481e98D1746Ff02e5e693F25A3615,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -252,21 +252,21 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // base
     if (chainId == 8453) {
         return Contracts({
-            multiswapRouterFacet: 0x0c58f09658d72Ffa455100706CFC8aDACE386A99,
-            transferFacet: 0x28713F0f1fC6133ACdfeDA7718710f10ca08a3B3,
-            stargateFacet: 0xF26e67225141097D4b01A588A2598f2ec2346e34,
-            layerZeroFacet: 0x7F17EA00590d1A1b6384717058f3C29a06391967,
+            multiswapRouterFacet: 0x8e9b5E48fc46CDDE5CB41C586C5c21209A053f01,
+            transferFacet: 0x0000600c2cAE34743ffA4605fce80bcda2fC1b33,
+            stargateFacet: 0xE06a5011B83c5D2b0e6aCfe54ecf1f46Dc6D7544,
+            layerZeroFacet: 0xA1458B50bb651c2B5231186D7CFef8cC469eC51b,
             symbiosisFacet: address(1),
-            acrossFacet: 0x77cdee5c19Bf6484a8e8C40BEBe4D688bab6a700,
+            acrossFacet: 0x62B1F797d0b00e79D9bA2a419D20fDC547c0B49F,
             crossCurveFacet: address(1),
             //
-            quoter: 0x61c99d91dFc8D9819E63677A3BEf1e9dfcBa35c2,
+            quoter: 0x90DF6f51165AFEccb379c047d1bc34f70225Fc71,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
             feeContract: 0xfdF5F450CF0dE94F6C0Bf0B2355de1EEb753B39D,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0x64BF7D769F1f8470FF42734f69e056d2A492397C,
+            prodEntryPoint: 0x1291EF9Fde55e8783faFfBe117F3D30613F85055,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -286,21 +286,21 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // scroll
     if (chainId == 534_352) {
         return Contracts({
-            multiswapRouterFacet: 0xF9B37dFa8479C657FddD9fB50dDb75404622EBCe,
-            transferFacet: 0x62Fa7C88078BC1DE3C60A4D825891CB414C288f8,
-            stargateFacet: 0x82eefc5d2053CC3C33d76F58979cAcd08944C2CC,
-            layerZeroFacet: 0xDa7fbeb9D9Ee83194f10E9D84Ad6DCb47A7311Dc,
+            multiswapRouterFacet: 0x490555CBa64d606FFf6f82a3A373cEA5d59B3973,
+            transferFacet: 0xACCa97a6F48342d069f19fb4502AC5C5c37541d4,
+            stargateFacet: 0x917213eDBEF61B83bc8c80f23Ba16b60Ebe68204,
+            layerZeroFacet: 0xD2A7A4cF1B25B92f47B4A702276DefbB42F45e77,
             symbiosisFacet: address(1),
-            acrossFacet: 0xaA2b8D9B4328076Ff656476111F5c654D1d70Eb0,
+            acrossFacet: 0xf9Fe66d241BF32610a557c204a0A660348965481,
             crossCurveFacet: address(1),
             //
-            quoter: 0xA7c61a0aae5e3CC3484c13B86dD39ABa80E70940,
+            quoter: 0x71e1e613f57102A7c921a829848C3823030ed500,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
             feeContract: 0x65DfbA5338137e0De3c7e9C11D9BFEd0B02c33b8,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0xc25bED344C4c3885f16d127F23FaDaa82784c2A6,
+            prodEntryPoint: 0x18Df5169aB4b6794cB1A61ADaf4511678e3E3e23,
             prodProxy: address(1),
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -320,21 +320,21 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // gnosis
     if (chainId == 100) {
         return Contracts({
-            multiswapRouterFacet: 0x7877c8087F1E152a51162DAdfAA55dD4700279b6,
-            transferFacet: 0x72d012ede34937332Eabc80D1B9D2f995AC434c1,
-            stargateFacet: 0x605750a4e1d8971d64a7c4FD5f8DF238e06dFFc6,
-            layerZeroFacet: 0xC40D56c2cb35E7d0d4c1a5C313500C144b8f5AAD,
+            multiswapRouterFacet: 0x82eefc5d2053CC3C33d76F58979cAcd08944C2CC,
+            transferFacet: 0xDa7fbeb9D9Ee83194f10E9D84Ad6DCb47A7311Dc,
+            stargateFacet: 0xaA2b8D9B4328076Ff656476111F5c654D1d70Eb0,
+            layerZeroFacet: 0xc25bED344C4c3885f16d127F23FaDaa82784c2A6,
             symbiosisFacet: address(1),
             acrossFacet: address(1),
             crossCurveFacet: address(1),
             //
-            quoter: 0xE2D0C301c6293a2cA130AF2ACC47051e349079c5,
+            quoter: 0xF9B37dFa8479C657FddD9fB50dDb75404622EBCe,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
             proxy: 0x27d6b06f29802a19c6c1216D540758f32ebD8dE6,
             feeContract: 0xF307b0a60330512D51e4C8e4ddAA3E26D8f08569,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0x2322D126382844B64E2FbDB1f69fe91A70Db463c,
+            prodEntryPoint: 0x0112d7bBa71214056EeDAAaC031ffA56CCf1471D,
             prodProxy: address(1),
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
