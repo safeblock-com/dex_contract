@@ -60,7 +60,7 @@ contract SymbiosisFacet is ISymbiosisFacet {
         tokensAndAmounts = Utils.decodeTokensAndAmountsArray();
 
         uint256 amount = Utils.getAmountFromArrayAndDelete({ tokensAndAmounts: tokensAndAmounts, token: token });
-        Utils.strictCompareAmounts({ greaterValue: amount, lowerValue: 0 });
+        Utils.expectNotZero({ value: amount });
 
         token.safeApprove({ spender: address(_portal), value: amount });
 

@@ -7,7 +7,6 @@ import { OFTComposeMsgCodec } from "../../libraries/external/OFTComposeMsgCodec.
 import { TransferHelper } from "../../libraries/TransferHelper.sol";
 import { TransientStorageLibrary } from "../../libraries/TransientStorageLibrary.sol";
 
-import { IErrors } from "../../interfaces/IErrors.sol";
 import { IStargate, SendParam, MessagingFee } from "./interfaces/IStargate.sol";
 import { OFTReceipt } from "./interfaces/IOFT.sol";
 import { ILayerZeroComposer } from "./interfaces/ILayerZeroComposer.sol";
@@ -97,9 +96,9 @@ contract StargateFacet is ILayerZeroComposer, IStargateFacet {
         tokensAndAmounts = Utils.decodeTokensAndAmountsArray();
         if (token > address(0)) {
             amountLD = Utils.getAmountFromArrayAndDelete({ tokensAndAmounts: tokensAndAmounts, token: token });
-            Utils.strictCompareAmounts({ greaterValue: amountLD, lowerValue: 0 });
+            Utils.expectNotZero({ value: amountLD });
         } else {
-            revert IErrors.StargateFacet_UnsupportedAsset();
+            revert IStargateFacet.StargateFacet_UnsupportedAsset();
         }
 
         uint256 balanceBefore = TransferHelper.safeGetBalance({ token: token, account: address(this) });
@@ -107,7 +106,7 @@ contract StargateFacet is ILayerZeroComposer, IStargateFacet {
         (uint256 valueToSend, SendParam memory sendParam, MessagingFee memory messagingFee) =
             _quoteV2(poolAddress, token, dstEid, amountLD, receiver, composeMsg, composeGasLimit);
 
-        Utils.compareAmounts(address(this).balance, valueToSend);
+        Utils.compareAmounts({ greaterValue: address(this).balance, lowerValue: valueToSend });
 
         TransferHelper.safeApprove({ token: token, spender: poolAddress, value: amountLD });
 
@@ -146,7 +145,7 @@ contract StargateFacet is ILayerZeroComposer, IStargateFacet {
         payable
     {
         if (msg.sender != _lzEndpointV2) {
-            revert IErrors.StargateFacet_NotLZEndpoint();
+            revert IStargateFacet.StargateFacet_NotLZEndpoint();
         }
 
         uint256 amountLD = OFTComposeMsgCodec.amountLD({ _msg: message });

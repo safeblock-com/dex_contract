@@ -22,10 +22,14 @@ import { E18, UNISWAP_V3_MASK, ADDRESS_MASK, FEE_MASK, E6, PERCENTAGE_MASK } fro
 import { RouterHelper } from "../libraries/RouterHelper.sol";
 import { Utils } from "../libraries/Utils.sol";
 
-import { IErrors } from "../interfaces/IErrors.sol";
-
 /// @title Multiswap-Partswap Quoter contract
 contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
+    // =========================
+    // errors
+    // =========================
+
+    error MultiswapRouterFacet_InvalidMultiswap2Calldata();
+
     // =========================
     // storage
     // =========================
@@ -167,11 +171,10 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
         {
             uint256 amountInPercentagesLength = data.amountInPercentages.length;
             if (amountInPercentagesLength == 0) {
-                revert IErrors.MultiswapRouterFacet_InvalidMultiswap2Calldata();
+                revert MultiswapRouterFacet_InvalidMultiswap2Calldata();
             }
             tokensOut = new address[](amountInPercentagesLength);
             for (uint256 i; i < amountInPercentagesLength;) {
-                // TODO optimize
                 tokensOut[i] = address(uint160(data.amountInPercentages[i]));
 
                 unchecked {
@@ -221,12 +224,12 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
         returns (uint256[] memory amountsOut)
     {
         uint256 length = data.tokensIn.length;
-        Utils.strictCompareAmounts({ greaterValue: length, lowerValue: 0 });
+        Utils.expectNotZero({ value: length });
         Utils.expectEqual({ left: length, right: data.pairs.length });
 
         unchecked {
             uint256 tokensOutLength = data.tokensOut.length;
-            Utils.strictCompareAmounts({ greaterValue: tokensOutLength, lowerValue: 0 });
+            Utils.expectNotZero({ value: tokensOutLength });
             Utils.checkUnique({ addresses: data.tokensOut });
 
             amountsOut = new uint256[](tokensOutLength);
@@ -247,7 +250,7 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
                     bytes32 encodedTokenIn = data.tokensIn[i];
                     address tokenIn = Utils.bytes32ToAddress({ encodedValue: encodedTokenIn });
                     uint256 tokenInIndex = Utils.getHighOrder96Bits({ encodedValue: encodedTokenIn });
-                    Utils.strictCompareAmounts({ greaterValue: tokenInIndex, lowerValue: 0 });
+                    Utils.expectNotZero({ value: tokenInIndex });
                     Utils.compareAmounts({ greaterValue: tokenInIndex, lowerValue: tokenInIndexCache });
                     uint256 amountIn;
                     if (tokenInIndex != tokenInIndexCache) {
@@ -288,12 +291,12 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
         returns (address[] memory tokensIn, uint256[] memory amountsIn)
     {
         uint256 length = data.tokensOut.length;
-        Utils.strictCompareAmounts({ greaterValue: length, lowerValue: 0 });
+        Utils.expectNotZero({ value: length });
         Utils.expectEqual({ left: length, right: data.amountsOut.length });
         Utils.expectEqual({ left: length, right: data.pairs.length });
 
         uint256 tokensInLength = data.tokensIn.length;
-        Utils.strictCompareAmounts({ greaterValue: tokensInLength, lowerValue: 0 });
+        Utils.expectNotZero({ value: tokensInLength });
         Utils.checkUnique({ addresses: data.tokensIn });
 
         tokensIn = data.tokensIn;
@@ -308,7 +311,7 @@ contract Quoter is UUPSUpgradeable, Initializable, Ownable2Step {
         for (uint256 i; i < length;) {
             address tokenOut = data.tokensOut[i];
             uint256 amountOut = data.amountsOut[i];
-            Utils.strictCompareAmounts({ greaterValue: amountOut, lowerValue: 0 });
+            Utils.expectNotZero({ value: amountOut });
 
             Utils.addElementToArrayOrAddAmount({
                 tokensAndAmounts: tokensAndAmounts,

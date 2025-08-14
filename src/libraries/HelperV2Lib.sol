@@ -5,13 +5,24 @@ import { IERC20 } from "forge-std/interfaces/IERC20.sol";
 
 import { E6, E18 } from "./Constants.sol";
 
-import { IErrors } from "../interfaces/IErrors.sol";
-
 /// @title HelperV2Lib
 /// @notice Utility library for calculating swap amounts in volatile and stable AMM pools.
 /// @dev Supports UniswapV2-style constant product formulas and stable curve math via Newton iteration.
 ///      This library is used throughout the protocol to handle AMM calculations for both volatile and stable pairs.
 library HelperV2Lib {
+    // =========================
+    // errors
+    // =========================
+
+    /// @dev Thrown when the input amount is less than the required minimum in Uniswap V2-style pools.
+    error UniswapV2_InsufficientInputAmount();
+
+    /// @dev Thrown when the output amount is less than the required minimum in Uniswap V2-style pools.
+    error UniswapV2_InsufficientOutputAmount();
+
+    /// @dev Thrown when there's not enough liquidity in a Uniswap V2-style pool to execute the swap.
+    error UniswapV2_InsufficientLiquidity();
+
     // ===========================
     // amountOut
     // ===========================
@@ -34,10 +45,10 @@ library HelperV2Lib {
         returns (uint256 amountOut)
     {
         if (amountIn == 0) {
-            revert IErrors.UniswapV2_InsufficientInputAmount();
+            revert UniswapV2_InsufficientInputAmount();
         }
         if (reserveIn == 0 || reserveOut == 0) {
-            revert IErrors.UniswapV2_InsufficientLiquidity();
+            revert UniswapV2_InsufficientLiquidity();
         }
 
         amountOut = calculateVolatileAmountOut({
@@ -70,10 +81,10 @@ library HelperV2Lib {
         returns (uint256 amountOut)
     {
         if (amountIn == 0) {
-            revert IErrors.UniswapV2_InsufficientInputAmount();
+            revert UniswapV2_InsufficientInputAmount();
         }
         if (reserveIn == 0 || reserveOut == 0) {
-            revert IErrors.UniswapV2_InsufficientLiquidity();
+            revert UniswapV2_InsufficientLiquidity();
         }
 
         amountOut = calculateStableAmountOut({
@@ -108,15 +119,15 @@ library HelperV2Lib {
         returns (uint256 amountIn)
     {
         if (amountOut == 0) {
-            revert IErrors.UniswapV2_InsufficientOutputAmount();
+            revert UniswapV2_InsufficientOutputAmount();
         }
 
         if (reserveIn == 0 || reserveOut == 0) {
-            revert IErrors.UniswapV2_InsufficientLiquidity();
+            revert UniswapV2_InsufficientLiquidity();
         }
 
         if (amountOut > reserveOut) {
-            revert IErrors.UniswapV2_InsufficientOutputAmount();
+            revert UniswapV2_InsufficientOutputAmount();
         }
 
         amountIn = calculateVolatileAmountIn({
@@ -149,15 +160,15 @@ library HelperV2Lib {
         returns (uint256 amountIn)
     {
         if (amountOut == 0) {
-            revert IErrors.UniswapV2_InsufficientOutputAmount();
+            revert UniswapV2_InsufficientOutputAmount();
         }
 
         if (reserveIn == 0 || reserveOut == 0) {
-            revert IErrors.UniswapV2_InsufficientLiquidity();
+            revert UniswapV2_InsufficientLiquidity();
         }
 
         if (amountOut > reserveOut) {
-            revert IErrors.UniswapV2_InsufficientOutputAmount();
+            revert UniswapV2_InsufficientOutputAmount();
         }
 
         amountIn = calculateStableAmountIn({

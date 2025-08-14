@@ -3,13 +3,38 @@ pragma solidity 0.8.19;
 
 import { CAST_INT_CONSTANT, ADDRESS_MASK } from "./Constants.sol";
 
-import { IErrors } from "../interfaces/IErrors.sol";
-
 /// @title Utils
 /// @notice General utility library for encoding, validation, array manipulation, and hashing in the router system.
 /// @dev Includes math validation, calldata decoding, address masking, Permit2 witness hashing, and custom data encoders.
 ///      This library is used throughout the protocol to handle various utility functions.
 library Utils {
+    // =========================
+    // errors
+    // =========================
+
+    /// @dev Thrown when a uint256 value cannot be safely cast to int256.
+    error InvalidIntCast();
+
+    /// @dev Thrown when an expected greater value is actually lower than the comparison value.
+    /// @param expectedGreaterValue The value that was expected to be larger.
+    /// @param expectedLowerBalance The value that was expected to be smaller.
+    error ValueLowerThanExpected(uint256 expectedGreaterValue, uint256 expectedLowerBalance);
+
+    /// @dev Thrown when two values that were expected to match do not.
+    /// @param left The first value.
+    /// @param right The second value.
+    error ValuesNotEqual(uint256 left, uint256 right);
+
+    /// @dev Thrown when duplicate tokens are detected in an array that must be unique.
+    error DuplicateToken();
+
+    /// @dev Thrown when a value is expected to be non-zero but is zero.
+    error UnexpectedZeroValue();
+
+    // =========================
+    // functions
+    // =========================
+
     /// @notice Checks that `greaterValue > lowerValue` and returns their difference.
     /// @dev Reverts if the condition is not satisfied.
     /// @param greaterValue Expected to be greater.
@@ -33,23 +58,14 @@ library Utils {
     /// @param greaterValue The value expected to be greater
     /// @param lowerValue The value expected to be lower
     function compareAmounts(uint256 greaterValue, uint256 lowerValue) internal pure {
-        if (greaterValue < lowerValue) {
-            revert IErrors.ValueLowerThanExpected({
-                expectedGreaterValue: greaterValue,
-                expectedLowerBalance: lowerValue
-            });
-        }
-    }
-
-    /// @notice Reverts if `greaterValue <= lowerValue`.
-    /// @param greaterValue The value expected to be strictly greater
-    /// @param lowerValue The value expected to be strictly lower
-    function strictCompareAmounts(uint256 greaterValue, uint256 lowerValue) internal pure {
-        if (greaterValue <= lowerValue) {
-            revert IErrors.ValueLowerThanExpected({
-                expectedGreaterValue: greaterValue,
-                expectedLowerBalance: lowerValue
-            });
+        assembly ("memory-safe") {
+            if lt(greaterValue, lowerValue) {
+                // ValueLowerThanExpected(uint256,uint256) selector
+                mstore(0, 0xa80090fd)
+                mstore(32, greaterValue)
+                mstore(64, lowerValue)
+                revert(28, 68)
+            }
         }
     }
 
@@ -59,8 +75,22 @@ library Utils {
     function expectEqual(uint256 left, uint256 right) internal pure {
         assembly ("memory-safe") {
             if sub(left, right) {
-                // IErrors.ValuesNotEqual()
-                mstore(0, 0xc8431659)
+                // ValuesNotEqual(uint256,uint256) selector
+                mstore(0, 0x460b9939)
+                mstore(32, left)
+                mstore(64, right)
+                revert(28, 68)
+            }
+        }
+    }
+
+    /// @notice Reverts with custom error if `value == 0`.
+    /// @param value The value to check
+    function expectNotZero(uint256 value) internal pure {
+        assembly ("memory-safe") {
+            if iszero(value) {
+                // UnexpectedZeroValue() selector
+                mstore(0, 0x75a0be41)
                 revert(28, 4)
             }
         }
@@ -80,7 +110,7 @@ library Utils {
         // cast a uint256 to a int256, revert on overflow
         // https://github.com/Uniswap/v3-core/blob/main/contracts/libraries/SafeCast.sol#L24
         if (amount > CAST_INT_CONSTANT) {
-            revert IErrors.InvalidIntCast();
+            revert InvalidIntCast();
         }
     }
 
@@ -338,7 +368,7 @@ library Utils {
                 for (uint256 i; i < length - 1; ++i) {
                     for (uint256 j = i + 1; j < length; ++j) {
                         if (addresses[i] == addresses[j]) {
-                            revert IErrors.DuplicateToken();
+                            revert DuplicateToken();
                         }
                     }
                 }

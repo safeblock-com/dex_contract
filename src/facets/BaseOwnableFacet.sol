@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import { IErrors } from "../interfaces/IErrors.sol";
-
+import { IOwnable } from "../external/IOwnable.sol";
 import { TransientStorageLibrary } from "../libraries/TransientStorageLibrary.sol";
 
 /// @title BaseOwnableFacet
@@ -44,7 +43,7 @@ abstract contract BaseOwnableFacet {
         if (owner != msg.sender) {
             address sender = TransientStorageLibrary.getSenderAddress();
             if (owner != sender) {
-                revert IErrors.Ownable_SenderIsNotOwner({ sender: sender });
+                revert IOwnable.Ownable_SenderIsNotOwner({ sender: sender });
             }
         }
     }

@@ -16,6 +16,21 @@ interface IOwnable {
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     // =========================
+    // errors
+    // =========================
+
+    /// @dev Thrown when the caller is not the current contract owner.
+    /// @param sender The address attempting the restricted action.
+    error Ownable_SenderIsNotOwner(address sender);
+
+    /// @dev Thrown when the caller is not the pending new owner in a two-step ownership transfer.
+    /// @param caller The address attempting to accept ownership.
+    error Ownable_CallerIsNotTheNewOwner(address caller);
+
+    /// @dev Thrown when trying to set the new owner to the zero address.
+    error Ownable_NewOwnerCannotBeAddressZero();
+
+    // =========================
     // getters
     // =========================
 

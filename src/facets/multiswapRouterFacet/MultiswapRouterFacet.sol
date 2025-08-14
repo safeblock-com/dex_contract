@@ -8,7 +8,6 @@ import { StorageLibrary, MultiswapRouterFacetStorage } from "../../libraries/Sto
 import { TransientStorageLibrary } from "../../libraries/TransientStorageLibrary.sol";
 import { E18, UNISWAP_V3_MASK, ADDRESS_MASK, PERCENTAGE_MASK } from "../../libraries/Constants.sol";
 
-import { IErrors } from "../../interfaces/IErrors.sol";
 import { IUniswapPool } from "../../interfaces/IUniswapPool.sol";
 
 import { IMultiswapRouterFacet } from "./interfaces/IMultiswapRouterFacet.sol";
@@ -47,11 +46,11 @@ contract MultiswapRouterFacet is IMultiswapRouterFacet {
         returns (bytes32[] memory tokensAndAmountsOut)
     {
         uint256 length = data.tokensIn.length;
-        Utils.strictCompareAmounts({ greaterValue: length, lowerValue: 0 });
+        Utils.expectNotZero({ value: length });
         Utils.expectEqual({ left: length, right: data.pairs.length });
 
         uint256 tokensOutLength = data.tokensOut.length;
-        Utils.strictCompareAmounts({ greaterValue: tokensOutLength, lowerValue: 0 });
+        Utils.expectNotZero({ value: tokensOutLength });
         Utils.expectEqual({ left: tokensOutLength, right: data.minAmountsOut.length });
         Utils.checkUnique({ addresses: data.tokensOut });
 
@@ -67,7 +66,7 @@ contract MultiswapRouterFacet is IMultiswapRouterFacet {
             bytes32 encodedTokenIn = data.tokensIn[i];
             address tokenIn = Utils.bytes32ToAddress({ encodedValue: encodedTokenIn });
             uint256 tokenInIndex = Utils.getHighOrder96Bits({ encodedValue: encodedTokenIn });
-            Utils.strictCompareAmounts({ greaterValue: tokenInIndex, lowerValue: 0 });
+            Utils.expectNotZero({ value: tokenInIndex });
             Utils.compareAmounts({ greaterValue: tokenInIndex, lowerValue: tokenInIndexCache });
             uint256 amountIn;
             if (tokenInIndex != tokenInIndexCache) {
@@ -77,7 +76,7 @@ contract MultiswapRouterFacet is IMultiswapRouterFacet {
                 amountIn = Utils.getAmountFromArrayAndDelete({ tokensAndAmounts: tokensAndAmountsOut, token: tokenIn });
             }
 
-            Utils.strictCompareAmounts({ greaterValue: amountIn, lowerValue: 0 });
+            Utils.expectNotZero({ value: amountIn });
 
             _multiswap(data.pairs[i], tokensAndAmountsOut, tokenIn, amountIn);
 
@@ -114,12 +113,12 @@ contract MultiswapRouterFacet is IMultiswapRouterFacet {
         returns (bytes32[] memory tokensAndAmountsOut)
     {
         uint256 length = data.pairs.length;
-        Utils.strictCompareAmounts({ greaterValue: length, lowerValue: 0 });
+        Utils.expectNotZero({ value: length });
 
-        Utils.expectEqual(length, data.amountInPercentages.length);
+        Utils.expectEqual({ left: length, right: data.amountInPercentages.length });
 
         uint256 tokensOutLength = data.tokensOut.length;
-        Utils.strictCompareAmounts({ greaterValue: tokensOutLength, lowerValue: 0 });
+        Utils.expectNotZero({ value: tokensOutLength });
         Utils.expectEqual({ left: tokensOutLength, right: data.minAmountsOut.length });
         Utils.checkUnique({ addresses: data.tokensOut });
 
@@ -155,7 +154,7 @@ contract MultiswapRouterFacet is IMultiswapRouterFacet {
             }
         }
 
-        Utils.expectEqual({ left: data.tokensOut.length, right: tokensAndAmountsOut.length });
+        Utils.expectEqual({ left: tokensOutLength, right: tokensAndAmountsOut.length });
         Utils.expectEqual({ left: tokensAndAmounts.length, right: 0 });
 
         for (uint256 i; i < tokensOutLength;) {
@@ -183,12 +182,12 @@ contract MultiswapRouterFacet is IMultiswapRouterFacet {
         returns (bytes32[] memory tokensAndAmountsOut)
     {
         uint256 length = data.tokensOut.length;
-        Utils.strictCompareAmounts({ greaterValue: length, lowerValue: 0 });
+        Utils.expectNotZero({ value: length });
         Utils.expectEqual({ left: length, right: data.pairs.length });
         Utils.expectEqual({ left: length, right: data.amountsOut.length });
 
         uint256 tokensInLength = data.tokensIn.length;
-        Utils.strictCompareAmounts({ greaterValue: tokensInLength, lowerValue: 0 });
+        Utils.expectNotZero({ value: tokensInLength });
         Utils.checkUnique({ addresses: data.tokensIn });
 
         bytes32[] memory tokensAndAmounts = Utils.decodeTokensAndAmountsArray();
@@ -211,7 +210,7 @@ contract MultiswapRouterFacet is IMultiswapRouterFacet {
         for (uint256 i; i < length;) {
             address tokenOut = data.tokensOut[i];
             uint256 amountOut = data.amountsOut[i];
-            Utils.strictCompareAmounts({ greaterValue: amountOut, lowerValue: 0 });
+            Utils.expectNotZero({ value: amountOut });
 
             _multiswapReverse(tokensAndAmountsOut, data.pairs[i], amountOut, tokenOut);
 
@@ -285,7 +284,7 @@ contract MultiswapRouterFacet is IMultiswapRouterFacet {
             sstore(s.slot, 0)
 
             if sub(caller(), sender) {
-                // IErrors.MultiswapRouterFacet_SenderMustBePool()
+                // IMultiswapRouterFacet.MultiswapRouterFacet_SenderMustBePool()
                 mstore(0, 0x990dbec2)
                 revert(28, 4)
             }
@@ -304,7 +303,7 @@ contract MultiswapRouterFacet is IMultiswapRouterFacet {
 
             // swaps entirely within 0-liquidity regions are not supported
             if (amount0Delta == 0 && amount1Delta == 0) {
-                revert IErrors.MultiswapRouterFacet_FailedV3Swap();
+                revert IMultiswapRouterFacet.MultiswapRouterFacet_FailedV3Swap();
             }
 
             uint256 amountToPay = amount0Delta > 0 ? uint256(amount0Delta) : uint256(amount1Delta);
@@ -342,7 +341,7 @@ contract MultiswapRouterFacet is IMultiswapRouterFacet {
             if (swapType == 2) {
                 // swaps entirely within 0-liquidity regions are not supported
                 if (amount0Delta == 0 && amount1Delta == 0) {
-                    revert IErrors.MultiswapRouterFacet_FailedV3Swap();
+                    revert IMultiswapRouterFacet.MultiswapRouterFacet_FailedV3Swap();
                 }
 
                 amountOut = amount0Delta > 0 ? uint256(amount0Delta) : uint256(amount1Delta);
@@ -405,7 +404,7 @@ contract MultiswapRouterFacet is IMultiswapRouterFacet {
         internal
         returns (uint256, address)
     {
-        Utils.strictCompareAmounts({ greaterValue: amountIn, lowerValue: 0 });
+        Utils.expectNotZero({ value: amountIn });
 
         // cache length of pairs to stack for gas savings
         uint256 length = pairs.length;

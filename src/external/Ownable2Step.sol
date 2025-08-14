@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import { IOwnable2Step } from "./IOwnable2Step.sol";
-import { Ownable, IErrors } from "./Ownable.sol";
+import { Ownable, IOwnable } from "./Ownable.sol";
 
 /// @title Ownable2Step
 /// @notice Contract module which provides a two-step access control mechanism
@@ -48,7 +48,7 @@ abstract contract Ownable2Step is Ownable, IOwnable2Step {
     /// @inheritdoc IOwnable2Step
     function acceptOwnership() external {
         if (msg.sender != _pendingOwner) {
-            revert IErrors.Ownable_CallerIsNotTheNewOwner({ caller: msg.sender });
+            revert IOwnable.Ownable_CallerIsNotTheNewOwner({ caller: msg.sender });
         }
 
         _transferOwnership(msg.sender);
@@ -68,7 +68,7 @@ abstract contract Ownable2Step is Ownable, IOwnable2Step {
     /// @param account The address to check
     function _checkIsNotAddressZero(address account) internal pure {
         if (account == address(0)) {
-            revert IErrors.Ownable_NewOwnerCannotBeAddressZero();
+            revert IOwnable.Ownable_NewOwnerCannotBeAddressZero();
         }
     }
 

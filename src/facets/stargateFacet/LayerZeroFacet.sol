@@ -18,6 +18,7 @@ import {
 import { IMessageLibManager } from "./interfaces/IMessageLibManager.sol";
 import { ISendLib } from "./interfaces/ISendLib.sol";
 
+import { IStargateFacet } from "./interfaces/IStargateFacet.sol";
 import { ILayerZeroFacet } from "./interfaces/ILayerZeroFacet.sol";
 
 /// @title LayerZeroFacet
@@ -121,7 +122,7 @@ contract LayerZeroFacet is BaseOwnableFacet, ILayerZeroFacet {
     /// @inheritdoc ILayerZeroFacet
     function setPeers(uint32[] calldata remoteEids, bytes32[] calldata remoteAddresses) external onlyOwner {
         uint256 length = remoteEids.length;
-        Utils.expectEqual(length, remoteAddresses.length);
+        Utils.expectEqual({ left: length, right: remoteAddresses.length });
 
         LayerZeroFacetStorage storage s = StorageLibrary.getLayerZeroFacetStorage();
 
@@ -136,7 +137,7 @@ contract LayerZeroFacet is BaseOwnableFacet, ILayerZeroFacet {
 
     /// @inheritdoc ILayerZeroFacet
     function setGasLimit(uint32[] calldata remoteEids, uint128[] calldata gasLimits) external onlyOwner {
-        Utils.expectEqual(remoteEids.length, gasLimits.length);
+        Utils.expectEqual({ left: remoteEids.length, right: gasLimits.length });
 
         LayerZeroFacetStorage storage s = StorageLibrary.getLayerZeroFacetStorage();
 
@@ -210,7 +211,7 @@ contract LayerZeroFacet is BaseOwnableFacet, ILayerZeroFacet {
 
         uint256 fee = _quote(remoteEid, options);
 
-        Utils.compareAmounts(address(this).balance, fee);
+        Utils.compareAmounts({ greaterValue: address(this).balance, lowerValue: fee });
 
         _endpointV2.send{ value: fee }({
             params: MessagingParams({

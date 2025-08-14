@@ -5,7 +5,7 @@ import { HelperV2Lib as Math } from "../../libraries/HelperV2Lib.sol";
 import { E18, E6 } from "../../libraries/Constants.sol";
 
 import { IUniswapPool } from "../../interfaces/IUniswapPool.sol";
-import { IErrors } from "../../interfaces/IErrors.sol";
+import { HelperV2Lib as External } from "../../libraries/HelperV2Lib.sol";
 
 library HelperV2Lib {
     // ===========================
@@ -23,7 +23,7 @@ library HelperV2Lib {
         returns (uint256 amountOut)
     {
         if (amountIn == 0) {
-            revert IErrors.UniswapV2_InsufficientInputAmount();
+            revert External.UniswapV2_InsufficientInputAmount();
         }
 
         if (reserveIn == 0 || reserveOut == 0) {
@@ -51,7 +51,7 @@ library HelperV2Lib {
         returns (uint256 amountOut)
     {
         if (amountIn == 0) {
-            revert IErrors.UniswapV2_InsufficientInputAmount();
+            revert External.UniswapV2_InsufficientInputAmount();
         }
 
         amountOut = Math.calculateStableAmountOut({
@@ -79,7 +79,7 @@ library HelperV2Lib {
         returns (uint256 amountIn)
     {
         if (amountOut == 0) {
-            revert IErrors.UniswapV2_InsufficientOutputAmount();
+            revert External.UniswapV2_InsufficientOutputAmount();
         }
 
         if (reserveIn == 0 || reserveOut == 0) {
@@ -111,7 +111,7 @@ library HelperV2Lib {
         returns (uint256 amountIn)
     {
         if (amountOut == 0) {
-            revert IErrors.UniswapV2_InsufficientOutputAmount();
+            revert External.UniswapV2_InsufficientOutputAmount();
         }
 
         if (reserveIn == 0 || reserveOut == 0) {

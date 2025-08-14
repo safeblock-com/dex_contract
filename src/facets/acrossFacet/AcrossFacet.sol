@@ -5,7 +5,6 @@ import { Utils } from "../../libraries/Utils.sol";
 import { TransferHelper } from "../../libraries/TransferHelper.sol";
 import { TransientStorageLibrary } from "../../libraries/TransientStorageLibrary.sol";
 
-import { IErrors } from "../../interfaces/IErrors.sol";
 import { IV3SpokePool } from "./interfaces/IV3SpokePool.sol";
 import { IAcrossFacet } from "./interfaces/IAcrossFacet.sol";
 
@@ -68,7 +67,7 @@ contract AcrossFacet is IAcrossFacet {
         uint256 nativeValue;
         if (inputToken > address(0)) {
             inputAmount = Utils.getAmountFromArrayAndDelete({ tokensAndAmounts: tokensAndAmounts, token: inputToken });
-            Utils.strictCompareAmounts({ greaterValue: inputAmount, lowerValue: 0 });
+            Utils.expectNotZero({ value: inputAmount });
 
             TransferHelper.safeApprove({ token: inputToken, spender: address(_spokePool), value: inputAmount });
         } else {
@@ -99,7 +98,7 @@ contract AcrossFacet is IAcrossFacet {
         external
     {
         if (msg.sender != _spokePool) {
-            revert IErrors.AcrossFacet_NotSpokePool();
+            revert IAcrossFacet.AcrossFacet_NotSpokePool();
         }
 
         (address fallbackAddress, bytes memory payload) = abi.decode(message, (address, bytes));

@@ -9,7 +9,7 @@ import { StorageLibrary, MultiswapRouterFacetStorage } from "./StorageLibrary.so
 import { ADDRESS_MASK, FEE_MASK, MIN_SQRT_RATIO_PLUS_ONE, MAX_SQRT_RATIO_MINUS_ONE } from "./Constants.sol";
 
 import { IUniswapPool } from "../interfaces/IUniswapPool.sol";
-import { IErrors } from "../interfaces/IErrors.sol";
+import { IMultiswapRouterFacet } from "../facets/multiswapRouterFacet/interfaces/IMultiswapRouterFacet.sol";
 
 /// @title RouterHelper
 /// @notice Internal helper library for executing Uniswap V2/V3 and Solidly swaps with support for exact-in and exact-out routing.
@@ -185,7 +185,7 @@ library RouterHelper {
                 // swap(uint256,uint256,address) selector
                 !Utils.makeCall(address(pair), abi.encodeWithSelector(0x6d9a640a, amount0Out, amount1Out, address(this)))
             ) {
-                revert IErrors.MultiswapRouterFacet_FailedV2Swap();
+                revert IMultiswapRouterFacet.MultiswapRouterFacet_FailedV2Swap();
             }
         }
 
@@ -246,7 +246,7 @@ library RouterHelper {
                 )
             )
         ) {
-            revert IErrors.MultiswapRouterFacet_FailedV2Swap();
+            revert IMultiswapRouterFacet.MultiswapRouterFacet_FailedV2Swap();
         }
     }
 
@@ -397,7 +397,7 @@ library RouterHelper {
                 // swap(uint256,uint256,address) selector
                 !Utils.makeCall(address(pair), abi.encodeWithSelector(0x6d9a640a, amount0Out, amount1Out, destination))
             ) {
-                revert IErrors.MultiswapRouterFacet_FailedV2Swap();
+                revert IMultiswapRouterFacet.MultiswapRouterFacet_FailedV2Swap();
             }
         }
 

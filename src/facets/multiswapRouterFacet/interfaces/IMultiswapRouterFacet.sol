@@ -5,6 +5,19 @@ pragma solidity ^0.8.0;
 /// @dev Multiswap Router interface
 interface IMultiswapRouterFacet {
     // =========================
+    // errors
+    // =========================
+
+    /// @dev Thrown when a Uniswap V2 swap fails.
+    error MultiswapRouterFacet_FailedV2Swap();
+
+    /// @dev Thrown when a Uniswap V3 swap fails, typically due to insufficient liquidity.
+    error MultiswapRouterFacet_FailedV3Swap();
+
+    /// @dev Thrown when the sender in the fallback function is not the expected Uniswap V3 pool.
+    error MultiswapRouterFacet_SenderMustBePool();
+
+    // =========================
     // main logic
     // =========================
 

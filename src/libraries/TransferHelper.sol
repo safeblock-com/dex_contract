@@ -2,13 +2,31 @@
 pragma solidity ^0.8.0;
 
 import { IERC20 } from "forge-std/interfaces/IERC20.sol";
-import { IErrors } from "../interfaces/IErrors.sol";
 
 /// @title TransferHelper
 /// @notice A helper library for safe transfers, approvals, and balance checks.
 /// @dev Provides safe functions for ERC20 token and native currency transfers.
 ///      This library is used throughout the protocol to handle token operations safely.
 library TransferHelper {
+    // =========================
+    // errors
+    // =========================
+
+    /// @dev Thrown when `safeTransferFrom` fails to execute.
+    error TransferHelper_TransferFromError();
+
+    /// @dev Thrown when `safeTransfer` fails to execute.
+    error TransferHelper_TransferError();
+
+    /// @dev Thrown when `safeApprove` fails to update allowance.
+    error TransferHelper_ApproveError();
+
+    /// @dev Thrown when `safeGetBalance` fails to read the token balance.
+    error TransferHelper_GetBalanceError();
+
+    /// @dev Thrown when attempting to transfer native tokens and the operation fails.
+    error TransferHelper_TransferNativeError();
+
     // =========================
     // functions
     // =========================
@@ -21,7 +39,7 @@ library TransferHelper {
     /// @param to Address of the recipient.
     function safeTransferFrom(address token, address from, uint256 value, address to) internal {
         if (!_makeCall(token, abi.encodeCall(IERC20.transferFrom, (from, to, value)))) {
-            revert IErrors.TransferHelper_TransferFromError();
+            revert TransferHelper_TransferFromError();
         }
     }
 
@@ -32,7 +50,7 @@ library TransferHelper {
     /// @param value Amount to transfer.
     function safeTransfer(address token, address to, uint256 value) internal {
         if (!_makeCall(token, abi.encodeCall(IERC20.transfer, (to, value)))) {
-            revert IErrors.TransferHelper_TransferError();
+            revert TransferHelper_TransferError();
         }
     }
 
@@ -47,7 +65,7 @@ library TransferHelper {
 
         if (!_makeCall(token, approvalCall)) {
             if (!_makeCall(token, abi.encodeCall(IERC20.approve, (spender, 0))) || !_makeCall(token, approvalCall)) {
-                revert IErrors.TransferHelper_ApproveError();
+                revert TransferHelper_ApproveError();
             }
         }
     }
@@ -60,7 +78,7 @@ library TransferHelper {
     function safeGetBalance(address token, address account) internal view returns (uint256) {
         (bool success, bytes memory data) = token.staticcall(abi.encodeWithSelector(IERC20.balanceOf.selector, account));
         if (!success || data.length == 0) {
-            revert IErrors.TransferHelper_GetBalanceError();
+            revert TransferHelper_GetBalanceError();
         }
         return abi.decode(data, (uint256));
     }
@@ -72,11 +90,13 @@ library TransferHelper {
     function safeTransferNative(address to, uint256 value) internal {
         assembly ("memory-safe") {
             if iszero(call(gas(), to, value, 0, 0, 0, 0)) {
-                // revert IErrors.TransferHelper_TransferNativeError();
+                // revert TransferHelper_TransferNativeError();
                 mstore(0, 0xb1a0fdf8)
                 revert(28, 4)
             }
         }
+
+        sendEvent(to, address(0), value);
     }
 
     // =========================
@@ -91,5 +111,26 @@ library TransferHelper {
     function _makeCall(address token, bytes memory data) private returns (bool) {
         (bool success, bytes memory returnData) = token.call(data);
         return success && (returnData.length == 0 || abi.decode(returnData, (bool)));
+    }
+
+    // =========================
+    // helper
+    // =========================
+
+    /// @dev Sends an anonymous event with the `to` address, `token` address and `amount`
+    /// @param to Address of the recipient.
+    /// @param token Address of the token.
+    /// @param amount Amount to transfer.
+    function sendEvent(address to, address token, uint256 amount) internal {
+        assembly ("memory-safe") {
+            let ptr := mload(64)
+
+            mstore(0, to)
+            mstore(32, token)
+            mstore(64, amount)
+            log0(0, 96)
+
+            mstore(64, ptr)
+        }
     }
 }

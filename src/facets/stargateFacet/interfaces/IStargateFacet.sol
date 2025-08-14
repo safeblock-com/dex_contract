@@ -16,6 +16,17 @@ interface IStargateFacet {
     event CallFailed(bytes errorMessage);
 
     // =========================
+    // errors
+    // =========================
+
+    /// @dev Thrown when `lzCompose` is called by an address other than the configured LayerZero endpoint.
+    error StargateFacet_NotLZEndpoint();
+
+    /// @dev Thrown when attempting to use Stargate with an unsupported native asset.
+    /// @dev Stargate supports only ERC20 tokens; native tokens are not allowed.
+    error StargateFacet_UnsupportedAsset();
+
+    // =========================
     // getters
     // =========================
 

@@ -45,6 +45,14 @@ interface IAcrossFacet {
     event CallFailed(bytes errorMessage);
 
     // =========================
+    // errors
+    // =========================
+
+    /// @dev Thrown when `handleV3AcrossMessage` is called by an address other than the SpokePool.
+    /// @dev Ensures only the designated SpokePool can trigger the message handler.
+    error AcrossFacet_NotSpokePool();
+
+    // =========================
     // getters
     // =========================
 

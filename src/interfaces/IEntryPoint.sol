@@ -16,6 +16,25 @@ interface IEntryPoint {
     }
 
     // =========================
+    // errors
+    // =========================
+
+    /// @dev Thrown when the function selector is not found in any facet or module.
+    /// @param selector The 4-byte function selector that was not matched.
+    error EntryPoint_FunctionDoesNotExist(bytes4 selector);
+
+    /// @dev Thrown when attempting to add a module that is already registered.
+    /// @param methodSignature The 4-byte signature of the module that is already added.
+    error EntryPoint_ModuleAlreadyAdded(bytes4 methodSignature);
+
+    /// @dev Thrown when trying to update or remove a module that was never added.
+    /// @param methodSignature The 4-byte signature of the missing module.
+    error EntryPoint_ModuleNotAdded(bytes4 methodSignature);
+
+    /// @dev Thrown when a function is called externally but is restricted to internal delegation.
+    error EntryPoint_OnlySelfCall();
+
+    // =========================
     // initializer
     // =========================
 

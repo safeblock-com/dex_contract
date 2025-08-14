@@ -14,7 +14,6 @@ import { FeeLibrary } from "./libraries/FeeLibrary.sol";
 import { ADDRESS_MASK } from "./libraries/Constants.sol";
 import { TransferHelper } from "./libraries/TransferHelper.sol";
 
-import { IErrors } from "./interfaces/IErrors.sol";
 import { ISignatureTransfer } from "./interfaces/ISignatureTransfer.sol";
 import { IWrappedNative } from "./interfaces/IWrappedNative.sol";
 
@@ -76,7 +75,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
     /// @dev Reverts if the function is not called through a delegatecall from the contract itself.
     modifier onlySelfCall() {
         if (msg.sender != address(this)) {
-            revert IErrors.EntryPoint_OnlySelfCall();
+            revert IEntryPoint.EntryPoint_OnlySelfCall();
         }
 
         _;
@@ -117,7 +116,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
             let mappingSlot := keccak256(0, 64)
 
             if sload(mappingSlot) {
-                // IErrors.EntryPoint_ModuleAlreadyAdded
+                // IEntryPoint.EntryPoint_ModuleAlreadyAdded
                 mstore(0, 0xefd5d8e4)
                 mstore(32, moduleSignature)
                 revert(28, 36)
@@ -151,7 +150,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
             let currentValue := sload(mappingSlot)
 
             if iszero(currentValue) {
-                // IErrors.EntryPoint_ModuleNotAdded
+                // IEntryPoint.EntryPoint_ModuleNotAdded
                 mstore(0, 0xeac1ef32)
                 mstore(32, moduleSignature)
                 revert(28, 36)
@@ -250,7 +249,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
             }
 
             uint256 amount = tokenTransfers.amounts[i];
-            Utils.strictCompareAmounts({ greaterValue: amount, lowerValue: 0 });
+            Utils.expectNotZero({ value: amount });
 
             address token = tokenTransfers.tokens[i];
             if (token > address(0)) {
@@ -332,7 +331,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
             facet = _getAddress(msg.sig);
 
             if (facet == address(0)) {
-                revert IErrors.EntryPoint_FunctionDoesNotExist({ selector: msg.sig });
+                revert IEntryPoint.EntryPoint_FunctionDoesNotExist({ selector: msg.sig });
             }
         }
 
@@ -435,7 +434,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
                     mstore(32, _moduleSignatureToAddress.slot)
                     facet := and(sload(keccak256(0, 64)), ADDRESS_MASK)
                     if iszero(facet) {
-                        // IErrors.EntryPoint_FunctionDoesNotExist
+                        // IEntryPoint.EntryPoint_FunctionDoesNotExist
                         mstore(0, 0x9365f537)
                         mstore(32, sig)
                         revert(28, 36)
@@ -489,7 +488,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
     function _getAddress(bytes4 selector) internal view returns (address facet) {
         bytes memory facetsAndSelectors = SSTORE2.read(_facetsAndSelectorsAddress);
         if (facetsAndSelectors.length < 29) {
-            revert IErrors.EntryPoint_FunctionDoesNotExist({ selector: selector });
+            revert IEntryPoint.EntryPoint_FunctionDoesNotExist({ selector: selector });
         }
         uint256 selectorsLength;
         uint256 addressesOffset;
@@ -515,7 +514,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
         _facets = new address[](length);
         bytes memory facetsAndSelectors = SSTORE2.read(_facetsAndSelectorsAddress);
         if (facetsAndSelectors.length < 29) {
-            revert IErrors.EntryPoint_FunctionDoesNotExist({ selector: 0x00000000 });
+            revert IEntryPoint.EntryPoint_FunctionDoesNotExist({ selector: 0x00000000 });
         }
 
         uint256 cDataStart;
@@ -661,7 +660,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
             }
 
             uint256 amount = tokenTransfersPermit2.amounts[i];
-            Utils.strictCompareAmounts({ greaterValue: amount, lowerValue: 0 });
+            Utils.expectNotZero({ value: amount });
 
             address token = tokenTransfersPermit2.tokens[i];
 
@@ -738,7 +737,7 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
         }
     }
 
-    /// @dev Function that should revert `IErrors.Ownable_Unauthorized` when `msg.sender` is not authorized to upgrade the contract.
+    /// @dev Function that should revert `IOwnable.Ownable_Unauthorized` when `msg.sender` is not authorized to upgrade the contract.
     /// Called by {upgradeTo} and {upgradeToAndCall}.
     ///
     /// Normally, this function will use an xref:access.adoc[access control] modifier such as {Ownable-onlyOwner}.
