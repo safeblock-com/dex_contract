@@ -234,7 +234,7 @@ contract MultiswapTest is BaseTest {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IErrors.ValueLowerThanExpected.selector, mData.minAmountsOut[0] - 1, mData.minAmountsOut[0]
+                Utils.ValueLowerThanExpected.selector, mData.minAmountsOut[0] - 1, mData.minAmountsOut[0]
             )
         );
         entryPoint.multicall({

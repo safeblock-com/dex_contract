@@ -39,7 +39,7 @@ contract AcrossFacetHandleTest is BaseTest {
 
         bytes memory message = _getMessage(optimismUniswapV3_USDC_OP_Pool, false);
 
-        vm.expectRevert(IErrors.AcrossFacet_NotSpokePool.selector);
+        vm.expectRevert(IAcrossFacet.AcrossFacet_NotSpokePool.selector);
         IAcrossFacet(address(entryPoint)).handleV3AcrossMessage({
             tokenSent: outputTokenUSDC,
             amount: 1000e6,
@@ -78,7 +78,7 @@ contract AcrossFacetHandleTest is BaseTest {
         vm.expectEmit();
         emit CallFailed({
             errorMessage: abi.encodeWithSelector(
-                IErrors.ValueLowerThanExpected.selector, quoterAmountOut, quoterAmountOut * 2
+                Utils.ValueLowerThanExpected.selector, quoterAmountOut, quoterAmountOut * 2
             )
         });
         _expectERC20TransferCall(outputTokenUSDC, user, 1000e6);

@@ -16,8 +16,6 @@ contract MultiswapReverseTest is BaseTest {
         deployForTest();
     }
 
-    // одинаковые токены, одинаковые пары
-
     // =========================
     // multiswapReverse
     // =========================
@@ -48,7 +46,7 @@ contract MultiswapReverseTest is BaseTest {
 
         _resetPrank(user);
 
-        vm.expectRevert(abi.encodeWithSelector(IErrors.ValueLowerThanExpected.selector, 0, 0));
+        vm.expectRevert(Utils.UnexpectedZeroValue.selector);
         entryPoint.multicall({
             tokenTransfers: IEntryPoint.TokenTransfers({ tokens: new address[](0), amounts: new uint256[](0) }),
             data: Solarray.bytess(abi.encodeCall(MultiswapRouterFacet.multiswapReverse, (mRData)))
@@ -66,7 +64,7 @@ contract MultiswapReverseTest is BaseTest {
 
         _resetPrank(user);
 
-        vm.expectRevert(IErrors.ValuesNotEqual.selector);
+        vm.expectRevert(abi.encodeWithSelector(Utils.ValuesNotEqual.selector, 1, 2));
         entryPoint.multicall({
             tokenTransfers: IEntryPoint.TokenTransfers({ tokens: new address[](0), amounts: new uint256[](0) }),
             data: Solarray.bytess(abi.encodeCall(MultiswapRouterFacet.multiswapReverse, (mRData)))
@@ -74,7 +72,7 @@ contract MultiswapReverseTest is BaseTest {
 
         mRData.pairs = new bytes32[][](0);
 
-        vm.expectRevert(IErrors.ValuesNotEqual.selector);
+        vm.expectRevert(abi.encodeWithSelector(Utils.ValuesNotEqual.selector, 1, 0));
         entryPoint.multicall({
             tokenTransfers: IEntryPoint.TokenTransfers({ tokens: new address[](0), amounts: new uint256[](0) }),
             data: Solarray.bytess(abi.encodeCall(MultiswapRouterFacet.multiswapReverse, (mRData)))
@@ -95,7 +93,7 @@ contract MultiswapReverseTest is BaseTest {
 
         _resetPrank(user);
 
-        vm.expectRevert(IErrors.ValuesNotEqual.selector);
+        vm.expectRevert(abi.encodeWithSelector(Utils.ValuesNotEqual.selector, 1, 2));
         entryPoint.multicall({
             tokenTransfers: IEntryPoint.TokenTransfers({ tokens: new address[](0), amounts: new uint256[](0) }),
             data: Solarray.bytess(abi.encodeCall(MultiswapRouterFacet.multiswapReverse, (mRData)))
@@ -103,7 +101,7 @@ contract MultiswapReverseTest is BaseTest {
 
         mRData.amountsOut = new uint256[](0);
 
-        vm.expectRevert(IErrors.ValuesNotEqual.selector);
+        vm.expectRevert(abi.encodeWithSelector(Utils.ValuesNotEqual.selector, 1, 0));
         entryPoint.multicall({
             tokenTransfers: IEntryPoint.TokenTransfers({ tokens: new address[](0), amounts: new uint256[](0) }),
             data: Solarray.bytess(abi.encodeCall(MultiswapRouterFacet.multiswapReverse, (mRData)))
@@ -122,7 +120,7 @@ contract MultiswapReverseTest is BaseTest {
 
         _resetPrank(user);
 
-        vm.expectRevert(IErrors.DuplicateToken.selector);
+        vm.expectRevert(Utils.DuplicateToken.selector);
         entryPoint.multicall({
             tokenTransfers: IEntryPoint.TokenTransfers({ tokens: new address[](0), amounts: new uint256[](0) }),
             data: Solarray.bytess(abi.encodeCall(MultiswapRouterFacet.multiswapReverse, (mRData)))
@@ -140,7 +138,7 @@ contract MultiswapReverseTest is BaseTest {
 
         _resetPrank(user);
 
-        vm.expectRevert(abi.encodeWithSelector(IErrors.ValueLowerThanExpected.selector, 0, 0));
+        vm.expectRevert(Utils.UnexpectedZeroValue.selector);
         entryPoint.multicall({
             tokenTransfers: IEntryPoint.TokenTransfers({ tokens: new address[](0), amounts: new uint256[](0) }),
             data: Solarray.bytess(abi.encodeCall(MultiswapRouterFacet.multiswapReverse, (mRData)))
@@ -161,7 +159,7 @@ contract MultiswapReverseTest is BaseTest {
         _resetPrank(user);
 
         // empty tokenTransfers
-        vm.expectRevert(IErrors.ValuesNotEqual.selector);
+        vm.expectRevert(abi.encodeWithSelector(Utils.ValuesNotEqual.selector, 1, 0));
         entryPoint.multicall({
             tokenTransfers: IEntryPoint.TokenTransfers({ tokens: new address[](0), amounts: new uint256[](0) }),
             data: Solarray.bytess(abi.encodeCall(MultiswapRouterFacet.multiswapReverse, (mRData)))
@@ -173,7 +171,7 @@ contract MultiswapReverseTest is BaseTest {
         IERC20(USDT).approve({ spender: address(entryPoint), amount: 1e18 });
         IERC20(USDC).approve({ spender: address(entryPoint), amount: 1e18 });
 
-        vm.expectRevert(IErrors.ValuesNotEqual.selector);
+        vm.expectRevert(abi.encodeWithSelector(Utils.ValuesNotEqual.selector, 1, 2));
         entryPoint.multicall({
             tokenTransfers: IEntryPoint.TokenTransfers({
                 tokens: Solarray.addresses(USDT, USDC),
@@ -205,7 +203,7 @@ contract MultiswapReverseTest is BaseTest {
 
         mRData.amountsOut[0] = 0;
 
-        vm.expectRevert(abi.encodeWithSelector(IErrors.ValueLowerThanExpected.selector, 0, 0));
+        vm.expectRevert(Utils.UnexpectedZeroValue.selector);
         entryPoint.multicall({
             tokenTransfers: tokenTransfers,
             data: Solarray.bytess(abi.encodeCall(MultiswapRouterFacet.multiswapReverse, (mRData)))
@@ -228,7 +226,7 @@ contract MultiswapReverseTest is BaseTest {
 
         mRData.amountsOut[1] = 0;
 
-        vm.expectRevert(abi.encodeWithSelector(IErrors.ValueLowerThanExpected.selector, 0, 0));
+        vm.expectRevert(Utils.UnexpectedZeroValue.selector);
         entryPoint.multicall({
             tokenTransfers: tokenTransfers,
             data: Solarray.bytess(abi.encodeCall(MultiswapRouterFacet.multiswapReverse, (mRData)))
@@ -252,7 +250,7 @@ contract MultiswapReverseTest is BaseTest {
 
         IERC20(USDC).approve({ spender: address(entryPoint), amount: 100e18 });
 
-        vm.expectRevert(IErrors.MultiswapRouterFacet_FailedV3Swap.selector);
+        vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_FailedV3Swap.selector);
         entryPoint.multicall({
             tokenTransfers: tokenTransfers,
             data: Solarray.bytess(
@@ -281,7 +279,7 @@ contract MultiswapReverseTest is BaseTest {
 
         IERC20(USDT).approve({ spender: address(entryPoint), amount: 100e18 });
 
-        vm.expectRevert(IErrors.MultiswapRouterFacet_FailedV2Swap.selector);
+        vm.expectRevert(IMultiswapRouterFacet.MultiswapRouterFacet_FailedV2Swap.selector);
         entryPoint.multicall({
             tokenTransfers: tokenTransfers,
             data: Solarray.bytess(
@@ -315,7 +313,7 @@ contract MultiswapReverseTest is BaseTest {
 
         IERC20(USDC).approve({ spender: address(entryPoint), amount: amountsIn[0] });
 
-        vm.expectRevert(IErrors.ValuesNotEqual.selector);
+        vm.expectRevert(abi.encodeWithSelector(Utils.ValuesNotEqual.selector, 1, 0));
         entryPoint.multicall({
             tokenTransfers: tokenTransfers,
             data: Solarray.bytess(
@@ -454,7 +452,7 @@ contract MultiswapReverseTest is BaseTest {
 
         IERC20(USDT).approve({ spender: address(entryPoint), amount: amountsIn[0] });
 
-        vm.expectRevert(IErrors.ValuesNotEqual.selector);
+        vm.expectRevert(abi.encodeWithSelector(Utils.ValuesNotEqual.selector, 1, 0));
         entryPoint.multicall({
             tokenTransfers: tokenTransfers,
             data: Solarray.bytess(abi.encodeCall(MultiswapRouterFacet.multiswapReverse, (mRData)))
@@ -489,7 +487,7 @@ contract MultiswapReverseTest is BaseTest {
         IERC20(USDT).approve({ spender: address(entryPoint), amount: amountsIn[0] });
 
         vm.expectRevert(
-            abi.encodeWithSelector(IErrors.ValueLowerThanExpected.selector, amountsIn[0], amountsIn[0] + 1e18)
+            abi.encodeWithSelector(Utils.ValueLowerThanExpected.selector, amountsIn[0], amountsIn[0] + 1e18)
         );
         entryPoint.multicall({
             tokenTransfers: tokenTransfers,

@@ -43,7 +43,7 @@ contract LayerZeroFacetTest is BaseTest {
             bytes32(uint256(uint160(address(entryPoint))))
         );
 
-        vm.expectRevert(IErrors.ValuesNotEqual.selector);
+        vm.expectRevert(abi.encodeWithSelector(Utils.ValuesNotEqual.selector, 2, 1));
         ILayerZeroFacet(address(entryPoint)).setPeers({
             remoteEids: Solarray.uint32s(30_101, 1),
             remoteAddresses: Solarray.bytes32s(bytes32(uint256(uint160(owner))))
@@ -62,7 +62,7 @@ contract LayerZeroFacetTest is BaseTest {
 
         assertEq(ILayerZeroFacet(address(entryPoint)).getGasLimit({ remoteEid: 30_101 }), 100_000);
 
-        vm.expectRevert(IErrors.ValuesNotEqual.selector);
+        vm.expectRevert(abi.encodeWithSelector(Utils.ValuesNotEqual.selector, 2, 1));
         ILayerZeroFacet(address(entryPoint)).setGasLimit({
             remoteEids: Solarray.uint32s(30_101, 1),
             gasLimits: Solarray.uint128s(30_000)
@@ -110,7 +110,7 @@ contract LayerZeroFacetTest is BaseTest {
 
         IERC20(USDT).approve({ spender: address(entryPoint), amount: 1000e18 });
 
-        vm.expectRevert(abi.encodeWithSelector(IErrors.ValueLowerThanExpected.selector, fee >> 1, fee));
+        vm.expectRevert(abi.encodeWithSelector(Utils.ValueLowerThanExpected.selector, fee >> 1, fee));
         entryPoint.multicall{ value: fee >> 1 }({
             tokenTransfers: IEntryPoint.TokenTransfers({
                 tokens: Solarray.addresses(USDT),

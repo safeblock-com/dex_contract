@@ -25,7 +25,7 @@ contract ReceiveStargateFacetTest is BaseTest {
     function test_stargateFacet_lzCompose_shouldRevertIfSenderIsNotLzEndpoint() external checkStorage {
         _resetPrank(user);
 
-        vm.expectRevert(IErrors.StargateFacet_NotLZEndpoint.selector);
+        vm.expectRevert(IStargateFacet.StargateFacet_NotLZEndpoint.selector);
         ILayerZeroComposer(address(entryPoint)).lzCompose({
             _from: user,
             _guid: bytes32(uint256(1)),
@@ -125,7 +125,7 @@ contract ReceiveStargateFacetTest is BaseTest {
         vm.expectEmit();
         emit CallFailed({
             errorMessage: abi.encodeWithSelector(
-                IErrors.ValueLowerThanExpected.selector, quoterAmountOut, mData.minAmountsOut[0]
+                Utils.ValueLowerThanExpected.selector, quoterAmountOut, mData.minAmountsOut[0]
             )
         });
         ILayerZeroComposer(address(entryPoint)).lzCompose({
@@ -142,7 +142,7 @@ contract ReceiveStargateFacetTest is BaseTest {
         });
     }
 
-    event TransferNative(address to) anonymous;
+    event TransferNative(address to, address token, uint256 amount) anonymous;
 
     function test_stargateFacet_lzCompose_shouldSendTokensToReceiverIfCallFailedWithNative() external checkStorage {
         _resetPrank(owner);
@@ -159,7 +159,7 @@ contract ReceiveStargateFacetTest is BaseTest {
         _resetPrank(contracts.layerZeroEndpointV2);
 
         vm.expectEmitAnonymous();
-        emit TransferNative({ to: user });
+        emit TransferNative({ to: user, token: address(0), amount: 0.001e18 });
         ILayerZeroComposer(address(entryPoint)).lzCompose({
             _from: user,
             _guid: bytes32(uint256(1)),

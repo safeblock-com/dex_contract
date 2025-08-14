@@ -168,13 +168,15 @@ contract EntryPointTest is BaseTest {
         });
 
         vm.expectRevert(
-            abi.encodeWithSelector(IErrors.EntryPoint_FunctionDoesNotExist.selector, Facet1.setValue1.selector)
+            abi.encodeWithSelector(IEntryPoint.EntryPoint_FunctionDoesNotExist.selector, Facet1.setValue1.selector)
         );
         Facet1(address(proxy)).setValue1({ value: 1 });
 
         IEntryPoint.TokenTransfers memory tokenTransfers;
 
-        vm.expectRevert(abi.encodeWithSelector(IErrors.EntryPoint_FunctionDoesNotExist.selector, bytes4(0x00000000)));
+        vm.expectRevert(
+            abi.encodeWithSelector(IEntryPoint.EntryPoint_FunctionDoesNotExist.selector, bytes4(0x00000000))
+        );
         EntryPoint(payable(address(proxy))).multicall({
             tokenTransfers: tokenTransfers,
             data: Solarray.bytess(abi.encodeCall(Facet1.setValue1, (1)), abi.encodeCall(Facet2.setValue2, (2)))
@@ -243,7 +245,7 @@ contract EntryPointTest is BaseTest {
 
         assertEq(entryPoint.getModuleAddress({ moduleSignature: moduleSignature }), moduleAddress);
 
-        vm.expectRevert(abi.encodeWithSelector(IErrors.EntryPoint_ModuleAlreadyAdded.selector, moduleSignature));
+        vm.expectRevert(abi.encodeWithSelector(IEntryPoint.EntryPoint_ModuleAlreadyAdded.selector, moduleSignature));
         entryPoint.addModule({ moduleSignature: moduleSignature, moduleAddress: moduleAddress });
     }
 
@@ -288,7 +290,7 @@ contract EntryPointTest is BaseTest {
 
         assertEq(entryPoint.getModuleAddress({ moduleSignature: moduleSignature }), address(0));
 
-        vm.expectRevert(abi.encodeWithSelector(IErrors.EntryPoint_ModuleNotAdded.selector, moduleSignature));
+        vm.expectRevert(abi.encodeWithSelector(IEntryPoint.EntryPoint_ModuleNotAdded.selector, moduleSignature));
         entryPoint.updateModule({ moduleSignature: moduleSignature, moduleAddress: moduleAddress });
     }
 
@@ -370,7 +372,9 @@ contract EntryPointTest is BaseTest {
 
         IEntryPoint.TokenTransfers memory tokenTransfers;
 
-        vm.expectRevert(abi.encodeWithSelector(IErrors.EntryPoint_FunctionDoesNotExist.selector, bytes4(0x11223344)));
+        vm.expectRevert(
+            abi.encodeWithSelector(IEntryPoint.EntryPoint_FunctionDoesNotExist.selector, bytes4(0x11223344))
+        );
         entryPoint.multicall({
             tokenTransfers: tokenTransfers,
             data: Solarray.bytess(
@@ -378,7 +382,9 @@ contract EntryPointTest is BaseTest {
             )
         });
 
-        vm.expectRevert(abi.encodeWithSelector(IErrors.EntryPoint_FunctionDoesNotExist.selector, bytes4(0x11223344)));
+        vm.expectRevert(
+            abi.encodeWithSelector(IEntryPoint.EntryPoint_FunctionDoesNotExist.selector, bytes4(0x11223344))
+        );
         entryPoint.multicall({
             tokenTransfers: tokenTransfers,
             data: Solarray.bytess(
@@ -395,7 +401,7 @@ contract EntryPointTest is BaseTest {
             amounts: Solarray.uint256s(1000e18, 1000e18)
         });
 
-        vm.expectRevert(IErrors.DuplicateToken.selector);
+        vm.expectRevert(Utils.DuplicateToken.selector);
         entryPoint.multicall({
             tokenTransfers: tokenTransfers,
             data: Solarray.bytess(abi.encodeWithSelector(Facet1.setValue1.selector, 1))
@@ -416,7 +422,7 @@ contract EntryPointTest is BaseTest {
             amounts: Solarray.uint256s(1000e18, 0)
         });
 
-        vm.expectRevert(abi.encodeWithSelector(IErrors.ValueLowerThanExpected.selector, 0, 0));
+        vm.expectRevert(Utils.UnexpectedZeroValue.selector);
         entryPoint.multicall({
             tokenTransfers: tokenTransfers,
             data: Solarray.bytess(abi.encodeWithSelector(Facet1.setValue1.selector, 1))
@@ -427,7 +433,7 @@ contract EntryPointTest is BaseTest {
             amounts: Solarray.uint256s(0, 1000e18)
         });
 
-        vm.expectRevert(abi.encodeWithSelector(IErrors.ValueLowerThanExpected.selector, 0, 0));
+        vm.expectRevert(Utils.UnexpectedZeroValue.selector);
         entryPoint.multicall({
             tokenTransfers: tokenTransfers,
             data: Solarray.bytess(abi.encodeWithSelector(Facet1.setValue1.selector, 1))
@@ -444,7 +450,7 @@ contract EntryPointTest is BaseTest {
         IEntryPoint.TokenTransfers memory tokenTransfers =
             IEntryPoint.TokenTransfers({ tokens: Solarray.addresses(USDT), amounts: Solarray.uint256s(1000e18) });
 
-        vm.expectRevert(IErrors.ValuesNotEqual.selector);
+        vm.expectRevert(abi.encodeWithSelector(Utils.ValuesNotEqual.selector, 1, 0));
         entryPoint.multicall({
             tokenTransfers: tokenTransfers,
             data: Solarray.bytess(abi.encodeWithSelector(Facet1.setValue1.selector, 1))
@@ -478,7 +484,7 @@ contract EntryPointTest is BaseTest {
     function test_entryPoint_fallback_shouldRevertIfFacetDoesNotExists() external {
         vm.expectRevert(
             abi.encodeWithSelector(
-                IErrors.EntryPoint_FunctionDoesNotExist.selector, InitialImplementation.upgradeTo.selector
+                IEntryPoint.EntryPoint_FunctionDoesNotExist.selector, InitialImplementation.upgradeTo.selector
             )
         );
         InitialImplementation(address(entryPoint)).upgradeTo({ implementation: address(0), data: bytes("") });

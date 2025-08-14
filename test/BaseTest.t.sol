@@ -45,8 +45,6 @@ import { IUniswapPool, HelperV3Lib } from "../src/lens/libraries/HelperV3Lib.sol
 
 import { CoinFlippersModule, ICoinFlippersModule, ICoinFlippersVault } from "../src/modules/CoinFlippersModule.sol";
 
-import { IErrors } from "../src/interfaces/IErrors.sol";
-
 import { CrossCurveFacet, ICrossCurveRouter } from "../src/facets/crossCurveFacet/CrossCurveFacet.sol";
 
 import { console2 } from "forge-std/console2.sol";

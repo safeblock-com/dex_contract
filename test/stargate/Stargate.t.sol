@@ -84,7 +84,7 @@ contract StargateFacetTest is BaseTest {
             composeGasLimit: 0
         });
 
-        vm.expectRevert(abi.encodeWithSelector(IErrors.ValueLowerThanExpected.selector, fee >> 1, fee));
+        vm.expectRevert(abi.encodeWithSelector(Utils.ValueLowerThanExpected.selector, fee >> 1, fee));
         entryPoint.multicall{ value: fee >> 1 }({
             tokenTransfers: IEntryPoint.TokenTransfers({
                 tokens: Solarray.addresses(USDT),
@@ -166,7 +166,7 @@ contract StargateFacetTest is BaseTest {
 
         assertGt(fee, 0.111111111111111111e18);
 
-        vm.expectRevert(IErrors.StargateFacet_UnsupportedAsset.selector);
+        vm.expectRevert(IStargateFacet.StargateFacet_UnsupportedAsset.selector);
         entryPoint.multicall{ value: fee }({
             tokenTransfers: IEntryPoint.TokenTransfers({ tokens: new address[](0), amounts: new uint256[](0) }),
             data: Solarray.bytess(

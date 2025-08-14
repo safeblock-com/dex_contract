@@ -116,7 +116,7 @@ contract UUPSUpgradeableTest is BaseTest {
         vm.assume(notOwner != owner);
 
         _resetPrank(notOwner);
-        vm.expectRevert(abi.encodeWithSelector(IErrors.Ownable_SenderIsNotOwner.selector, notOwner));
+        vm.expectRevert(abi.encodeWithSelector(IOwnable.Ownable_SenderIsNotOwner.selector, notOwner));
         UUPSUpgradeable(proxy).upgradeTo({ newImplementation: implV2 });
     }
 
