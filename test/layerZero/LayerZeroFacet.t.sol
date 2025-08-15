@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-import { BaseTest, IERC20, Solarray, IStargateFacet, LayerZeroFacet, ILayerZeroFacet } from "../BaseTest.t.sol";
+import "../BaseTest.t.sol";
+
 import { Origin } from "../../src/facets/stargateFacet/interfaces/ILayerZeroEndpointV2.sol";
 
 import "../Helpers.t.sol";
@@ -42,7 +43,7 @@ contract LayerZeroFacetTest is BaseTest {
             bytes32(uint256(uint160(address(entryPoint))))
         );
 
-        vm.expectRevert(ILayerZeroFacet.LayerZeroFacet_LengthMismatch.selector);
+        vm.expectRevert(abi.encodeWithSelector(Utils.ValuesNotEqual.selector, 2, 1));
         ILayerZeroFacet(address(entryPoint)).setPeers({
             remoteEids: Solarray.uint32s(30_101, 1),
             remoteAddresses: Solarray.bytes32s(bytes32(uint256(uint160(owner))))
@@ -61,7 +62,7 @@ contract LayerZeroFacetTest is BaseTest {
 
         assertEq(ILayerZeroFacet(address(entryPoint)).getGasLimit({ remoteEid: 30_101 }), 100_000);
 
-        vm.expectRevert(ILayerZeroFacet.LayerZeroFacet_LengthMismatch.selector);
+        vm.expectRevert(abi.encodeWithSelector(Utils.ValuesNotEqual.selector, 2, 1));
         ILayerZeroFacet(address(entryPoint)).setGasLimit({
             remoteEids: Solarray.uint32s(30_101, 1),
             gasLimits: Solarray.uint128s(30_000)
@@ -93,7 +94,7 @@ contract LayerZeroFacetTest is BaseTest {
     uint32 remoteEidV2 = 30_101;
     address stargatePool = 0x138EB30f73BC423c6455C53df6D89CB01d9eBc63;
 
-    function test_layerZeroFacet_sendDeposit_shoudRevertIfFeeNotMet() external {
+    function test_layerZeroFacet_sendDeposit_shouldRevertIfFeeNotEnough() external {
         uint128 nativeTransferCap = ILayerZeroFacet(address(entryPoint)).getNativeSendCap({ remoteEid: remoteEidV2 });
 
         uint256 fee = ILayerZeroFacet(address(entryPoint)).estimateFee({
@@ -109,25 +110,17 @@ contract LayerZeroFacetTest is BaseTest {
 
         IERC20(USDT).approve({ spender: address(entryPoint), amount: 1000e18 });
 
-        (uint256 _fee,) = IStargateFacet(address(entryPoint)).quoteV2({
-            poolAddress: stargatePool,
-            dstEid: remoteEidV2,
-            amountLD: 1000e18,
-            receiver: user,
-            composeMsg: bytes(""),
-            composeGasLimit: 0
-        });
-
-        vm.expectRevert(ILayerZeroFacet.LayerZeroFacet_FeeNotMet.selector);
-        entryPoint.multicall{ value: (fee + _fee) >> 1 }({
-            data: Solarray.bytess(
-                abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool, remoteEidV2, 1000e18, user, 0, bytes(""))),
-                abi.encodeCall(ILayerZeroFacet.sendDeposit, (remoteEidV2, nativeTransferCap, user))
-            )
+        vm.expectRevert(abi.encodeWithSelector(Utils.ValueLowerThanExpected.selector, fee >> 1, fee));
+        entryPoint.multicall{ value: fee >> 1 }({
+            tokenTransfers: IEntryPoint.TokenTransfers({
+                tokens: Solarray.addresses(USDT),
+                amounts: Solarray.uint256s(1000e18)
+            }),
+            data: Solarray.bytess(abi.encodeCall(ILayerZeroFacet.sendDeposit, (remoteEidV2, nativeTransferCap, user)))
         });
     }
 
-    function test_layerZeroFacet_sendDeposit_shoudSendDeposit() external {
+    function test_layerZeroFacet_sendDeposit_shouldSendDeposit() external {
         uint128 nativeTransferCap = ILayerZeroFacet(address(entryPoint)).getNativeSendCap({ remoteEid: remoteEidV2 });
 
         uint256 fee = ILayerZeroFacet(address(entryPoint)).estimateFee({
@@ -153,8 +146,12 @@ contract LayerZeroFacetTest is BaseTest {
         });
 
         entryPoint.multicall{ value: fee + _fee }({
+            tokenTransfers: IEntryPoint.TokenTransfers({
+                tokens: Solarray.addresses(USDT),
+                amounts: Solarray.uint256s(1000e18)
+            }),
             data: Solarray.bytess(
-                abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool, remoteEidV2, 1000e18, user, 0, bytes(""))),
+                abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool, remoteEidV2, user, 0, bytes(""))),
                 abi.encodeCall(ILayerZeroFacet.sendDeposit, (remoteEidV2, nativeTransferCap, user))
             )
         });

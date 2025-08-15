@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-import { BaseTest, IOwnable2Step, IOwnable, EntryPoint, Initializable, IFeeContract } from "./BaseTest.t.sol";
+import "./BaseTest.t.sol";
 
 import { Proxy, InitialImplementation } from "../src/proxy/Proxy.sol";
 import { UUPSUpgradeable, ERC1967Utils } from "../src/proxy/UUPSUpgradeable.sol";
@@ -26,7 +26,11 @@ contract OwnableAndProxyTest is BaseTest {
     // =========================
 
     function test_entryPoint_disableInitializers(address newOwner) external {
-        EntryPoint entryPointImplementation = new EntryPoint({ facetsAndSelectors: bytes("") });
+        EntryPoint entryPointImplementation = new EntryPoint({
+            facetsAndSelectors: bytes(""),
+            permit2Address: contracts.permit2,
+            wrappedNativeAddress: contracts.wrappedNative
+        });
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
         entryPointImplementation.initialize({ newOwner: newOwner });
@@ -44,7 +48,13 @@ contract OwnableAndProxyTest is BaseTest {
 
         EntryPoint _entryPoint = EntryPoint(payable(address(new Proxy({ initialOwner: owner }))));
         InitialImplementation(address(_entryPoint)).upgradeTo({
-            implementation: address(new EntryPoint({ facetsAndSelectors: bytes("") })),
+            implementation: address(
+                new EntryPoint({
+                    facetsAndSelectors: bytes(""),
+                    permit2Address: contracts.permit2,
+                    wrappedNativeAddress: contracts.wrappedNative
+                })
+            ),
             data: abi.encodeCall(EntryPoint.initialize, (newOwner))
         });
         assertEq(_entryPoint.owner(), newOwner);
@@ -94,7 +104,7 @@ contract OwnableAndProxyTest is BaseTest {
         assertEq(entryPoint.owner(), owner);
 
         _resetPrank(owner);
-        vm.expectRevert(IOwnable2Step.Ownable_NewOwnerCannotBeAddressZero.selector);
+        vm.expectRevert(IOwnable.Ownable_NewOwnerCannotBeAddressZero.selector);
         entryPoint.transferOwnership({ newOwner: address(0) });
     }
 
@@ -134,7 +144,7 @@ contract OwnableAndProxyTest is BaseTest {
         assertEq(entryPoint.pendingOwner(), pendingOwner);
 
         _resetPrank(notPendingOwner);
-        vm.expectRevert(abi.encodeWithSelector(IOwnable2Step.Ownable_CallerIsNotTheNewOwner.selector, notPendingOwner));
+        vm.expectRevert(abi.encodeWithSelector(IOwnable.Ownable_CallerIsNotTheNewOwner.selector, notPendingOwner));
         entryPoint.acceptOwnership();
     }
 

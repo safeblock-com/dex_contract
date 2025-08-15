@@ -2,28 +2,29 @@
 pragma solidity 0.8.19;
 
 import { IOwnable } from "../external/IOwnable.sol";
-
-import { TransientStorageFacetLibrary } from "../libraries/TransientStorageFacetLibrary.sol";
+import { TransientStorageLibrary } from "../libraries/TransientStorageLibrary.sol";
 
 /// @title BaseOwnableFacet
-/// @notice A base contract providing ownership-based access control for facets in a diamond-like proxy.
+/// @notice A base contract providing ownership-based access control for facets in a diamond-like proxy
 /// @dev Implements a single-owner model with a modifier to restrict function access.
-///      Uses `TransientStorageFacetLibrary` to verify the original sender in delegated calls.
+///      Uses `TransientStorageLibrary` to verify the original sender in delegated calls.
+///      This contract is intended to be inherited by facets that require owner-only access control.
 abstract contract BaseOwnableFacet {
     // =========================
     // storage
     // =========================
 
     /// @dev The address of the contract owner.
-    ///      Stored privately to prevent direct access. Set via `EntryPoint`’s ownership transfer mechanisms.
+    ///      Stored privately to prevent direct access. Set via `EntryPoint`'s ownership transfer mechanisms.
     address private _owner;
 
     // =========================
     // modifiers
     // =========================
 
-    /// @dev Restricts function access to the contract owner.
-    ///      Reverts with `IOwnable.Ownable_SenderIsNotOwner` if the caller or original sender is not the owner.
+    /// @notice Restricts function access to the contract owner
+    /// @dev Reverts with `IErrors.Ownable_SenderIsNotOwner` if the caller or original sender is not the owner.
+    ///      This modifier should be used on functions that should only be callable by the contract owner.
     modifier onlyOwner() {
         _checkOwner();
         _;
@@ -33,13 +34,14 @@ abstract contract BaseOwnableFacet {
     // internal functions
     // =========================
 
-    /// @dev Verifies if the caller or original sender is the contract owner.
-    ///      Checks `msg.sender` and the sender stored in `TransientStorageFacetLibrary` against `_owner`.
-    ///      Reverts with `IOwnable.Ownable_SenderIsNotOwner` if neither matches.
+    /// @dev Verifies if the caller or original sender is the contract owner
+    /// @dev Checks `msg.sender` and the sender stored in `TransientStorageLibrary` against `_owner`.
+    ///      Reverts with `IErrors.Ownable_SenderIsNotOwner` if neither matches.
+    ///      This function is used by the `onlyOwner` modifier to enforce access control.
     function _checkOwner() internal view {
         address owner = _owner;
         if (owner != msg.sender) {
-            address sender = TransientStorageFacetLibrary.getSenderAddress();
+            address sender = TransientStorageLibrary.getSenderAddress();
             if (owner != sender) {
                 revert IOwnable.Ownable_SenderIsNotOwner({ sender: sender });
             }

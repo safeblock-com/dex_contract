@@ -18,7 +18,7 @@ function getModules(uint256 chainId) pure returns (Modules memory) {
     // ethereum
     if (chainId == 1) {
         return Modules({
-            coinFlippersModule: 0x62Fa7C88078BC1DE3C60A4D825891CB414C288f8,
+            coinFlippersModule: 0x0c58f09658d72Ffa455100706CFC8aDACE386A99,
             // helper
             coinFlippersVault: 0xA63cB21C43664B762C8401f7FFBBfc3947fF8D70
         });
@@ -117,7 +117,7 @@ contract DeployModule is Script {
         EntryPoint entryPoint;
 
         if (version > 0) {
-            entryPoint = EntryPoint(payable(contracts.prodProxyV2));
+            entryPoint = EntryPoint(payable(contracts.prodProxyV3));
         } else {
             entryPoint = EntryPoint(payable(contracts.proxy));
         }

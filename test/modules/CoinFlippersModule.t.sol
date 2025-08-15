@@ -1,15 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-import {
-    BaseTest,
-    CoinFlippersModule,
-    ICoinFlippersModule,
-    ICoinFlippersVault,
-    IMultiswapRouterFacet,
-    Solarray,
-    TransferHelper
-} from "../BaseTest.t.sol";
+import "../BaseTest.t.sol";
 
 contract CoinFlippersModuleTest is BaseTest {
     using TransferHelper for address;
@@ -44,14 +36,20 @@ contract CoinFlippersModuleTest is BaseTest {
     address usdtMainnet = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
 
     function test_coinFlippersModule_deposit_shouldDepositTokensIntoCoinFlippersVault() external {
-        IMultiswapRouterFacet.Multiswap2Calldata memory m2Data;
+        IMultiswapRouterFacet.MultiswapCalldata memory mData;
 
-        m2Data.tokenIn = usdtMainnet;
-        m2Data.fullAmount = 1000e6;
-        m2Data.amountInPercentages = Solarray.uint256s(1e18);
-        m2Data.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(pair));
-        m2Data.tokensOut = Solarray.addresses(coinFlippersToken);
-        m2Data.minAmountsOut = quoter.multiswap2({ data: m2Data });
+        mData.tokensIn = Solarray.bytes32s(Utils.encodeTokenAndAmount({ token: usdtMainnet, amount: 1 }));
+        mData.tokensOut = Solarray.addresses(coinFlippersToken);
+        mData.pairs = Solarray.bytes32Arrays(
+            Solarray.bytes32s(
+                _encodePercentageInPool(0x000000000000000000000bb8b56034aaEeDebEd89af24e6675fCbCEF30f21DBf, 1e18)
+            )
+        );
+
+        IEntryPoint.TokenTransfers memory tokenTransfers =
+            IEntryPoint.TokenTransfers({ tokens: Solarray.addresses(usdtMainnet), amounts: Solarray.uint256s(1000e6) });
+
+        mData.minAmountsOut = quoter.multiswap({ tokenTransfers: tokenTransfers, data: mData });
 
         vm.mockCall(
             coinFlippersVault,
@@ -61,7 +59,7 @@ contract CoinFlippersModuleTest is BaseTest {
                     keccak256("merchantID"),
                     keccak256("paymentID"),
                     coinFlippersToken,
-                    m2Data.minAmountsOut[0],
+                    mData.minAmountsOut[0],
                     block.timestamp + 100,
                     new bytes(61)
                 )
@@ -73,10 +71,11 @@ contract CoinFlippersModuleTest is BaseTest {
 
         usdtMainnet.safeApprove({ spender: address(entryPoint), value: 1000e6 });
 
-        _expectERC20ApproveCall(coinFlippersToken, coinFlippersVault, m2Data.minAmountsOut[0]);
+        _expectERC20ApproveCall(coinFlippersToken, coinFlippersVault, mData.minAmountsOut[0]);
         entryPoint.multicall({
+            tokenTransfers: tokenTransfers,
             data: Solarray.bytess(
-                abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data)),
+                abi.encodeCall(MultiswapRouterFacet.multiswap, (mData)),
                 abi.encodeCall(
                     ICoinFlippersModule.deposit,
                     (

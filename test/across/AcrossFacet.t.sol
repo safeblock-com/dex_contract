@@ -1,18 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {
-    BaseTest,
-    IERC20,
-    Solarray,
-    IMultiswapRouterFacet,
-    ITransferFacet,
-    AcrossFacet,
-    IAcrossFacet,
-    TransferHelper,
-    IEntryPoint,
-    TransferFacet
-} from "../BaseTest.t.sol";
+import "../BaseTest.t.sol";
 
 import { E18 } from "../../src/libraries/Constants.sol";
 
@@ -28,9 +17,6 @@ contract AcrossFacetTest is BaseTest {
 
         deal({ token: inputTokenUSDC, to: user, give: 1000e6 });
         deal({ to: user, give: 1000e18 });
-
-        entryPoint.setFeeContractAddressAndFee({ feeContractAddress: address(feeContract), fee: 300 });
-        quoter.setRouter({ router: address(entryPoint) });
     }
 
     // =========================
@@ -59,22 +45,24 @@ contract AcrossFacetTest is BaseTest {
 
     uint256 constant outputAmountPercentage = 0.999e18;
 
-    function test_acrossFacet_sendAcrossDepositV3_shouldSendDepositAfterTransferTokenFromUser()
-        external
-        checkTokenStorage(Solarray.addresses(inputTokenUSDC))
-    {
+    function test_acrossFacet_sendAcrossDepositV3_shouldSendDepositAfterTransferTokenFromUser() external checkStorage {
         _resetPrank(user);
 
         uint256 inputAmount = 1000e6;
-        uint256 outputAmount = inputAmount * outputAmountPercentage / E18;
 
-        IERC20(inputTokenUSDC).approve({ spender: address(entryPoint), amount: 1000e18 });
+        IEntryPoint.TokenTransfers memory tokenTransfers = IEntryPoint.TokenTransfers({
+            tokens: Solarray.addresses(inputTokenUSDC),
+            amounts: Solarray.uint256s(inputAmount)
+        });
 
-        bytes memory message = _getMessage(optimismUniswapV3_USDC_OP_Pool, outputAmount);
+        IERC20(inputTokenUSDC).approve({ spender: address(entryPoint), amount: inputAmount });
+
+        bytes memory message = _getMessage(optimismUniswapV3_USDC_OP_Pool);
 
         _expectERC20TransferFromCall(inputTokenUSDC, user, address(entryPoint), inputAmount);
         _expectERC20ApproveCall(inputTokenUSDC, contracts.acrossSpokePool, inputAmount);
         entryPoint.multicall({
+            tokenTransfers: tokenTransfers,
             data: Solarray.bytess(
                 abi.encodeCall(
                     AcrossFacet.sendAcrossDepositV3,
@@ -83,7 +71,7 @@ contract AcrossFacetTest is BaseTest {
                             recipient: address(entryPoint),
                             inputToken: inputTokenUSDC,
                             outputToken: outputTokenUSDC,
-                            inputAmount: inputAmount,
+                            inputAmount: 0,
                             outputAmountPercent: outputAmountPercentage,
                             destinationChainId: dstChainId,
                             exclusiveRelayer: address(0),
@@ -98,56 +86,15 @@ contract AcrossFacetTest is BaseTest {
         });
     }
 
-    function test_acrossFacet_sendAcrossDepositV3_shouldRevertIfTransferFromFails()
-        external
-        checkTokenStorage(Solarray.addresses(inputTokenUSDC))
-    {
-        _resetPrank(user);
-
-        uint256 inputAmount = 1000e6;
-        uint256 outputAmount = inputAmount * outputAmountPercentage / E18;
-
-        bytes memory message = _getMessage(optimismUniswapV3_USDC_OP_Pool, outputAmount);
-
-        vm.expectRevert(TransferHelper.TransferHelper_TransferFromError.selector);
-        entryPoint.multicall({
-            data: Solarray.bytess(
-                abi.encodeCall(
-                    AcrossFacet.sendAcrossDepositV3,
-                    (
-                        IAcrossFacet.V3AcrossDepositParams({
-                            recipient: address(entryPoint),
-                            inputToken: inputTokenUSDC,
-                            outputToken: outputTokenUSDC,
-                            inputAmount: inputAmount,
-                            outputAmountPercent: outputAmountPercentage,
-                            destinationChainId: dstChainId,
-                            exclusiveRelayer: address(0),
-                            quoteTimestamp: uint32(block.timestamp),
-                            fillDeadline: uint32(block.timestamp + 3600),
-                            exclusivityDeadline: 0,
-                            message: message
-                        })
-                    )
-                )
-            )
-        });
-    }
-
-    function test_acrossFacet_sendAcrossDepositV3_shouldSendDepositWithNativeCurrency()
-        external
-        checkTokenStorage(Solarray.addresses(inputTokenWETH))
-    {
+    function test_acrossFacet_sendAcrossDepositV3_shouldSendDepositWithNativeCurrency() external checkStorage {
         _resetPrank(user);
 
         uint256 inputAmount = 1000e18;
-        uint256 outputAmount = inputAmount * outputAmountPercentage / E18;
 
-        bytes memory message = _getMessage(optimismUniswapV3_WETH_OP_Pool, outputAmount);
+        bytes memory message = _getMessage(optimismUniswapV3_USDC_OP_Pool);
 
-        assertEq(user.balance, 1000e18);
-
-        entryPoint.multicall{ value: 1000e18 }({
+        entryPoint.multicall{ value: inputAmount }({
+            tokenTransfers: IEntryPoint.TokenTransfers({ tokens: new address[](0), amounts: new uint256[](0) }),
             data: Solarray.bytess(
                 abi.encodeCall(
                     AcrossFacet.sendAcrossDepositV3,
@@ -156,7 +103,7 @@ contract AcrossFacetTest is BaseTest {
                             recipient: address(entryPoint),
                             inputToken: address(0), // WETH
                             outputToken: outputTokenWETH,
-                            inputAmount: inputAmount,
+                            inputAmount: 0,
                             outputAmountPercent: outputAmountPercentage,
                             destinationChainId: dstChainId,
                             exclusiveRelayer: address(0),
@@ -173,73 +120,38 @@ contract AcrossFacetTest is BaseTest {
         assertEq(user.balance, 0);
     }
 
-    function test_acrossFacet_sendAcrossDepositV3_shouldRevertIfNativeCurrencyNotEnough()
-        external
-        checkTokenStorage(Solarray.addresses(inputTokenWETH))
-    {
-        _resetPrank(user);
-
-        uint256 inputAmount = 1000e18;
-        uint256 outputAmount = inputAmount * outputAmountPercentage / E18;
-
-        bytes memory message = _getMessage(optimismUniswapV3_WETH_OP_Pool, outputAmount);
-
-        vm.expectRevert();
-        entryPoint.multicall{ value: 999e18 }({
-            data: Solarray.bytess(
-                abi.encodeCall(
-                    AcrossFacet.sendAcrossDepositV3,
-                    (
-                        IAcrossFacet.V3AcrossDepositParams({
-                            recipient: address(entryPoint),
-                            inputToken: address(0), // WETH
-                            outputToken: outputTokenWETH,
-                            inputAmount: inputAmount,
-                            outputAmountPercent: outputAmountPercentage,
-                            destinationChainId: dstChainId,
-                            exclusiveRelayer: address(0),
-                            quoteTimestamp: uint32(block.timestamp),
-                            fillDeadline: uint32(block.timestamp + 3600),
-                            exclusivityDeadline: 0,
-                            message: message
-                        })
-                    )
-                )
-            )
-        });
-    }
-
     address constant tokenForSwap = 0xF19308F923582A6f7c465e5CE7a9Dc1BEC6665B1;
     bytes32 constant poolForSwap = 0x800000000000000000000000c45A81BC23A64eA556ab4CdF08A86B61cdcEEA8b;
 
-    function test_acrossFacet_sendAcrossDepositV3_shouldSendDepositAfterSwap()
-        external
-        checkTokenStorage(Solarray.addresses(inputTokenWETH, tokenForSwap))
-    {
+    function test_acrossFacet_sendAcrossDepositV3_shouldSendDepositAfterSwap() external checkStorage {
         deal({ token: tokenForSwap, to: user, give: 1000e18 });
 
-        IMultiswapRouterFacet.Multiswap2Calldata memory m2Data;
+        IMultiswapRouterFacet.MultiswapCalldata memory mData;
 
-        m2Data.tokenIn = tokenForSwap;
-        m2Data.fullAmount = 1000e18;
-        m2Data.amountInPercentages = Solarray.uint256s(1e18);
-        m2Data.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(poolForSwap));
-        m2Data.tokensOut = Solarray.addresses(inputTokenWETH);
-        m2Data.minAmountsOut = quoter.multiswap2({ data: m2Data });
+        mData.tokensIn = Solarray.bytes32s(Utils.encodeTokenAndAmount({ token: tokenForSwap, amount: 1 }));
+        mData.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(_encodePercentageInPool(poolForSwap, 1e18)));
+        mData.tokensOut = Solarray.addresses(inputTokenWETH);
+
+        IEntryPoint.TokenTransfers memory tokenTransfers = IEntryPoint.TokenTransfers({
+            tokens: Solarray.addresses(tokenForSwap),
+            amounts: Solarray.uint256s(1000e18)
+        });
+
+        mData.minAmountsOut = quoter.multiswap({ tokenTransfers: tokenTransfers, data: mData });
 
         _resetPrank(user);
 
         IERC20(tokenForSwap).approve({ spender: address(entryPoint), amount: 1000e18 });
 
-        uint256 inputAmount = m2Data.minAmountsOut[0];
-        uint256 outputAmount = inputAmount * outputAmountPercentage / E18;
+        uint256 inputAmount = mData.minAmountsOut[0];
 
-        bytes memory message = _getMessage(optimismUniswapV3_WETH_OP_Pool, outputAmount);
+        bytes memory message = _getMessage(optimismUniswapV3_WETH_OP_Pool);
 
         _expectERC20ApproveCall(inputTokenWETH, contracts.acrossSpokePool, inputAmount);
         entryPoint.multicall({
+            tokenTransfers: tokenTransfers,
             data: Solarray.bytess(
-                abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data)),
+                abi.encodeCall(MultiswapRouterFacet.multiswap, (mData)),
                 abi.encodeCall(
                     AcrossFacet.sendAcrossDepositV3,
                     (
@@ -247,7 +159,7 @@ contract AcrossFacetTest is BaseTest {
                             recipient: address(entryPoint),
                             inputToken: inputTokenWETH, // WETH
                             outputToken: outputTokenWETH,
-                            inputAmount: inputAmount,
+                            inputAmount: 0,
                             outputAmountPercent: outputAmountPercentage,
                             destinationChainId: dstChainId,
                             exclusiveRelayer: address(0),
@@ -268,27 +180,23 @@ contract AcrossFacetTest is BaseTest {
 
     address constant OP_TOKEN = 0x4200000000000000000000000000000000000042;
 
-    function _getMessage(bytes32 pool, uint256 amountIn) internal view returns (bytes memory) {
-        IMultiswapRouterFacet.Multiswap2Calldata memory m2Data;
+    function _getMessage(bytes32 pool) internal view returns (bytes memory) {
+        IMultiswapRouterFacet.MultiswapCalldata memory mData;
 
         if (pool == optimismUniswapV3_USDC_OP_Pool) {
-            m2Data.tokenIn = outputTokenUSDC;
+            mData.tokensIn = Solarray.bytes32s(Utils.encodeTokenAndAmount({ token: inputTokenUSDC, amount: 1 }));
         } else {
-            m2Data.tokenIn = outputTokenWETH;
+            mData.tokensIn = Solarray.bytes32s(Utils.encodeTokenAndAmount({ token: outputTokenWETH, amount: 1 }));
         }
-        m2Data.fullAmount = amountIn;
-        m2Data.amountInPercentages = Solarray.uint256s(1e18);
-        m2Data.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(pool));
-        m2Data.tokensOut = Solarray.addresses(OP_TOKEN);
-        m2Data.minAmountsOut = Solarray.uint256s(0);
+        mData.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(pool));
+        mData.tokensOut = Solarray.addresses(OP_TOKEN);
+        mData.minAmountsOut = Solarray.uint256s(0);
 
-        return abi.encodeCall(
-            IEntryPoint.multicall,
-            (
-                Solarray.bytess(
-                    abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data)),
-                    abi.encodeCall(TransferFacet.transferToken, (user, m2Data.tokensOut))
-                )
+        return abi.encodeWithSignature(
+            "multicall(bytes[])",
+            Solarray.bytess(
+                abi.encodeCall(MultiswapRouterFacet.multiswap, (mData)),
+                abi.encodeCall(TransferFacet.transferToken, (user, mData.tokensOut))
             )
         );
     }

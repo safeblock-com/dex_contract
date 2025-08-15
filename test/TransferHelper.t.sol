@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.19;
 
-import { BaseTest, TransferHelper } from "./BaseTest.t.sol";
+import "./BaseTest.t.sol";
 
 contract MockTransferHelper {
     using TransferHelper for address;

@@ -93,4 +93,41 @@ library SwapMath {
             }
         }
     }
+
+    function computeSwapStep(
+        uint160 sqrtRatioCurrentX96,
+        uint160 sqrtRatioTargetX96,
+        uint128 liquidity,
+        uint24 feePips
+    )
+        internal
+        pure
+        returns (uint160 sqrtRatioNextX96, uint256 amountIn, uint256 amountOut, uint256 feeAmount)
+    {
+        unchecked {
+            bool zeroForOne = sqrtRatioCurrentX96 >= sqrtRatioTargetX96;
+
+            uint256 amountRemainingLessFee = FullMath.mulDiv(uint256(type(uint128).max), 1e6 - feePips, 1e6);
+
+            amountIn = zeroForOne
+                ? SqrtPriceMath.getAmount0Delta(sqrtRatioTargetX96, sqrtRatioCurrentX96, liquidity, true)
+                : SqrtPriceMath.getAmount1Delta(sqrtRatioCurrentX96, sqrtRatioTargetX96, liquidity, true);
+            if (amountRemainingLessFee >= amountIn) {
+                sqrtRatioNextX96 = sqrtRatioTargetX96;
+            } else {
+                sqrtRatioNextX96 = SqrtPriceMath.getNextSqrtPriceFromInput(
+                    sqrtRatioCurrentX96, liquidity, amountRemainingLessFee, zeroForOne
+                );
+            }
+
+            // get the input/output amounts
+            if (zeroForOne) {
+                amountOut = SqrtPriceMath.getAmount1Delta(sqrtRatioNextX96, sqrtRatioCurrentX96, liquidity, false);
+            } else {
+                amountOut = SqrtPriceMath.getAmount0Delta(sqrtRatioCurrentX96, sqrtRatioNextX96, liquidity, false);
+            }
+
+            feeAmount = FullMath.mulDivRoundingUp(amountIn, feePips, 1e6 - feePips);
+        }
+    }
 }

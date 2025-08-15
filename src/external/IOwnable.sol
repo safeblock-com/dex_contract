@@ -2,6 +2,8 @@
 pragma solidity ^0.8.0;
 
 /// @title IOwnable - Ownable Interface
+/// @notice Interface for ownership management in contracts
+/// @dev This interface defines the standard functions for ownership control
 interface IOwnable {
     // =========================
     // events
@@ -17,9 +19,16 @@ interface IOwnable {
     // errors
     // =========================
 
-    /// @notice Throws when the caller is not authorized to perform an operation.
-    /// @param sender The address of the sender trying to access a restricted function.
+    /// @dev Thrown when the caller is not the current contract owner.
+    /// @param sender The address attempting the restricted action.
     error Ownable_SenderIsNotOwner(address sender);
+
+    /// @dev Thrown when the caller is not the pending new owner in a two-step ownership transfer.
+    /// @param caller The address attempting to accept ownership.
+    error Ownable_CallerIsNotTheNewOwner(address caller);
+
+    /// @dev Thrown when trying to set the new owner to the zero address.
+    error Ownable_NewOwnerCannotBeAddressZero();
 
     // =========================
     // getters

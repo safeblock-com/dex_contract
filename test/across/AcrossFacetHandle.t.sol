@@ -1,18 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {
-    BaseTest,
-    IERC20,
-    Solarray,
-    IMultiswapRouterFacet,
-    ITransferFacet,
-    AcrossFacet,
-    IAcrossFacet,
-    TransferHelper,
-    IEntryPoint,
-    TransferFacet
-} from "../BaseTest.t.sol";
+import "../BaseTest.t.sol";
 
 import { E18 } from "../../src/libraries/Constants.sol";
 
@@ -48,7 +37,7 @@ contract AcrossFacetHandleTest is BaseTest {
     function test_acrossFacet_handleV3AcrossMessage_shouldRevertIfSenderIsNotSpokePool() external {
         _resetPrank(user);
 
-        bytes memory message = _getMessage(optimismUniswapV3_USDC_OP_Pool, 1000e6, false);
+        bytes memory message = _getMessage(optimismUniswapV3_USDC_OP_Pool, false);
 
         vm.expectRevert(IAcrossFacet.AcrossFacet_NotSpokePool.selector);
         IAcrossFacet(address(entryPoint)).handleV3AcrossMessage({
@@ -59,10 +48,7 @@ contract AcrossFacetHandleTest is BaseTest {
         });
     }
 
-    function test_acrossFacet_handleV3AcrossMessage_shouldCallMessageFromCall()
-        external
-        checkTokenStorage(Solarray.addresses(OP_TOKEN, outputTokenUSDC))
-    {
+    function test_acrossFacet_handleV3AcrossMessage_shouldCallMessageFromCall() external checkStorage {
         _resetPrank(contracts.acrossSpokePool);
 
         assertEq(TransferHelper.safeGetBalance({ token: outputTokenUSDC, account: address(entryPoint) }), 1000e6);
@@ -71,7 +57,7 @@ contract AcrossFacetHandleTest is BaseTest {
             tokenSent: outputTokenUSDC,
             amount: 1000e6,
             relayer: address(0),
-            message: abi.encode(user, _getMessage(optimismUniswapV3_USDC_OP_Pool, 1000e6, false))
+            message: abi.encode(user, _getMessage(optimismUniswapV3_USDC_OP_Pool, false))
         });
 
         assertEq(TransferHelper.safeGetBalance({ token: outputTokenUSDC, account: address(entryPoint) }), 0);
@@ -79,13 +65,10 @@ contract AcrossFacetHandleTest is BaseTest {
 
     event CallFailed(bytes errorMessage);
 
-    function test_acrossFacet_handleV3AcrossMessage_shouldEmitCallFailedIfMessageFails()
-        external
-        checkTokenStorage(Solarray.addresses(OP_TOKEN, outputTokenUSDC))
-    {
+    function test_acrossFacet_handleV3AcrossMessage_shouldEmitCallFailedIfMessageFails() external checkStorage {
         _resetPrank(contracts.acrossSpokePool);
 
-        bytes memory message = _getMessage(optimismUniswapV3_USDC_OP_Pool, 1000e6, true);
+        bytes memory message = _getMessage(optimismUniswapV3_USDC_OP_Pool, true);
 
         uint256 quoterAmountOut;
         assembly {
@@ -95,9 +78,7 @@ contract AcrossFacetHandleTest is BaseTest {
         vm.expectEmit();
         emit CallFailed({
             errorMessage: abi.encodeWithSelector(
-                IMultiswapRouterFacet.MultiswapRouterFacet_ValueLowerThanExpected.selector,
-                quoterAmountOut,
-                quoterAmountOut * 2
+                Utils.ValueLowerThanExpected.selector, quoterAmountOut, quoterAmountOut * 2
             )
         });
         _expectERC20TransferCall(outputTokenUSDC, user, 1000e6);
@@ -115,33 +96,34 @@ contract AcrossFacetHandleTest is BaseTest {
 
     address constant OP_TOKEN = 0x4200000000000000000000000000000000000042;
 
-    function _getMessage(bytes32 pool, uint256 amountIn, bool fail) internal view returns (bytes memory) {
-        IMultiswapRouterFacet.Multiswap2Calldata memory m2Data;
+    function _getMessage(bytes32 pool, bool fail) internal view returns (bytes memory) {
+        IMultiswapRouterFacet.MultiswapCalldata memory mData;
 
         if (pool == optimismUniswapV3_USDC_OP_Pool) {
-            m2Data.tokenIn = outputTokenUSDC;
+            mData.tokensIn = Solarray.bytes32s(Utils.encodeTokenAndAmount({ token: outputTokenUSDC, amount: 1 }));
         } else {
-            m2Data.tokenIn = outputTokenWETH;
+            mData.tokensIn = Solarray.bytes32s(Utils.encodeTokenAndAmount({ token: outputTokenWETH, amount: 1 }));
         }
-        m2Data.fullAmount = amountIn;
-        m2Data.amountInPercentages = Solarray.uint256s(1e18);
-        m2Data.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(pool));
-        m2Data.tokensOut = Solarray.addresses(OP_TOKEN);
+        mData.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(pool));
+        mData.tokensOut = Solarray.addresses(OP_TOKEN);
 
-        uint256 quoterAmountOut = quoter.multiswap2({ data: m2Data })[0];
+        IEntryPoint.TokenTransfers memory tokenTransfers = IEntryPoint.TokenTransfers({
+            tokens: Solarray.addresses(pool == optimismUniswapV3_USDC_OP_Pool ? outputTokenUSDC : outputTokenWETH),
+            amounts: Solarray.uint256s(pool == optimismUniswapV3_USDC_OP_Pool ? 1000e6 : 1000e18)
+        });
+
+        uint256 quoterAmountOut = quoter.multiswap({ tokenTransfers: tokenTransfers, data: mData })[0];
         assembly {
             mstore(0, quoterAmountOut)
         }
 
-        m2Data.minAmountsOut = fail ? Solarray.uint256s(quoterAmountOut * 2) : Solarray.uint256s(quoterAmountOut);
+        mData.minAmountsOut = fail ? Solarray.uint256s(quoterAmountOut * 2) : Solarray.uint256s(quoterAmountOut);
 
-        return abi.encodeCall(
-            IEntryPoint.multicall,
-            (
-                Solarray.bytess(
-                    abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data)),
-                    abi.encodeCall(TransferFacet.transferToken, (user, m2Data.tokensOut))
-                )
+        return abi.encodeWithSignature(
+            "multicall(bytes[])",
+            Solarray.bytess(
+                abi.encodeCall(MultiswapRouterFacet.multiswap, (mData)),
+                abi.encodeCall(TransferFacet.transferToken, (user, mData.tokensOut))
             )
         );
     }

@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import { UUPSUpgradeable, ERC1967Utils } from "../../src/proxy/UUPSUpgradeable.sol";
 
-import { BaseTest, Proxy, InitialImplementation, Ownable, IOwnable } from "../BaseTest.t.sol";
+import "../BaseTest.t.sol";
 
 contract Implementation is UUPSUpgradeable, Ownable {
     function initialize() external {

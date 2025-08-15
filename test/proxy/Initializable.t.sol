@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-import { BaseTest, Initializable } from "../BaseTest.t.sol";
+import "../BaseTest.t.sol";
 
 contract MockInitializable is Initializable {
     function getVersion() external view returns (uint8) {

@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { IUniswapPool } from "../../facets/multiswapRouterFacet/interfaces/IUniswapPool.sol";
-import { PoolHelper } from "../../libraries/PoolHelper.sol";
-
+import { HelperV2Lib as Math } from "../../libraries/HelperV2Lib.sol";
 import { E18, E6 } from "../../libraries/Constants.sol";
 
-library HelperV2Lib {
-    error UniswapV2_InsufficientInputAmount();
-    error UniswapV2_InsufficientOutputAmount();
+import { IUniswapPool } from "../../interfaces/IUniswapPool.sol";
+import { HelperV2Lib as External } from "../../libraries/HelperV2Lib.sol";
 
+library HelperV2Lib {
     // ===========================
     // amountOut
     // ===========================
@@ -25,14 +23,14 @@ library HelperV2Lib {
         returns (uint256 amountOut)
     {
         if (amountIn == 0) {
-            revert UniswapV2_InsufficientInputAmount();
+            revert External.UniswapV2_InsufficientInputAmount();
         }
 
         if (reserveIn == 0 || reserveOut == 0) {
             return 0;
         }
 
-        amountOut = PoolHelper.calculateVolatileAmountOut({
+        amountOut = Math.calculateVolatileAmountOut({
             amountIn: amountIn,
             reserveIn: reserveIn,
             reserveOut: reserveOut,
@@ -53,10 +51,10 @@ library HelperV2Lib {
         returns (uint256 amountOut)
     {
         if (amountIn == 0) {
-            revert UniswapV2_InsufficientInputAmount();
+            revert External.UniswapV2_InsufficientInputAmount();
         }
 
-        amountOut = PoolHelper.calculateStableAmountOut({
+        amountOut = Math.calculateStableAmountOut({
             tokenIn: tokenIn,
             tokenOut: tokenOut,
             amountIn: amountIn,
@@ -81,7 +79,7 @@ library HelperV2Lib {
         returns (uint256 amountIn)
     {
         if (amountOut == 0) {
-            revert UniswapV2_InsufficientOutputAmount();
+            revert External.UniswapV2_InsufficientOutputAmount();
         }
 
         if (reserveIn == 0 || reserveOut == 0) {
@@ -92,7 +90,7 @@ library HelperV2Lib {
             return type(uint256).max;
         }
 
-        amountIn = PoolHelper.calculateVolatileAmountIn({
+        amountIn = Math.calculateVolatileAmountIn({
             amountOut: amountOut,
             reserveIn: reserveIn,
             reserveOut: reserveOut,
@@ -113,7 +111,7 @@ library HelperV2Lib {
         returns (uint256 amountIn)
     {
         if (amountOut == 0) {
-            revert UniswapV2_InsufficientOutputAmount();
+            revert External.UniswapV2_InsufficientOutputAmount();
         }
 
         if (reserveIn == 0 || reserveOut == 0) {
@@ -124,7 +122,7 @@ library HelperV2Lib {
             return type(uint256).max;
         }
 
-        amountIn = PoolHelper.calculateStableAmountIn({
+        amountIn = Math.calculateStableAmountIn({
             tokenIn: tokenIn,
             tokenOut: tokenOut,
             amountOut: amountOut,

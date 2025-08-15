@@ -6,18 +6,6 @@ import { UlnConfig, Origin } from "./ILayerZeroEndpointV2.sol";
 /// @title ILayerZeroFacet - LayerZeroFacet Interface
 interface ILayerZeroFacet {
     // =========================
-    // errors
-    // =========================
-
-    /// @dev Thrown when the lengths of input arrays do not match.
-    ///      Triggered in `setPeers` and `setGasLimit` if array lengths are unequal.
-    error LayerZeroFacet_LengthMismatch();
-
-    /// @dev Thrown when the contract’s native balance is insufficient to cover the messaging fee.
-    ///      Triggered in `sendDeposit` if the balance is less than the quoted fee.
-    error LayerZeroFacet_FeeNotMet();
-
-    // =========================
     // getters
     // =========================
 
@@ -87,13 +75,20 @@ interface ILayerZeroFacet {
     // =========================
 
     /// @notice Sends a cross-chain message with a native drop to a remote chain.
-    /// @dev Uses `TransientStorageFacetLibrary` to get the sender, constructs native drop options,
+    /// @dev Uses `TransientStorageLibrary` to get the sender, constructs native drop options,
     ///      quotes the fee and sends the message via `_endpointV2.send`.
     ///      Reverts with `LayerZeroFacet_FeeNotMet` if the native balance is insufficient.
     /// @param remoteEid The remote chain’s endpoint ID.
     /// @param nativeDrop The amount of native currency to drop on the remote chain.
     /// @param to The recipient address for the native drop (defaults to sender if zero).
-    function sendDeposit(uint32 remoteEid, uint128 nativeDrop, address to) external payable;
+    function sendDeposit(
+        uint32 remoteEid,
+        uint128 nativeDrop,
+        address to
+    )
+        external
+        payable
+        returns (bytes32[] memory);
 
     // =========================
     // setters

@@ -6,24 +6,25 @@ import { IERC20 } from "forge-std/interfaces/IERC20.sol";
 /// @title TransferHelper
 /// @notice A helper library for safe transfers, approvals, and balance checks.
 /// @dev Provides safe functions for ERC20 token and native currency transfers.
+///      This library is used throughout the protocol to handle token operations safely.
 library TransferHelper {
     // =========================
     // errors
     // =========================
 
-    /// @notice Thrown when `safeTransferFrom` fails.
+    /// @dev Thrown when `safeTransferFrom` fails to execute.
     error TransferHelper_TransferFromError();
 
-    /// @notice Thrown when `safeTransfer` fails.
+    /// @dev Thrown when `safeTransfer` fails to execute.
     error TransferHelper_TransferError();
 
-    /// @notice Thrown when `safeApprove` fails.
+    /// @dev Thrown when `safeApprove` fails to update allowance.
     error TransferHelper_ApproveError();
 
-    /// @notice Thrown when `safeGetBalance` fails.
+    /// @dev Thrown when `safeGetBalance` fails to read the token balance.
     error TransferHelper_GetBalanceError();
 
-    /// @notice Thrown when `safeTransferNative` fails.
+    /// @dev Thrown when attempting to transfer native tokens and the operation fails.
     error TransferHelper_TransferNativeError();
 
     // =========================
@@ -34,8 +35,8 @@ library TransferHelper {
     /// @dev Uses low-level call to ensure proper error handling.
     /// @param token Address of the ERC20 token to transfer.
     /// @param from Address of the sender.
-    /// @param to Address of the recipient.
     /// @param value Amount to transfer.
+    /// @param to Address of the recipient.
     function safeTransferFrom(address token, address from, uint256 value, address to) internal {
         if (!_makeCall(token, abi.encodeCall(IERC20.transferFrom, (from, to, value)))) {
             revert TransferHelper_TransferFromError();
@@ -93,11 +94,9 @@ library TransferHelper {
                 mstore(0, 0xb1a0fdf8)
                 revert(28, 4)
             }
-
-            // send anonymous event with the `to` address
-            mstore(0, to)
-            log0(0, 32)
         }
+
+        sendEvent(to, address(0), value);
     }
 
     // =========================
@@ -106,12 +105,32 @@ library TransferHelper {
 
     /// @dev Helper function to make a low-level call for token methods.
     /// @dev Ensures correct return value and decodes it.
-    ///
     /// @param token Address to make the call on.
     /// @param data Calldata for the low-level call.
     /// @return True if the call succeeded, false otherwise.
     function _makeCall(address token, bytes memory data) private returns (bool) {
         (bool success, bytes memory returnData) = token.call(data);
         return success && (returnData.length == 0 || abi.decode(returnData, (bool)));
+    }
+
+    // =========================
+    // helper
+    // =========================
+
+    /// @dev Sends an anonymous event with the `to` address, `token` address and `amount`
+    /// @param to Address of the recipient.
+    /// @param token Address of the token.
+    /// @param amount Amount to transfer.
+    function sendEvent(address to, address token, uint256 amount) internal {
+        assembly ("memory-safe") {
+            let ptr := mload(64)
+
+            mstore(0, to)
+            mstore(32, token)
+            mstore(64, amount)
+            log0(0, 96)
+
+            mstore(64, ptr)
+        }
     }
 }

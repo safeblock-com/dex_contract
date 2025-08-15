@@ -2,9 +2,9 @@
 pragma solidity 0.8.19;
 
 import { TransferHelper } from "../../libraries/TransferHelper.sol";
-import { TransientStorageFacetLibrary } from "../../libraries/TransientStorageFacetLibrary.sol";
+import { Utils } from "../../libraries/Utils.sol";
 
-import { ISignatureTransfer } from "./interfaces/ISignatureTransfer.sol";
+import { ISignatureTransfer } from "../../interfaces/ISignatureTransfer.sol";
 import { IWrappedNative } from "../../interfaces/IWrappedNative.sol";
 
 import { ITransferFacet } from "./interfaces/ITransferFacet.sol";
@@ -13,6 +13,8 @@ import { ITransferFacet } from "./interfaces/ITransferFacet.sol";
 /// @notice A facet for handling token transfers in a diamond-like proxy contract.
 /// @dev Facilitates ERC20 token transfers, permit-based transfers via Permit2,
 ///      and native token unwrapping using a wrapped native token contract.
+///      This facet is part of the diamond proxy pattern and provides functionality for token transfers.
+///      It integrates with the EntryPoint contract to route calls appropriately.
 contract TransferFacet is ITransferFacet {
     // =========================
     // storage
@@ -122,63 +124,35 @@ contract TransferFacet is ITransferFacet {
     // =========================
 
     /// @inheritdoc ITransferFacet
-    function transferFromPermit2(
-        address token,
-        uint256 amount,
-        uint256 nonce,
-        uint256 deadline,
-        bytes calldata signature
+    function transferToken(
+        address to,
+        address[] calldata tokens
     )
         external
+        returns (bytes32[] memory tokensAndAmounts)
     {
-        uint256 balanceBefore = TransferHelper.safeGetBalance({ token: token, account: address(this) });
-
-        if (amount > 0) {
-            _permit2.permitTransferFrom({
-                permit: ISignatureTransfer.PermitTransferFrom({
-                    permitted: ISignatureTransfer.TokenPermissions({ token: token, amount: amount }),
-                    nonce: nonce,
-                    deadline: deadline
-                }),
-                transferDetails: ISignatureTransfer.SignatureTransferDetails({ to: address(this), requestedAmount: amount }),
-                owner: TransientStorageFacetLibrary.getSenderAddress(),
-                signature: signature
-            });
-        }
-
-        unchecked {
-            uint256 balanceAfter = TransferHelper.safeGetBalance({ token: token, account: address(this) });
-
-            if (balanceAfter <= balanceBefore) {
-                revert ITransferFacet.TransferFacet_TransferFromFailed();
-            }
-
-            balanceAfter = balanceAfter - balanceBefore;
-
-            TransientStorageFacetLibrary.setAmountForToken({ token: token, amount: balanceAfter, record: true });
-        }
-    }
-
-    /// @inheritdoc ITransferFacet
-    function transferToken(address to, address[] calldata tokens) external {
         uint256 length = tokens.length;
 
+        tokensAndAmounts = Utils.decodeTokensAndAmountsArray();
         while (length > 0) {
             unchecked {
                 --length;
             }
             address token = tokens[length];
-            uint256 amount = TransientStorageFacetLibrary.getAmountForToken({ token: token });
+            uint256 amount = Utils.getAmountFromArrayAndDelete({ tokensAndAmounts: tokensAndAmounts, token: token });
 
             if (amount > 0) {
                 TransferHelper.safeTransfer({ token: token, to: to, value: amount });
+                TransferHelper.sendEvent({ to: to, token: token, amount: amount });
             }
         }
     }
 
     /// @inheritdoc ITransferFacet
-    function unwrapNativeAndTransferTo(address to) external {
-        uint256 amount = TransientStorageFacetLibrary.getAmountForToken({ token: address(_wrappedNative) });
+    function unwrapNativeAndTransferTo(address to) external returns (bytes32[] memory tokensAndAmounts) {
+        tokensAndAmounts = Utils.decodeTokensAndAmountsArray();
+        uint256 amount =
+            Utils.getAmountFromArrayAndDelete({ tokensAndAmounts: tokensAndAmounts, token: address(_wrappedNative) });
         if (amount > 0) {
             _wrappedNative.withdraw({ wad: amount });
 

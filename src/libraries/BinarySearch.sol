@@ -5,9 +5,11 @@ pragma solidity ^0.8.0;
 /// @notice A library for performing binary search on a bytes array to retrieve facet addresses.
 /// @dev Provides an efficient binary search implementation for mapping function selectors to facet addresses
 ///      stored in a sorted bytes array.
+///      This library is used in the diamond proxy pattern to efficiently look up facet addresses
+///      for function selectors.
 library BinarySearch {
-    /// @dev Searches for the facet address associated with a given function selector.
-    ///      Performs a binary search on a sorted bytes array containing concatenated function selectors and facet address indices.
+    /// @notice Searches for the facet address associated with a given function selector.
+    /// @dev Performs a binary search on a sorted bytes array containing concatenated function selectors and facet address indices.
     ///      The array is assumed to be sorted by selectors, with selectors occupying 4 bytes and address indices 1 byte per entry.
     ///      If the selector is found, the corresponding facet address is retrieved from the address section of the array.
     /// @param selector The 4-byte function selector to search for.

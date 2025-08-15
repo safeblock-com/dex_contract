@@ -1,17 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {
-    BaseTest,
-    IERC20,
-    Solarray,
-    IMultiswapRouterFacet,
-    ITransferFacet,
-    StargateFacet,
-    IStargateFacet,
-    TransferHelper,
-    TransferHelper
-} from "../BaseTest.t.sol";
+import "../BaseTest.t.sol";
 
 import "../Helpers.t.sol";
 
@@ -29,9 +19,6 @@ contract StargateFacetTest is BaseTest {
         deal({ token: USDC, to: user, give: 1000e18 });
         deal({ token: WBNB, to: user, give: 1000e18 });
         deal({ to: user, give: 1000e18 });
-
-        entryPoint.setFeeContractAddressAndFee({ feeContractAddress: address(feeContract), fee: 300 });
-        quoter.setRouter({ router: address(entryPoint) });
     }
 
     // =========================
@@ -51,10 +38,7 @@ contract StargateFacetTest is BaseTest {
     uint32 dstEidV2 = 30_101;
     address stargatePool = 0x138EB30f73BC423c6455C53df6D89CB01d9eBc63;
 
-    function test_stargateFacet_sendStargateV2_shouldSendStargateV2()
-        external
-        checkTokenStorage(Solarray.addresses(USDT))
-    {
+    function test_stargateFacet_sendStargateV2_shouldSendStargateV2() external checkStorage {
         _resetPrank(user);
 
         IERC20(USDT).approve({ spender: address(entryPoint), amount: 1000e18 });
@@ -72,19 +56,21 @@ contract StargateFacetTest is BaseTest {
 
         address[] memory tokensOut = Solarray.addresses(USDT);
 
-        _expectERC20TransferCall(USDT, address(feeContract), 1000e18 * 300 / 1_000_000);
+        _expectERC20TransferFromCall(USDT, user, address(entryPoint), 1000e18);
+        _expectERC20ApproveCall(USDT, stargatePool, 1000e18);
         entryPoint.multicall{ value: fee }({
+            tokenTransfers: IEntryPoint.TokenTransfers({
+                tokens: Solarray.addresses(USDT),
+                amounts: Solarray.uint256s(1000e18)
+            }),
             data: Solarray.bytess(
-                abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool, dstEidV2, 1000e18, user, 0, bytes(""))),
+                abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool, dstEidV2, user, 0, bytes(""))),
                 abi.encodeCall(ITransferFacet.transferToken, (user, tokensOut))
             )
         });
     }
 
-    function test_stargateFacet_sendStargateV2_shouldRevertIfNativeBalanceNotEnough()
-        external
-        checkTokenStorage(Solarray.addresses(USDT))
-    {
+    function test_stargateFacet_sendStargateV2_shouldRevertIfNativeBalanceNotEnough() external checkStorage {
         _resetPrank(user);
 
         IERC20(USDT).approve({ spender: address(entryPoint), amount: 1000e18 });
@@ -98,42 +84,14 @@ contract StargateFacetTest is BaseTest {
             composeGasLimit: 0
         });
 
-        vm.expectRevert(IStargateFacet.StargateFacet_InvalidNativeBalance.selector);
+        vm.expectRevert(abi.encodeWithSelector(Utils.ValueLowerThanExpected.selector, fee >> 1, fee));
         entryPoint.multicall{ value: fee >> 1 }({
+            tokenTransfers: IEntryPoint.TokenTransfers({
+                tokens: Solarray.addresses(USDT),
+                amounts: Solarray.uint256s(1000e18)
+            }),
             data: Solarray.bytess(
-                abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool, dstEidV2, 1000e18, user, 0, bytes("")))
-            )
-        });
-    }
-
-    function test_stargateFacet_sendStargateV2_shouldRevertIfTransferFromError()
-        external
-        checkTokenStorage(Solarray.addresses(USDT))
-    {
-        _resetPrank(user);
-
-        (uint256 fee,) = IStargateFacet(address(entryPoint)).quoteV2({
-            poolAddress: stargatePool,
-            dstEid: dstEidV2,
-            amountLD: 1000e18,
-            receiver: user,
-            composeMsg: bytes(""),
-            composeGasLimit: 0
-        });
-
-        vm.expectRevert(TransferHelper.TransferHelper_TransferFromError.selector);
-        entryPoint.multicall{ value: fee }({
-            data: Solarray.bytess(
-                abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool, dstEidV2, 1000e18, user, 0, bytes("")))
-            )
-        });
-
-        deal({ token: USDT, to: user, give: 1000e18 });
-
-        vm.expectRevert(TransferHelper.TransferHelper_TransferFromError.selector);
-        entryPoint.multicall{ value: fee }({
-            data: Solarray.bytess(
-                abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool, dstEidV2, 1000e18, user, 0, bytes("")))
+                abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool, dstEidV2, user, 0, bytes("")))
             )
         });
     }
@@ -142,85 +100,80 @@ contract StargateFacetTest is BaseTest {
     // sendStargate with multiswap
     // =========================
 
-    function test_stargateFacet_sendStargateWithMultiswap_shouldSendStargateV2WithMultiswap()
-        external
-        checkTokenStorage(Solarray.addresses(WBNB, USDT))
-    {
-        IMultiswapRouterFacet.Multiswap2Calldata memory m2Data;
+    function test_stargateFacet_sendStargateWithMultiswap_shouldSendStargateV2WithMultiswap() external checkStorage {
+        IMultiswapRouterFacet.MultiswapCalldata memory mData;
 
-        m2Data.fullAmount = 10e18;
-        m2Data.amountInPercentages = Solarray.uint256s(1e18);
-        m2Data.tokenIn = WBNB;
-        m2Data.pairs = Solarray.bytes32Arrays(
-            Solarray.bytes32s(WBNB_ETH_Bakery, BUSD_ETH_Biswap, BUSD_CAKE_Biswap, USDC_CAKE_Cake, USDT_USDC_Cake)
-        );
-        m2Data.tokensOut = Solarray.addresses(USDT);
+        mData.tokensIn = Solarray.bytes32s(Utils.encodeTokenAndAmount({ token: USDC, amount: 1 }));
+        mData.tokensOut = Solarray.addresses(USDT);
+        mData.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(_encodePercentageInPool(USDT_USDC_Cake, 1e18)));
 
-        m2Data.minAmountsOut = quoter.multiswap2({ data: m2Data });
+        IEntryPoint.TokenTransfers memory tokenTransfers =
+            IEntryPoint.TokenTransfers({ tokens: Solarray.addresses(USDC), amounts: Solarray.uint256s(1000e18) });
+
+        mData.minAmountsOut = quoter.multiswap({ tokenTransfers: tokenTransfers, data: mData });
 
         _resetPrank(user);
 
-        IERC20(WBNB).approve({ spender: address(entryPoint), amount: 1000e18 });
+        IERC20(USDC).approve({ spender: address(entryPoint), amount: 1000e18 });
 
         (uint256 fee,) = IStargateFacet(address(entryPoint)).quoteV2({
             poolAddress: stargatePool,
             dstEid: dstEidV2,
-            amountLD: m2Data.minAmountsOut[0],
+            amountLD: mData.minAmountsOut[0],
             receiver: user,
             composeMsg: bytes(""),
             composeGasLimit: 0
         });
 
-        _expectERC20TransferCall(WBNB, address(feeContract), m2Data.fullAmount * 300 / 1_000_000);
+        _expectERC20TransferFromCall(USDC, user, address(entryPoint), 1000e18);
+        _expectERC20ApproveCall(USDT, stargatePool, mData.minAmountsOut[0]);
         entryPoint.multicall{ value: fee }({
+            tokenTransfers: tokenTransfers,
             data: Solarray.bytess(
-                abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data)),
-                abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool, dstEidV2, 0, user, 0, bytes(""))),
-                abi.encodeCall(ITransferFacet.transferToken, (user, m2Data.tokensOut))
+                abi.encodeCall(MultiswapRouterFacet.multiswap, (mData)),
+                abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool, dstEidV2, user, 0, bytes(""))),
+                abi.encodeCall(ITransferFacet.transferToken, (user, Solarray.addresses(USDT)))
             )
         });
 
         assertEq(IERC20(USDT).balanceOf({ account: address(entryPoint) }), 0);
     }
 
-    // =========================
-    // no transfer revert
-    // =========================
+    address stargatePool_2 = 0x77b2043768d28E9C9aB44E1aBfC95944bcE57931;
+    uint16 dstEidV2_2 = 30_110;
 
-    function test_stargateFacet_sendStargateV2_noTransferRevert()
-        external
-        checkTokenStorage(Solarray.addresses(WBNB, USDT))
-    {
-        IMultiswapRouterFacet.Multiswap2Calldata memory m2Data;
+    function test_stargateFacet_sendStargateNative_shouldRevertIfSendStargateWithNativePool() external checkStorage {
+        vm.createSelectFork(vm.rpcUrl("ethereum_public"));
 
-        m2Data.fullAmount = 1000e18;
-        m2Data.amountInPercentages = Solarray.uint256s(1e18);
-        m2Data.tokenIn = USDC;
-        m2Data.pairs = Solarray.bytes32Arrays(Solarray.bytes32s(USDT_USDC_Bakery));
-        m2Data.tokensOut = Solarray.addresses(USDT);
+        _createUsers();
 
-        m2Data.minAmountsOut = quoter.multiswap2({ data: m2Data });
+        _resetPrank(owner);
+
+        deployForTest();
+
+        deal({ to: user, give: 1000e18 });
 
         _resetPrank(user);
 
-        deal({ token: WBNB, to: address(entryPoint), give: 1000e18 });
-
         (uint256 fee,) = IStargateFacet(address(entryPoint)).quoteV2({
-            poolAddress: stargatePool,
-            dstEid: dstEidV2,
-            amountLD: m2Data.minAmountsOut[0],
+            poolAddress: stargatePool_2,
+            dstEid: dstEidV2_2,
+            amountLD: 0.111111111111111111e18,
             receiver: user,
             composeMsg: bytes(""),
             composeGasLimit: 0
         });
 
-        vm.expectRevert(TransferHelper.TransferHelper_TransferFromError.selector);
+        assertGt(fee, 0.111111111111111111e18);
+
+        vm.expectRevert(IStargateFacet.StargateFacet_UnsupportedAsset.selector);
         entryPoint.multicall{ value: fee }({
+            tokenTransfers: IEntryPoint.TokenTransfers({ tokens: new address[](0), amounts: new uint256[](0) }),
             data: Solarray.bytess(
-                abi.encodeCall(IMultiswapRouterFacet.multiswap2, (m2Data)),
-                abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool, dstEidV2, 0, user, 0, bytes(""))),
-                abi.encodeCall(ITransferFacet.transferToken, (user, m2Data.tokensOut))
+                abi.encodeCall(IStargateFacet.sendStargateV2, (stargatePool_2, dstEidV2_2, user, 0, bytes("")))
             )
         });
+
+        assertEq(address(entryPoint).balance, 0);
     }
 }
