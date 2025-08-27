@@ -76,7 +76,7 @@ library TransferHelper {
     /// @param account Address of the account to fetch balance for.
     /// @return The balance of the account.
     function safeGetBalance(address token, address account) internal view returns (uint256) {
-        (bool success, bytes memory data) = token.staticcall(abi.encodeWithSelector(IERC20.balanceOf.selector, account));
+        (bool success, bytes memory data) = token.staticcall(abi.encodeCall(IERC20.balanceOf, (account)));
         if (!success || data.length == 0) {
             revert TransferHelper_GetBalanceError();
         }

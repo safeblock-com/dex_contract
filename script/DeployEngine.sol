@@ -48,7 +48,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // ethereum
     if (chainId == 1) {
         return Contracts({
-            multiswapRouterFacet: 0x64BF7D769F1f8470FF42734f69e056d2A492397C,
+            multiswapRouterFacet: 0xbF9e94b89D6f4f8DA8e56Bc2F92C058d5e12e1Ae,
             transferFacet: 0x22c9F7E674d52C71b9f00F6e637bd66A6c83D41A,
             stargateFacet: 0xD9Aa9C211ca25d46e04d40dA04A6965bBDe4246A,
             layerZeroFacet: 0x8318AEB7Dfc6990A2Ec80e0a97F43906a502547a,
@@ -62,7 +62,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContract: 0x453B60E247108B92C3B413bF944853A43da9b850,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0xa51280B52900e808AF87d9BA758066c10a3dFa2a,
+            prodEntryPoint: 0x8e9b5E48fc46CDDE5CB41C586C5c21209A053f01,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -82,7 +82,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // bnb
     if (chainId == 56) {
         return Contracts({
-            multiswapRouterFacet: 0x4f42804cc5c268919c410c3dAD701f1ac28dEE95,
+            multiswapRouterFacet: 0xe514120888329e44414E40f0b1F5Ae4eB3C89F96,
             transferFacet: 0xC69A50AEd37f7c08fe6C602f92922Cffd7E7045A,
             stargateFacet: 0x13095C9AFF4cC68953414eb9b2e85D7a330A1433,
             layerZeroFacet: 0x3368e0aA3400227D915A0f4511648c290aAB5529,
@@ -96,7 +96,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContract: 0xd36f8CC82EA004B4d0c15BdCf584D19aaD775209,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0x4F7fe6A778d87F4dEE5bB665A4f275C4E0B32368,
+            prodEntryPoint: 0xB2699c5433382d7475d502a1e98850cC7C621D1D,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -116,7 +116,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // polygon
     if (chainId == 137) {
         return Contracts({
-            multiswapRouterFacet: 0x565358F34ecaE13b8E9D97C12b0baE84b87bE476,
+            multiswapRouterFacet: 0x4E8B3593b50942133d0484F90FD38a655e5fFA7D,
             transferFacet: 0x5bd810757d09FD3CD139379c7A8d4321F50C4505,
             stargateFacet: 0x47A75CD6226570d038443c399181a0E95ADd25B3,
             layerZeroFacet: 0x991AC2Fa8E194118e6FF0681E558564E0446A08C,
@@ -130,7 +130,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContract: 0x85Db0f7aBEA9A1232e7617bE69d7988a3221EF15,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0xC962F4A886153E1C01F1a7fD634B9131eF7818ea,
+            prodEntryPoint: 0x82FE07c03eF5676519e7919584f726A1499dd0E8,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -150,7 +150,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // avalanche
     if (chainId == 43_114) {
         return Contracts({
-            multiswapRouterFacet: 0xBc351C0ECc28ab7ec8126365E6c9C51d5c572BEF,
+            multiswapRouterFacet: 0x5c12c5160697a129AF51fBc94C2BE50eBFD2bF53,
             transferFacet: 0x4bEdfe5B9f35C258376fDDb46D1b2Db2b85ebC00,
             stargateFacet: 0xe9ccF0993b6593bFF94d68c10cE469BF52d00677,
             layerZeroFacet: 0x9FC94bed2FF68cC279070C4bBE86Bb3F3C42E14B,
@@ -164,7 +164,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContract: 0x595EeaA4E8A8643bE5E2462f109C94012A472774,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0x633AbbcE954Fc3fcB3D2e2D27E86B75dE6650d66,
+            prodEntryPoint: 0x30A46f018C7D7d8eb42098Ec658B123B34E93F68,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -184,7 +184,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // optimism
     if (chainId == 10) {
         return Contracts({
-            multiswapRouterFacet: 0x526Cfaef82c25Bc42b1403Da389fCf5bCe0B8854,
+            multiswapRouterFacet: 0x3bC7a01b433F232de34132179DdAEE12F7FEE0c2,
             transferFacet: 0x50E4D4a7385992a415A6F27294658B1017cF8701,
             stargateFacet: 0xdb7Dbf34EBFAE345e69e848FD58b8cBA0252Fca9,
             layerZeroFacet: 0x9876C5c806E1A97634E0A5df7817e0E2f5fBE109,
@@ -198,7 +198,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContract: 0xE846Bc68EC2cE2BC813eBDEB315f24cC46cdf4de,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0x30A46f018C7D7d8eb42098Ec658B123B34E93F68,
+            prodEntryPoint: 0xb6adBf8c60857DeAa4D756D29a63f21D0732CaB3,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -218,7 +218,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // arbitrum
     if (chainId == 42_161) {
         return Contracts({
-            multiswapRouterFacet: 0x9FC94bed2FF68cC279070C4bBE86Bb3F3C42E14B,
+            multiswapRouterFacet: 0x30A46f018C7D7d8eb42098Ec658B123B34E93F68,
             transferFacet: 0x633AbbcE954Fc3fcB3D2e2D27E86B75dE6650d66,
             stargateFacet: 0xa1cF9Aa16071F97BcF9AAB75A5A6D79CB53DFb9C,
             layerZeroFacet: 0x64D225f5a87E01CF015770815de34f03fe59fE13,
@@ -232,7 +232,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContract: 0x7E9bF77656C1FB73813e725153c70300C502e56f,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0xDf7621CA6cA481e98D1746Ff02e5e693F25A3615,
+            prodEntryPoint: 0xFd58921ec28d7c407ba684DD8dED4F5B22bd4a44,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -252,7 +252,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // base
     if (chainId == 8453) {
         return Contracts({
-            multiswapRouterFacet: 0x8e9b5E48fc46CDDE5CB41C586C5c21209A053f01,
+            multiswapRouterFacet: 0x443e430a87d68e285E56FBD76cB4ef60DA0bCe9f,
             transferFacet: 0x0000600c2cAE34743ffA4605fce80bcda2fC1b33,
             stargateFacet: 0xE06a5011B83c5D2b0e6aCfe54ecf1f46Dc6D7544,
             layerZeroFacet: 0xA1458B50bb651c2B5231186D7CFef8cC469eC51b,
@@ -266,7 +266,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContract: 0xfdF5F450CF0dE94F6C0Bf0B2355de1EEb753B39D,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0x1291EF9Fde55e8783faFfBe117F3D30613F85055,
+            prodEntryPoint: 0x422b28F886AC3D0a4AF792DC75077CE44305ABda,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -286,7 +286,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // scroll
     if (chainId == 534_352) {
         return Contracts({
-            multiswapRouterFacet: 0x490555CBa64d606FFf6f82a3A373cEA5d59B3973,
+            multiswapRouterFacet: 0xfDf7b550BD971dF0846872080cE93c67dE00853f,
             transferFacet: 0xACCa97a6F48342d069f19fb4502AC5C5c37541d4,
             stargateFacet: 0x917213eDBEF61B83bc8c80f23Ba16b60Ebe68204,
             layerZeroFacet: 0xD2A7A4cF1B25B92f47B4A702276DefbB42F45e77,
@@ -300,7 +300,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContract: 0x65DfbA5338137e0De3c7e9C11D9BFEd0B02c33b8,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0x18Df5169aB4b6794cB1A61ADaf4511678e3E3e23,
+            prodEntryPoint: 0xCc5bdcB370BDff54F92bEBF2EF7EE4cD049E45b0,
             prodProxy: address(1),
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -320,7 +320,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // gnosis
     if (chainId == 100) {
         return Contracts({
-            multiswapRouterFacet: 0x82eefc5d2053CC3C33d76F58979cAcd08944C2CC,
+            multiswapRouterFacet: 0xfdF5F450CF0dE94F6C0Bf0B2355de1EEb753B39D,
             transferFacet: 0xDa7fbeb9D9Ee83194f10E9D84Ad6DCb47A7311Dc,
             stargateFacet: 0xaA2b8D9B4328076Ff656476111F5c654D1d70Eb0,
             layerZeroFacet: 0xc25bED344C4c3885f16d127F23FaDaa82784c2A6,
@@ -334,7 +334,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContract: 0xF307b0a60330512D51e4C8e4ddAA3E26D8f08569,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0x0112d7bBa71214056EeDAAaC031ffA56CCf1471D,
+            prodEntryPoint: 0xFd431Bcc7D1aAc3166e7D6c328b21567c55AAfD0,
             prodProxy: address(1),
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -354,8 +354,8 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
     // unit zero
     if (chainId == 88_811) {
         return Contracts({
-            multiswapRouterFacet: 0xa6a39188097bc275593dDb875705491A70DBEC0B,
-            transferFacet: 0x995f1B46F71Bc83a90653286e85185D27956687e,
+            multiswapRouterFacet: 0x4bb53eBbBbAC038248aC3983fF9242Fa76a39C12,
+            transferFacet: 0x285D48921d0BB493f856Ac6D4f4b4448B32a419a,
             stargateFacet: address(1),
             layerZeroFacet: address(1),
             symbiosisFacet: address(1),
@@ -368,7 +368,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContract: 0x96Fda36A350e40F89Bcdeb5149eFE4C77316F961,
             feeContractProxy: 0xbe35b0b10037e11a6D0A71c326FcF929935A4230,
             //
-            prodEntryPoint: 0x48229df22D71eecFf545A3698ACbacc5CF41D658,
+            prodEntryPoint: 0x6Bab837Bb491135D99dBAA3c03eff3266776c0AE,
             prodProxy: address(0),
             prodProxyV2: address(0),
             prodProxyV3: 0x65DfbA5338137e0De3c7e9C11D9BFEd0B02c33b8,
@@ -518,6 +518,16 @@ library DeployEngine {
             }
             iCache = i;
             facetAddresses[addressIndex] = contracts.acrossFacet;
+            ++addressIndex;
+        }
+
+        if (contracts.crossCurveFacet > address(1)) {
+            selectors[i++] = CrossCurveFacet.startCrossCurve.selector;
+            for (uint256 k; k < i - iCache; ++k) {
+                addressIndexes[j++] = addressIndex;
+            }
+            iCache = i;
+            facetAddresses[addressIndex] = contracts.crossCurveFacet;
             ++addressIndex;
         }
 

@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { CALLBACK_FACET_STORAGE, SENDER_FACET_STORAGE } from "./Constants.sol";
+import {
+    CALLBACK_FACET_STORAGE,
+    SENDER_FACET_STORAGE,
+    FEE_TOKEN_AND_AMOUNT_FACET_STORAGE,
+    ADDRESS_MASK
+} from "./Constants.sol";
 
 /// @title TransientStorageLibrary
 /// @notice Library for managing transient (temporary) storage in a diamond-like proxy contract.
@@ -62,6 +67,26 @@ library TransientStorageLibrary {
     function cleanSenderAddress() internal {
         assembly ("memory-safe") {
             sstore(SENDER_FACET_STORAGE, 0)
+        }
+    }
+
+    /// @notice Sets the fee token and amount into temporary storage.
+    function setFeeTokenAndAmount(address feeToken, uint256 feeAmount) internal {
+        assembly ("memory-safe") {
+            sstore(FEE_TOKEN_AND_AMOUNT_FACET_STORAGE, add(shl(160, feeAmount), feeToken))
+        }
+    }
+
+    /// @notice Gets the fee token and amount from temporary storage and resets the slot if set.
+    function getFeeTokenAndAmount() internal returns (address feeToken, uint256 feeAmount) {
+        assembly ("memory-safe") {
+            feeToken := sload(FEE_TOKEN_AND_AMOUNT_FACET_STORAGE)
+            if feeToken {
+                feeAmount := shr(160, feeToken)
+                feeToken := and(feeToken, ADDRESS_MASK)
+
+                sstore(FEE_TOKEN_AND_AMOUNT_FACET_STORAGE, 0)
+            }
         }
     }
 }

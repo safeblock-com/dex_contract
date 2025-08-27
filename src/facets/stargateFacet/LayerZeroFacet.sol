@@ -18,7 +18,6 @@ import {
 import { IMessageLibManager } from "./interfaces/IMessageLibManager.sol";
 import { ISendLib } from "./interfaces/ISendLib.sol";
 
-import { IStargateFacet } from "./interfaces/IStargateFacet.sol";
 import { ILayerZeroFacet } from "./interfaces/ILayerZeroFacet.sol";
 
 /// @title LayerZeroFacet

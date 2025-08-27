@@ -7,7 +7,6 @@ import { TickBitmap } from "./uni3Libs/TickBitmap.sol";
 import { TickMath } from "./uni3Libs/TickMath.sol";
 import { SwapMath } from "./uni3Libs/SwapMath.sol";
 import { SafeCast } from "./uni3Libs/SafeCast.sol";
-import { FixedPoint128 } from "./uni3Libs/FixedPoint128.sol";
 import { FullMath } from "./uni3Libs/FullMath.sol";
 
 import { E18, _2E96 } from "../../libraries/Constants.sol";
@@ -230,6 +229,7 @@ library HelperV3Lib {
     }
 
     function getTickLiquidityNet(IUniswapPool pool, int24 tick) internal view returns (int128 liquidityNet) {
+        /// forge-lint: disable-next-line(unchecked-call)
         (, bytes memory data) = address(pool).staticcall(abi.encodeWithSignature("ticks(int24)", tick));
 
         if (data.length == 320) {
@@ -255,13 +255,16 @@ library HelperV3Lib {
         bytes memory data;
 
         if (fee == 0) {
+            /// forge-lint: disable-next-line(unchecked-call)
             (, data) = address(pool).staticcall(abi.encodeWithSignature("fee()"));
             fee = abi.decode(data, (uint24));
         }
 
+        /// forge-lint: disable-next-line(unchecked-call)
         (, data) = address(pool).staticcall(abi.encodeWithSignature("tickSpacing()"));
         tickSpacing = abi.decode(data, (int24));
 
+        /// forge-lint: disable-next-line(unchecked-call)
         (, data) = address(pool).staticcall(abi.encodeWithSignature("liquidity()"));
         liquidity = abi.decode(data, (uint128));
     }
@@ -284,6 +287,7 @@ library HelperV3Lib {
                 }
             }
         } else {
+            /// forge-lint: disable-next-line(unchecked-call)
             (, data) = address(pool).staticcall(abi.encodeWithSignature("globalState()"));
 
             if (data.length == 224) {

@@ -30,6 +30,10 @@ bytes32 constant CALLBACK_FACET_STORAGE = 0x1248b983d56fa782b7a88ee11066fc074605
 ///      Calculated as keccak256("sender.facet.storage") - 1.
 bytes32 constant SENDER_FACET_STORAGE = 0x289cc669fe96ce33e95427b15b06e5cf0e5e79eb9894ad468d456975ce05c197;
 
+/// @dev Storage slot used to temporarily hold the sender address across internal calls.
+///      Calculated as keccak256("feeTokenAndAmount.facet.storage") - 1.
+bytes32 constant FEE_TOKEN_AND_AMOUNT_FACET_STORAGE = 0x9c13ee85847e65d4779a4abcc83bdb760e20a0bde59fae75b7067e1808225b07;
+
 // =========================
 // FeeLibrary Constants
 // =========================

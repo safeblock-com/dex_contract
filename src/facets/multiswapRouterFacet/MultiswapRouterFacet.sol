@@ -85,26 +85,7 @@ contract MultiswapRouterFacet is IMultiswapRouterFacet {
             }
         }
 
-        Utils.expectEqual({ left: tokensOutLength, right: tokensAndAmountsOut.length });
-        Utils.expectEqual({ left: tokensAndAmounts.length, right: 0 });
-
-        for (uint256 i; i < tokensOutLength;) {
-            bytes32 tokenOutAndAmountOut = tokensAndAmountsOut[i];
-            address tokenOut = Utils.bytes32ToAddress({ encodedValue: tokenOutAndAmountOut });
-            uint256 amountOut = Utils.getHighOrder96Bits({ encodedValue: tokenOutAndAmountOut });
-            for (uint256 j; j < tokensOutLength;) {
-                if (tokenOut == data.tokensOut[j]) {
-                    Utils.compareAmounts({ greaterValue: amountOut, lowerValue: data.minAmountsOut[j] });
-                    break;
-                }
-                unchecked {
-                    ++j;
-                }
-            }
-            unchecked {
-                ++i;
-            }
-        }
+        _checkMinAmountsOut(tokensOutLength, tokensAndAmountsOut, tokensAndAmounts, data.tokensOut, data.minAmountsOut);
     }
 
     /// @inheritdoc IMultiswapRouterFacet
@@ -154,26 +135,7 @@ contract MultiswapRouterFacet is IMultiswapRouterFacet {
             }
         }
 
-        Utils.expectEqual({ left: tokensOutLength, right: tokensAndAmountsOut.length });
-        Utils.expectEqual({ left: tokensAndAmounts.length, right: 0 });
-
-        for (uint256 i; i < tokensOutLength;) {
-            bytes32 tokenOutAndAmountOut = tokensAndAmountsOut[i];
-            address tokenOut = Utils.bytes32ToAddress({ encodedValue: tokenOutAndAmountOut });
-            uint256 amountOut = Utils.getHighOrder96Bits({ encodedValue: tokenOutAndAmountOut });
-            for (uint256 j; j < tokensOutLength;) {
-                if (tokenOut == data.tokensOut[j]) {
-                    Utils.compareAmounts({ greaterValue: amountOut, lowerValue: data.minAmountsOut[j] });
-                    break;
-                }
-                unchecked {
-                    ++j;
-                }
-            }
-            unchecked {
-                ++i;
-            }
-        }
+        _checkMinAmountsOut(tokensOutLength, tokensAndAmountsOut, tokensAndAmounts, data.tokensOut, data.minAmountsOut);
     }
 
     /// @inheritdoc IMultiswapRouterFacet
@@ -261,6 +223,8 @@ contract MultiswapRouterFacet is IMultiswapRouterFacet {
                 ++i;
             }
         }
+
+        _takeFee(tokensAndAmountsOut);
     }
 
     /// @notice Handles swap callbacks from Uniswap V2 and V3 pools
@@ -620,5 +584,57 @@ contract MultiswapRouterFacet is IMultiswapRouterFacet {
             tokensAndAmounts: tokensAndAmountsOut,
             element: Utils.encodeTokenAndAmount({ token: tokenOut, amount: amountOut })
         });
+    }
+
+    /// @dev Internal function to check if the output amounts are greater than or equal to the minimum amounts.
+    function _checkMinAmountsOut(
+        uint256 tokensOutLength,
+        bytes32[] memory tokensAndAmountsOut,
+        bytes32[] memory tokensAndAmounts,
+        address[] calldata tokensOut,
+        uint256[] calldata minAmountsOut
+    )
+        internal
+    {
+        Utils.expectEqual({ left: tokensOutLength, right: tokensAndAmountsOut.length });
+        Utils.expectEqual({ left: tokensAndAmounts.length, right: 0 });
+
+        for (uint256 i; i < tokensOutLength;) {
+            bytes32 tokenOutAndAmountOut = tokensAndAmountsOut[i];
+            address tokenOut = Utils.bytes32ToAddress({ encodedValue: tokenOutAndAmountOut });
+            uint256 amountOut = Utils.getHighOrder96Bits({ encodedValue: tokenOutAndAmountOut });
+            for (uint256 j; j < tokensOutLength;) {
+                if (tokenOut == tokensOut[j]) {
+                    Utils.compareAmounts({ greaterValue: amountOut, lowerValue: minAmountsOut[j] });
+                    break;
+                }
+                unchecked {
+                    ++j;
+                }
+            }
+            unchecked {
+                ++i;
+            }
+        }
+
+        _takeFee(tokensAndAmountsOut);
+    }
+
+    /// @dev Internal function to take fee if any
+    function _takeFee(bytes32[] memory tokensAndAmounts) internal {
+        (address feeToken, uint256 feeAmount) = TransientStorageLibrary.getFeeTokenAndAmount();
+        if (feeToken > address(0)) {
+            uint256 amount = Utils.getAmountFromArrayAndDelete({ tokensAndAmounts: tokensAndAmounts, token: feeToken });
+            Utils.expectNotZero({ value: amount });
+            uint256 diff = Utils.compareAmountsWithDifference({ greaterValue: amount, lowerValue: feeAmount });
+
+            TransferHelper.safeTransfer({ token: feeToken, to: tx.origin, value: feeAmount });
+            if (diff > 0) {
+                Utils.addElementToArrayOrAddAmount({
+                    tokensAndAmounts: tokensAndAmounts,
+                    element: Utils.encodeTokenAndAmount({ token: feeToken, amount: diff })
+                });
+            }
+        }
     }
 }

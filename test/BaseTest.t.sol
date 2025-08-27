@@ -148,15 +148,14 @@ contract BaseTest is Test {
         "PermitBatchWitnessTransferFrom(TokenPermissions[] permitted,address spender,uint256 nonce,uint256 deadline,";
 
     // Permit2 Witness for meta transactions
-    string internal constant DATA_SENDER_AND_FEE_DETAILS_TYPE =
-        "DataSenderAndFeeDetails(bytes[] data,address sender,address feeToken,uint256 feeAmount)";
+    string internal constant DATA_AND_SENDER_DETAILS_TYPE = "DataAndSenderDetails(bytes[] data,address sender)";
     string internal constant TOKEN_PERMISSIONS_TYPE = "TokenPermissions(address token,uint256 amount)";
 
     function hash(ISignatureTransfer.PermitBatchTransferFrom memory permit) internal view returns (bytes32) {
         uint256 numPermitted = permit.permitted.length;
         bytes32[] memory tokenPermissionHashes = new bytes32[](numPermitted);
 
-        for (uint256 i = 0; i < numPermitted; ++i) {
+        for (uint256 i; i < numPermitted; ++i) {
             tokenPermissionHashes[i] = _hashTokenPermissions(permit.permitted[i]);
         }
 
@@ -183,9 +182,7 @@ contract BaseTest is Test {
             abi.encodePacked(
                 _PERMIT_BATCH_WITNESS_TRANSFER_FROM_TYPEHASH_STUB,
                 abi.encodePacked(
-                    "DataSenderAndFeeDetails dataSenderAndFeeDetails)",
-                    DATA_SENDER_AND_FEE_DETAILS_TYPE,
-                    TOKEN_PERMISSIONS_TYPE
+                    "DataAndSenderDetails dataAndSenderDetails)", DATA_AND_SENDER_DETAILS_TYPE, TOKEN_PERMISSIONS_TYPE
                 )
             )
         );
@@ -193,7 +190,7 @@ contract BaseTest is Test {
         uint256 numPermitted = permit.permitted.length;
         bytes32[] memory tokenPermissionHashes = new bytes32[](numPermitted);
 
-        for (uint256 i = 0; i < numPermitted; ++i) {
+        for (uint256 i; i < numPermitted; ++i) {
             tokenPermissionHashes[i] = _hashTokenPermissions(permit.permitted[i]);
         }
 
@@ -261,6 +258,10 @@ contract BaseTest is Test {
         return keccak256(abi.encodePacked("\x19\x01", domainSeparator, dataHash));
     }
 
+    function hash(bytes[] calldata data, address sender) external pure returns (bytes32) {
+        return Utils.hashDataAndSenderDetails({ data: data, sender: sender });
+    }
+
     function _assertEqual(bytes4 selector, bytes4[] memory selectors) internal pure {
         bool contains;
 
@@ -272,20 +273,6 @@ contract BaseTest is Test {
         }
 
         assertTrue(contains);
-    }
-
-    function hash(
-        bytes[] calldata data,
-        address sender,
-        address feeToken,
-        uint256 feeAmount
-    )
-        external
-        pure
-        returns (bytes32)
-    {
-        return
-            Utils.hashDataSenderAndFeeDetails({ data: data, sender: sender, feeToken: feeToken, feeAmount: feeAmount });
     }
 
     modifier checkStorage() {

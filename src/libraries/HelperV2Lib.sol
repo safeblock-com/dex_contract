@@ -333,6 +333,7 @@ library HelperV2Lib {
     /// @return The result of the invariant function.
     function _f(uint256 x0, uint256 y) private pure returns (uint256) {
         unchecked {
+            /// forge-lint: disable-next-line(divide-before-multiply)
             return x0 * (y * y / E18 * y / E18) / E18 + (x0 * x0 / E18 * x0 / E18) * y / E18;
         }
     }

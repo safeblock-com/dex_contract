@@ -9,13 +9,11 @@ import { Ownable2Step } from "../external/Ownable2Step.sol";
 import { IUniswapPool } from "../interfaces/IUniswapPool.sol";
 
 import { HelperV2Lib } from "./libraries/HelperV2Lib.sol";
-import { HelperV3Lib, TickMath, Slot0, SwapCache, SwapState, FeeAndTickSpacing } from "./libraries/HelperV3Lib.sol";
+import { HelperV3Lib, TickMath } from "./libraries/HelperV3Lib.sol";
 
 import { IMultiswapRouterFacet } from "../facets/multiswapRouterFacet/interfaces/IMultiswapRouterFacet.sol";
 
 import { IEntryPoint } from "../interfaces/IEntryPoint.sol";
-
-import { TransferHelper } from "../libraries/TransferHelper.sol";
 
 import { E18, UNISWAP_V3_MASK, ADDRESS_MASK, FEE_MASK, E6, PERCENTAGE_MASK } from "../libraries/Constants.sol";
 

@@ -44,6 +44,7 @@ library TickBitmap {
             if (lte) {
                 (int16 wordPos, uint8 bitPos) = position(compressed);
                 // all the 1s at or to the right of the current bitPos
+                /// forge-lint: disable-next-line(incorrect-shift)
                 uint256 mask = (1 << bitPos) - 1 + (1 << bitPos);
                 uint256 masked;
                 try pool.tickBitmap(wordPos) returns (uint256 retValue) {
@@ -62,6 +63,7 @@ library TickBitmap {
                 // start from the word of the next tick, since the current tick state doesn't matter
                 (int16 wordPos, uint8 bitPos) = position(compressed + 1);
                 // all the 1s at or to the left of the bitPos
+                /// forge-lint: disable-next-line(incorrect-shift)
                 uint256 mask = ~((1 << bitPos) - 1);
                 uint256 masked;
                 try pool.tickBitmap(wordPos) returns (uint256 retValue) {
@@ -99,6 +101,7 @@ library TickBitmap {
             if (lte) {
                 (int16 wordPos, uint8 bitPos) = position(compressed);
                 // all the 1s at or to the right of the current bitPos
+                /// forge-lint: disable-next-line(incorrect-shift)
                 uint256 mask = (1 << bitPos) - 1 + (1 << bitPos);
                 uint256 masked;
 
@@ -137,6 +140,7 @@ library TickBitmap {
                 // start from the word of the next tick, since the current tick state doesn't matter
                 (int16 wordPos, uint8 bitPos) = position(compressed + 1);
                 // all the 1s at or to the left of the bitPos
+                /// forge-lint: disable-next-line(incorrect-shift)
                 uint256 mask = ~((1 << bitPos) - 1);
                 uint256 masked;
 

@@ -182,36 +182,24 @@ library Utils {
         }
     }
 
-    /// @notice EIP-712 type string for DataSenderAndFeeDetails struct
+    /// @notice EIP-712 type string for DataAndSenderDetails struct
     /// @dev Used for Permit2 witness hashing in meta transactions
-    string internal constant DATA_SENDER_AND_FEE_DETAILS_TYPE =
-        "DataSenderAndFeeDetails(bytes[] data,address sender,address feeToken,uint256 feeAmount)";
+    string internal constant DATA_AND_SENDER_DETAILS_TYPE = "DataAndSenderDetails(bytes[] data,address sender)";
 
-    /// @notice EIP-712 typehash for DataSenderAndFeeDetails struct
-    /// @dev Precomputed hash of DATA_SENDER_AND_FEE_DETAILS_TYPE
-    bytes32 internal constant DATA_SENDER_AND_FEE_DETAILS_TYPEHASH =
-        0x5926d5c484218bc647e0624d5a08d6123e30560a9383b1ac7192a5ddcc02d686;
+    /// @notice EIP-712 typehash for DataAndSenderDetails struct
+    /// @dev Precomputed hash of DATA_AND_SENDER_DETAILS_TYPE
+    bytes32 internal constant DATA_AND_SENDER_DETAILS_TYPEHASH =
+        0x1db49191f6aedd50e82a59daff95f48b956d744441ff81e8755316b05950578a;
 
     /// @notice EIP-712 type string for TokenPermissions struct
     /// @dev Used for Permit2 witness hashing in meta transactions
     string internal constant TOKEN_PERMISSIONS_TYPE = "TokenPermissions(address token,uint256 amount)";
 
-    /// @notice Returns EIP-712 Permit2 hash for data, sender, feeToken, and feeAmount.
+    /// @notice Returns EIP-712 Permit2 hash for data and sender.
     /// @param data Array of bytes data to be hashed
     /// @param sender The address of the sender
-    /// @param feeToken The token address for fee payment
-    /// @param feeAmount The amount for fee payment
     /// @return hash The computed EIP-712 hash
-    function hashDataSenderAndFeeDetails(
-        bytes[] calldata data,
-        address sender,
-        address feeToken,
-        uint256 feeAmount
-    )
-        internal
-        pure
-        returns (bytes32 hash)
-    {
+    function hashDataAndSenderDetails(bytes[] calldata data, address sender) internal pure returns (bytes32 hash) {
         assembly ("memory-safe") {
             let length := data.length
             let ptr := mload(64)
@@ -230,11 +218,9 @@ library Utils {
                 mstore(dst, keccak256(dst, dataLength))
             }
             mstore(add(ptr, 32), keccak256(ptr, mul(length, 32)))
-            mstore(ptr, DATA_SENDER_AND_FEE_DETAILS_TYPEHASH)
+            mstore(ptr, DATA_AND_SENDER_DETAILS_TYPEHASH)
             mstore(add(ptr, 64), sender)
-            mstore(add(ptr, 96), feeToken)
-            mstore(add(ptr, 128), feeAmount)
-            hash := keccak256(ptr, 160)
+            hash := keccak256(ptr, 96)
         }
     }
 
@@ -243,9 +229,7 @@ library Utils {
     function getWitnessTypeString() internal pure returns (string memory) {
         return string(
             abi.encodePacked(
-                "DataSenderAndFeeDetails dataSenderAndFeeDetails)",
-                DATA_SENDER_AND_FEE_DETAILS_TYPE,
-                TOKEN_PERMISSIONS_TYPE
+                "DataAndSenderDetails dataAndSenderDetails)", DATA_AND_SENDER_DETAILS_TYPE, TOKEN_PERMISSIONS_TYPE
             )
         );
     }

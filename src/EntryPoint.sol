@@ -287,18 +287,16 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
         external
         wrap(sender)
     {
+        TransientStorageLibrary.setFeeTokenAndAmount({
+            feeToken: tokenTransfersPermit2.feeToken,
+            feeAmount: tokenTransfersPermit2.feeAmount
+        });
+
         Utils.expectEqual({
             left: _multicall(
                 data,
                 _transferTokensPermit2(
-                    sender,
-                    tokenTransfersPermit2,
-                    Utils.hashDataSenderAndFeeDetails({
-                        data: data,
-                        sender: msg.sender,
-                        feeToken: tokenTransfersPermit2.feeToken,
-                        feeAmount: tokenTransfersPermit2.feeAmount
-                    })
+                    sender, tokenTransfersPermit2, Utils.hashDataAndSenderDetails({ data: data, sender: msg.sender })
                 )
             ).length,
             right: 0
@@ -676,9 +674,6 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
             });
         }
 
-        address feeToken;
-        uint256 feeAmount;
-
         if (witness == bytes32(0)) {
             _permit2.permitTransferFrom({
                 permit: ISignatureTransfer.PermitBatchTransferFrom({
@@ -703,8 +698,6 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
                 witnessTypeString: Utils.getWitnessTypeString(),
                 signature: tokenTransfersPermit2.signature
             });
-            feeToken = tokenTransfersPermit2.feeToken;
-            feeAmount = tokenTransfersPermit2.feeAmount;
         }
 
         unchecked {
@@ -722,11 +715,6 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
                 });
 
                 amount -= FeeLibrary.payFee({ feeContract: feeContract, fee: fee, token: token, amount: amount });
-
-                if (feeToken == token) {
-                    amount = Utils.compareAmountsWithDifference({ greaterValue: amount, lowerValue: feeAmount });
-                    TransferHelper.safeTransfer({ token: token, to: msg.sender, value: feeAmount });
-                }
 
                 tokensAndAmounts[i] = Utils.encodeTokenAndAmount({ token: token, amount: amount });
             }

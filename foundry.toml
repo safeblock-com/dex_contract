@@ -9,6 +9,16 @@ optimizer_runs = 1000
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 
+[lint]
+exclude_lints = [
+    "mixed-case-variable",
+    "mixed-case-function",
+    "erc20-unchecked-transfer",
+    "screaming-snake-case-immutable",
+    "screaming-snake-case-const",
+    "pascal-case-struct",
+]
+
 [rpc_endpoints]
 optimism_public = "https://optimism-rpc.publicnode.com"
 bsc_public = "https://bsc-dataseed2.ninicoin.io"

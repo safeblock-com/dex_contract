@@ -444,6 +444,7 @@ library RouterHelper {
                     reserve1 = r1;
                     stableSwap = st;
                 } catch {
+                    /// forge-lint: disable-next-line(unchecked-call)
                     (, bytes memory data) = address(pair).staticcall(abi.encodeWithSignature("getReserves()"));
                     uint256 feeToken0;
                     uint256 feeToken1;
