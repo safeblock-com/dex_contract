@@ -7,9 +7,12 @@ import { OFTComposeMsgCodec } from "../../libraries/external/OFTComposeMsgCodec.
 import { TransferHelper } from "../../libraries/TransferHelper.sol";
 import { TransientStorageLibrary } from "../../libraries/TransientStorageLibrary.sol";
 
+import { LayerZeroLib } from "../../libraries/LayerZeroLib.sol";
+
 import { IStargate, SendParam, MessagingFee } from "./interfaces/IStargate.sol";
 import { OFTReceipt } from "./interfaces/IOFT.sol";
 import { ILayerZeroComposer } from "./interfaces/ILayerZeroComposer.sol";
+import { ILayerZeroEndpointV2 } from "./interfaces/ILayerZeroEndpointV2.sol";
 
 import { IStargateFacet } from "./interfaces/IStargateFacet.sol";
 
@@ -41,6 +44,7 @@ contract StargateFacet is ILayerZeroComposer, IStargateFacet {
     constructor(address endpointV2) {
         _lzEndpointV2 = endpointV2;
     }
+
     // =========================
     // getters
     // =========================
@@ -114,6 +118,90 @@ contract StargateFacet is ILayerZeroComposer, IStargateFacet {
             sendParam: sendParam,
             fee: messagingFee,
             refundAddress: TransientStorageLibrary.getSenderAddress()
+        });
+
+        unchecked {
+            uint256 balanceAfter =
+                amountLD - (balanceBefore - TransferHelper.safeGetBalance({ token: token, account: address(this) }));
+
+            if (balanceAfter > 0) {
+                Utils.addElementToArrayOrAddAmount({
+                    tokensAndAmounts: tokensAndAmounts,
+                    element: Utils.encodeTokenAndAmount({ token: token, amount: balanceAfter })
+                });
+            }
+        }
+    }
+
+    function _validateReceiver(
+        address receiver,
+        address sender,
+        uint32 dstEid,
+        address tokenIn,
+        address tokenOut,
+        uint256 minAmountLD,
+        bytes calldata extraData
+    )
+        internal
+        returns (address)
+    {
+        if (receiver == address(0)) {
+            // send cross-chain message through LayerZero
+            receiver = LayerZeroLib.sendCrossChainMessage({
+                sender: sender,
+                endpoint: ILayerZeroEndpointV2(_lzEndpointV2),
+                remoteEid: dstEid,
+                trustedPeer: LayerZeroLib.getPeer({ remoteEid: dstEid }),
+                tokenIn: tokenIn,
+                tokenOut: tokenOut,
+                minimalAmountOut: minAmountLD,
+                extraData: extraData
+            });
+        }
+
+        return receiver;
+    }
+
+    function sendStargate(
+        address poolAddress,
+        uint32 dstEid,
+        address receiver,
+        address tokenOut,
+        bytes calldata extraData // data for tokensOut, tokensReceiver and so on
+    )
+        external
+        returns (bytes32[] memory tokensAndAmounts)
+    {
+        address token = IStargate(poolAddress).token();
+        uint256 amountLD;
+
+        tokensAndAmounts = Utils.decodeTokensAndAmountsArray();
+        if (token > address(0)) {
+            amountLD = Utils.getAmountFromArrayAndDelete({ tokensAndAmounts: tokensAndAmounts, token: token });
+            Utils.expectNotZero({ value: amountLD });
+        } else {
+            revert IStargateFacet.StargateFacet_UnsupportedAsset();
+        }
+
+        address sender = TransientStorageLibrary.getSenderAddress();
+
+        (uint256 valueToSend, SendParam memory sendParam, MessagingFee memory messagingFee) =
+            _quoteV2(poolAddress, token, dstEid, amountLD, receiver, bytes(""), 0);
+
+        receiver = _validateReceiver(receiver, sender, dstEid, token, tokenOut, sendParam.minAmountLD, extraData);
+
+        sendParam.to = OFTComposeMsgCodec.addressToBytes32({ _addr: receiver });
+
+        Utils.compareAmounts({ greaterValue: address(this).balance, lowerValue: valueToSend });
+
+        uint256 balanceBefore = TransferHelper.safeGetBalance({ token: token, account: address(this) });
+
+        TransferHelper.safeApprove({ token: token, spender: poolAddress, value: amountLD });
+
+        IStargate(poolAddress).sendToken{ value: valueToSend }({
+            sendParam: sendParam,
+            fee: messagingFee,
+            refundAddress: sender
         });
 
         unchecked {
@@ -228,7 +316,7 @@ contract StargateFacet is ILayerZeroComposer, IStargateFacet {
 
         sendParam = SendParam({
             dstEid: dstEid,
-            to: OFTComposeMsgCodec.addressToBytes32(receiver),
+            to: OFTComposeMsgCodec.addressToBytes32({ _addr: receiver }),
             amountLD: amountLD,
             minAmountLD: 0,
             extraOptions: extraOptions,

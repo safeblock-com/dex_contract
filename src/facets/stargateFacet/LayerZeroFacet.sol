@@ -6,7 +6,7 @@ import { BaseOwnableFacet } from "../BaseOwnableFacet.sol";
 import { Utils } from "../../libraries/Utils.sol";
 import { StorageLibrary, LayerZeroFacetStorage } from "../../libraries/StorageLibrary.sol";
 import { TransientStorageLibrary } from "../../libraries/TransientStorageLibrary.sol";
-import { Utils } from "../../libraries/Utils.sol";
+import { LayerZeroLib } from "../../libraries/LayerZeroLib.sol";
 
 import {
     ILayerZeroEndpointV2,
@@ -17,6 +17,8 @@ import {
 } from "./interfaces/ILayerZeroEndpointV2.sol";
 import { IMessageLibManager } from "./interfaces/IMessageLibManager.sol";
 import { ISendLib } from "./interfaces/ISendLib.sol";
+
+import { IStargateFacet } from "./interfaces/IStargateFacet.sol";
 
 import { ILayerZeroFacet } from "./interfaces/ILayerZeroFacet.sol";
 
@@ -33,10 +35,6 @@ contract LayerZeroFacet is BaseOwnableFacet, ILayerZeroFacet {
     /// @dev The address of the LayerZero V2 endpoint contract.
     ///      Immutable, set during construction. Used for sending messages and querying configurations.
     ILayerZeroEndpointV2 internal immutable _endpointV2;
-
-    // =========================
-    // storage
-    // =========================
 
     // =========================
     // constructor
@@ -64,7 +62,7 @@ contract LayerZeroFacet is BaseOwnableFacet, ILayerZeroFacet {
 
     /// @inheritdoc ILayerZeroFacet
     function getPeer(uint32 remoteEid) external view returns (bytes32 trustedRemote) {
-        return _getPeer(remoteEid);
+        return LayerZeroLib.getPeer({ remoteEid: remoteEid });
     }
 
     /// @inheritdoc ILayerZeroFacet
@@ -109,9 +107,29 @@ contract LayerZeroFacet is BaseOwnableFacet, ILayerZeroFacet {
         view
         returns (uint256 nativeFee)
     {
-        unchecked {
-            return _quote(remoteEid, _createNativeDropOption(remoteEid, nativeAmount, to));
-        }
+        nativeFee = LayerZeroLib.quote({
+            endpoint: _endpointV2,
+            remoteEid: remoteEid,
+            trustedPeer: LayerZeroLib.getPeer({ remoteEid: remoteEid }),
+            message: bytes(""),
+            options: _createNativeDropOption(remoteEid, nativeAmount, to)
+        });
+    }
+
+    function quoteMessage(uint32 remoteEid, bytes calldata extraData) external view returns (uint256 nativeFee) {
+        uint256 nonce = StorageLibrary.getLayerZeroFacetStorage().nonce[remoteEid];
+
+        bytes32 trustedPeer = LayerZeroLib.getPeer({ remoteEid: remoteEid });
+
+        nativeFee = LayerZeroLib.quote({
+            endpoint: _endpointV2,
+            remoteEid: remoteEid,
+            trustedPeer: trustedPeer,
+            message: abi.encode(
+                address(this), address(this), block.chainid, nonce, address(this), address(this), 0, extraData
+            ),
+            options: LayerZeroLib.getLzReceiveOptions()
+        });
     }
 
     // =========================
@@ -208,14 +226,22 @@ contract LayerZeroFacet is BaseOwnableFacet, ILayerZeroFacet {
 
         bytes memory options = _createNativeDropOption(remoteEid, nativeDrop, to > address(0) ? to : sender);
 
-        uint256 fee = _quote(remoteEid, options);
+        bytes32 trustedPeer = LayerZeroLib.getPeer({ remoteEid: remoteEid });
+
+        uint256 fee = LayerZeroLib.quote({
+            endpoint: _endpointV2,
+            remoteEid: remoteEid,
+            trustedPeer: trustedPeer,
+            message: bytes(""),
+            options: options
+        });
 
         Utils.compareAmounts({ greaterValue: address(this).balance, lowerValue: fee });
 
         _endpointV2.send{ value: fee }({
             params: MessagingParams({
                 dstEid: remoteEid,
-                receiver: _getPeer(remoteEid),
+                receiver: trustedPeer,
                 message: bytes(""),
                 options: options,
                 payInLzToken: false
@@ -237,13 +263,80 @@ contract LayerZeroFacet is BaseOwnableFacet, ILayerZeroFacet {
 
     /// @inheritdoc ILayerZeroFacet
     function allowInitializePath(Origin calldata origin) external view returns (bool) {
-        return _getPeer(origin.srcEid) == origin.sender;
+        return LayerZeroLib.getPeer({ remoteEid: origin.srcEid }) == origin.sender;
     }
 
     /// @inheritdoc ILayerZeroFacet
-    function lzReceive(Origin calldata, bytes32, bytes calldata, address, bytes calldata) external pure {
-        return;
+    function lzReceive(
+        Origin calldata origin,
+        bytes32 guid,
+        bytes calldata message,
+        address executor,
+        bytes calldata extraData
+    )
+        external
+    {
+        _lzReceive(origin, guid, message, executor, extraData);
     }
+
+    /// @notice Invoked by OAppReceiver when EndpointV2.lzReceive is called
+    /// @dev   origin    Metadata (source chain, sender address, nonce)
+    /// @dev   guid      Global unique ID for tracking this message
+    /// @param message   ABI-encoded bytes (the string we sent earlier)
+    /// @dev   executor  Executor address that delivered the message
+    /// @dev   extraData Additional data from the Executor (unused here)
+    function _lzReceive(
+        Origin calldata, /* origin */
+        bytes32, /* guid */
+        bytes calldata message,
+        address, /* executor */
+        bytes calldata /* extraData */
+    )
+        internal
+    {
+        if (msg.sender != address(_endpointV2)) {
+            revert IStargateFacet.StargateFacet_NotLZEndpoint();
+        }
+
+        (
+            address dstAddress,
+            address user,
+            uint256 nonce,
+            uint256 srcChainId,
+            address tokenIn,
+            address tokenOut,
+            uint256 minimalAmountOut,
+            bytes memory extraData
+        ) = abi.decode(message, (address, address, uint256, uint256, address, address, uint256, bytes));
+
+        LayerZeroFacetStorage storage s = StorageLibrary.getLayerZeroFacetStorage();
+
+        assembly ("memory-safe") {
+            mstore(0, dstAddress)
+            mstore(32, add(s.slot, 4))
+            sstore(keccak256(0, 64), add(user, add(shl(192, srcChainId), shl(160, nonce))))
+        }
+
+        emit MessageReceived({
+            dstAddress: dstAddress,
+            user: user,
+            srcChainId: srcChainId,
+            tokenIn: tokenIn,
+            tokenOut: tokenOut,
+            minimalAmountOut: minimalAmountOut,
+            extraData: extraData
+        });
+    }
+
+    event MessageReceived(
+        address dstAddress,
+        address user,
+        uint256 srcChainId,
+        address tokenIn,
+        address tokenOut,
+        uint256 minimalAmountOut,
+        bytes extraData
+    );
 
     // =========================
     // internal
@@ -287,39 +380,6 @@ contract LayerZeroFacet is BaseOwnableFacet, ILayerZeroFacet {
             nativeAmount,
             _to
         );
-    }
-
-    /// @dev Quotes the native fee for a cross-chain message.
-    ///      Constructs a `MessagingParams` struct with the provided options and queries `_endpointV2.quote` for the fee.
-    /// @param remoteEid The remote chain’s endpoint ID.
-    /// @param options The encoded options for the message (e.g., native drop).
-    /// @return nativeFee The estimated native currency fee for the message.
-    function _quote(uint32 remoteEid, bytes memory options) internal view returns (uint256 nativeFee) {
-        MessagingFee memory fee = _endpointV2.quote({
-            params: MessagingParams({
-                dstEid: remoteEid,
-                receiver: _getPeer(remoteEid),
-                message: bytes(""),
-                options: options,
-                payInLzToken: false
-            }),
-            sender: address(this)
-        });
-
-        return fee.nativeFee;
-    }
-
-    /// @dev Retrieves the trusted peer address for a remote endpoint ID.
-    ///      Returns the stored peer from the `peers` mapping or `address(this)` if unset.
-    /// @param remoteEid The remote chain’s endpoint ID.
-    /// @return trustedRemote The trusted peer address (bytes32).
-    function _getPeer(uint32 remoteEid) internal view returns (bytes32 trustedRemote) {
-        trustedRemote = StorageLibrary.getLayerZeroFacetStorage().peers[remoteEid];
-        if (trustedRemote == 0) {
-            assembly {
-                trustedRemote := address()
-            }
-        }
     }
 
     /// @dev Retrieves the gas limit for messages to a remote endpoint ID.

@@ -31,6 +31,19 @@ library TransferHelper {
     // functions
     // =========================
 
+    /// @notice Executes a safe transfer token or native.
+    /// @dev Uses low-level call to ensure proper error handling.
+    /// @param token Address of the ERC20 token to transfer or address(0).
+    /// @param to Address of the recipient.
+    /// @param value Amount to transfer.
+    function safeTransferTokenOrNative(address token, address to, uint256 value) internal {
+        if (token > address(0)) {
+            safeTransfer({ token: token, to: to, value: value });
+        } else {
+            safeTransferNative({ to: to, value: value });
+        }
+    }
+
     /// @notice Executes a safe transfer from one address to another.
     /// @dev Uses low-level call to ensure proper error handling.
     /// @param token Address of the ERC20 token to transfer.
@@ -76,11 +89,15 @@ library TransferHelper {
     /// @param account Address of the account to fetch balance for.
     /// @return The balance of the account.
     function safeGetBalance(address token, address account) internal view returns (uint256) {
-        (bool success, bytes memory data) = token.staticcall(abi.encodeCall(IERC20.balanceOf, (account)));
-        if (!success || data.length == 0) {
-            revert TransferHelper_GetBalanceError();
+        if (token > address(0)) {
+            (bool success, bytes memory data) = token.staticcall(abi.encodeCall(IERC20.balanceOf, (account)));
+            if (!success || data.length == 0) {
+                revert TransferHelper_GetBalanceError();
+            }
+            return abi.decode(data, (uint256));
+        } else {
+            return account.balance;
         }
-        return abi.decode(data, (uint256));
     }
 
     /// @notice Executes a safe transfer of native currency (e.g., ETH).

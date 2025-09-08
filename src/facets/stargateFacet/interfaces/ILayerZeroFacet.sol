@@ -140,5 +140,5 @@ interface ILayerZeroFacet {
 
     /// @notice Handles incoming LayerZero messages.
     /// @dev Currently a no-op, returning immediately without processing.
-    function lzReceive(Origin calldata, bytes32, bytes calldata, address, bytes calldata) external pure;
+    function lzReceive(Origin calldata, bytes32, bytes calldata, address, bytes calldata) external;
 }

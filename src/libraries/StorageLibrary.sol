@@ -33,6 +33,10 @@ struct LayerZeroFacetStorage {
     /// @notice Fallback gas limit for endpoint IDs without a specific override.
     /// @dev Used in message dispatch to unknown or rarely used chains.
     uint128 defaultGasLimit;
+    //
+    mapping(uint32 eid => uint256) nonce;
+    //
+    mapping(address dstAddress => bytes32) userAndNonce;
 }
 
 /// @title StorageLibrary

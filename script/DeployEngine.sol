@@ -40,6 +40,8 @@ struct Contracts {
     address crossCurveUnifiedRouter;
     //
     address multisig;
+    //
+    address authorizedSender;
 }
 
 address constant multisig = address(0);
@@ -75,7 +77,9 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             acrossSpokePool: 0x5c7BCd6E7De5423a257D81B442095A1a6ced35C5,
             crossCurveUnifiedRouter: 0xA2A786ff9148f7C88EE93372Db8CBe9e94585c74,
             //
-            multisig: multisig
+            multisig: multisig,
+            //
+            authorizedSender: 0xF4831F2D2E5407471a9a964C791362567cA9Ca78
         });
     }
 
@@ -84,8 +88,8 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
         return Contracts({
             multiswapRouterFacet: 0xe514120888329e44414E40f0b1F5Ae4eB3C89F96,
             transferFacet: 0xC69A50AEd37f7c08fe6C602f92922Cffd7E7045A,
-            stargateFacet: 0x13095C9AFF4cC68953414eb9b2e85D7a330A1433,
-            layerZeroFacet: 0x3368e0aA3400227D915A0f4511648c290aAB5529,
+            stargateFacet: 0xb0A3eF30A00670D0AA907909160E7b1a16c51a85,
+            layerZeroFacet: 0x2c5C3775Be2E4Aa408Acc836a39d853Ca1CE68Ef,
             symbiosisFacet: address(1),
             acrossFacet: address(1),
             crossCurveFacet: address(1),
@@ -109,7 +113,9 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             acrossSpokePool: address(0),
             crossCurveUnifiedRouter: 0xA2A786ff9148f7C88EE93372Db8CBe9e94585c74,
             //
-            multisig: multisig
+            multisig: multisig,
+            //
+            authorizedSender: 0xF4831F2D2E5407471a9a964C791362567cA9Ca78
         });
     }
 
@@ -118,8 +124,8 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
         return Contracts({
             multiswapRouterFacet: 0x4E8B3593b50942133d0484F90FD38a655e5fFA7D,
             transferFacet: 0x5bd810757d09FD3CD139379c7A8d4321F50C4505,
-            stargateFacet: 0x47A75CD6226570d038443c399181a0E95ADd25B3,
-            layerZeroFacet: 0x991AC2Fa8E194118e6FF0681E558564E0446A08C,
+            stargateFacet: 0x0B14925b19327563BAa76cBeC04A3d4c0F8619b6,
+            layerZeroFacet: 0x41FaCCFaa42e62988e3D3346B3987bb1D56a6481,
             symbiosisFacet: address(1),
             acrossFacet: 0xd4D07c5cd66390833b0bA9E5f6d2c93b83E511c4,
             crossCurveFacet: address(1),
@@ -130,7 +136,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContract: 0x85Db0f7aBEA9A1232e7617bE69d7988a3221EF15,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0x82FE07c03eF5676519e7919584f726A1499dd0E8,
+            prodEntryPoint: 0x2c4F3e3d9cc614e40B70BC24a67a525d22bF5270,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -143,7 +149,9 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             acrossSpokePool: 0x9295ee1d8C5b022Be115A2AD3c30C72E34e7F096,
             crossCurveUnifiedRouter: address(0),
             //
-            multisig: multisig
+            multisig: multisig,
+            //
+            authorizedSender: 0xF4831F2D2E5407471a9a964C791362567cA9Ca78
         });
     }
 
@@ -177,7 +185,9 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             acrossSpokePool: address(0),
             crossCurveUnifiedRouter: 0xA2A786ff9148f7C88EE93372Db8CBe9e94585c74,
             //
-            multisig: multisig
+            multisig: multisig,
+            //
+            authorizedSender: 0xF4831F2D2E5407471a9a964C791362567cA9Ca78
         });
     }
 
@@ -211,7 +221,9 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             acrossSpokePool: 0x6f26Bf09B1C792e3228e5467807a900A503c0281,
             crossCurveUnifiedRouter: 0xA2A786ff9148f7C88EE93372Db8CBe9e94585c74,
             //
-            multisig: multisig
+            multisig: multisig,
+            //
+            authorizedSender: 0xF4831F2D2E5407471a9a964C791362567cA9Ca78
         });
     }
 
@@ -245,7 +257,9 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             acrossSpokePool: 0xe35e9842fceaCA96570B734083f4a58e8F7C5f2A,
             crossCurveUnifiedRouter: 0xA2A786ff9148f7C88EE93372Db8CBe9e94585c74,
             //
-            multisig: multisig
+            multisig: multisig,
+            //
+            authorizedSender: 0xF4831F2D2E5407471a9a964C791362567cA9Ca78
         });
     }
 
@@ -279,7 +293,9 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             acrossSpokePool: 0x09aea4b2242abC8bb4BB78D537A67a245A7bEC64,
             crossCurveUnifiedRouter: 0xA2A786ff9148f7C88EE93372Db8CBe9e94585c74,
             //
-            multisig: multisig
+            multisig: multisig,
+            //
+            authorizedSender: 0xF4831F2D2E5407471a9a964C791362567cA9Ca78
         });
     }
 
@@ -313,7 +329,9 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             acrossSpokePool: 0x3baD7AD0728f9917d1Bf08af5782dCbD516cDd96,
             crossCurveUnifiedRouter: address(0),
             //
-            multisig: multisig
+            multisig: multisig,
+            //
+            authorizedSender: 0xF4831F2D2E5407471a9a964C791362567cA9Ca78
         });
     }
 
@@ -347,41 +365,9 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             acrossSpokePool: address(0),
             crossCurveUnifiedRouter: 0xA2A786ff9148f7C88EE93372Db8CBe9e94585c74,
             //
-            multisig: multisig
-        });
-    }
-
-    // unit zero
-    if (chainId == 88_811) {
-        return Contracts({
-            multiswapRouterFacet: 0x4bb53eBbBbAC038248aC3983fF9242Fa76a39C12,
-            transferFacet: 0x285D48921d0BB493f856Ac6D4f4b4448B32a419a,
-            stargateFacet: address(1),
-            layerZeroFacet: address(1),
-            symbiosisFacet: address(1),
-            acrossFacet: address(1),
-            crossCurveFacet: address(1),
+            multisig: multisig,
             //
-            quoter: 0x15ad2B8844a7f42A94F37AdFc90BeeBd5D1c99AA,
-            quoterProxy: 0xdF735aCD459014f793E3E7d27F5C598381E23A21,
-            proxy: 0xA26c8aC451d9EBbd4B40e8D2Ed91f5c55b989001,
-            feeContract: 0x96Fda36A350e40F89Bcdeb5149eFE4C77316F961,
-            feeContractProxy: 0xbe35b0b10037e11a6D0A71c326FcF929935A4230,
-            //
-            prodEntryPoint: 0x6Bab837Bb491135D99dBAA3c03eff3266776c0AE,
-            prodProxy: address(0),
-            prodProxyV2: address(0),
-            prodProxyV3: 0x65DfbA5338137e0De3c7e9C11D9BFEd0B02c33b8,
-            prodFeeContractProxy: 0x911eEd36e5fB42d0202FAA2b0A848d35777eB05F,
-            //
-            wrappedNative: 0xCF43F7703d9B4E8835f977eF364B4014fA7e856E,
-            layerZeroEndpointV2: address(0),
-            symbiosisPortal: address(0),
-            permit2: 0xf383062455CeF04f5b54C9a4d5FA177FD4bb06b6,
-            acrossSpokePool: address(0),
-            crossCurveUnifiedRouter: 0xA2A786ff9148f7C88EE93372Db8CBe9e94585c74,
-            //
-            multisig: multisig
+            authorizedSender: 0xF4831F2D2E5407471a9a964C791362567cA9Ca78
         });
     }
 
@@ -415,7 +401,9 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             acrossSpokePool: 0x5c7BCd6E7De5423a257D81B442095A1a6ced35C5,
             crossCurveUnifiedRouter: address(0),
             //
-            multisig: multisig
+            multisig: multisig,
+            //
+            authorizedSender: 0xF4831F2D2E5407471a9a964C791362567cA9Ca78
         });
     }
 
@@ -462,6 +450,7 @@ library DeployEngine {
             selectors[i++] = StargateFacet.lzEndpoint.selector;
             selectors[i++] = StargateFacet.quoteV2.selector;
             selectors[i++] = StargateFacet.sendStargateV2.selector;
+            selectors[i++] = StargateFacet.sendStargate.selector;
             selectors[i++] = StargateFacet.lzCompose.selector;
             for (uint256 k; k < i - iCache; ++k) {
                 addressIndexes[j++] = addressIndex;
@@ -481,6 +470,7 @@ library DeployEngine {
             selectors[i++] = LayerZeroFacet.getNativeSendCap.selector;
             selectors[i++] = LayerZeroFacet.isSupportedEid.selector;
             selectors[i++] = LayerZeroFacet.estimateFee.selector;
+            selectors[i++] = LayerZeroFacet.quoteMessage.selector;
             selectors[i++] = LayerZeroFacet.sendDeposit.selector;
             selectors[i++] = LayerZeroFacet.setPeers.selector;
             selectors[i++] = LayerZeroFacet.setGasLimit.selector;
@@ -545,7 +535,8 @@ library DeployEngine {
                     facetAddresses: facetAddresses
                 }),
                 permit2Address: contracts.permit2,
-                wrappedNativeAddress: contracts.wrappedNative
+                wrappedNativeAddress: contracts.wrappedNative,
+                authorizedSender: contracts.authorizedSender
             })
         );
     }

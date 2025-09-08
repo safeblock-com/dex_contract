@@ -14,8 +14,11 @@ import { FeeLibrary } from "./libraries/FeeLibrary.sol";
 import { ADDRESS_MASK } from "./libraries/Constants.sol";
 import { TransferHelper } from "./libraries/TransferHelper.sol";
 
+import { StorageLibrary, LayerZeroFacetStorage } from "./libraries/StorageLibrary.sol";
+
 import { ISignatureTransfer } from "./interfaces/ISignatureTransfer.sol";
 import { IWrappedNative } from "./interfaces/IWrappedNative.sol";
+import { IMultiswapRouterFacet } from "./facets/multiswapRouterFacet/interfaces/IMultiswapRouterFacet.sol";
 
 import { IEntryPoint } from "./interfaces/IEntryPoint.sol";
 
@@ -41,6 +44,8 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
     /// @dev Array of registered module signatures.
     bytes4[] private _moduleSignatures;
 
+    address private immutable _authorizedSender;
+
     // =========================
     // constructor
     // =========================
@@ -51,11 +56,12 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
     /// @param facetsAndSelectors Encoded data containing facet function selectors and addresses.
     /// @param permit2Address Address of the deployed Permit2 contract used for signature-based transfers.
     /// @param wrappedNativeAddress Address of the deployed Wrapped Native token contract (e.g., WETH).
-    constructor(bytes memory facetsAndSelectors, address permit2Address, address wrappedNativeAddress) {
+    constructor(bytes memory facetsAndSelectors, address permit2Address, address wrappedNativeAddress, address authorizedSender) {
         _disableInitializers();
         _permit2 = ISignatureTransfer(permit2Address);
         _wrappedNative = IWrappedNative(wrappedNativeAddress);
         _facetsAndSelectorsAddress = SSTORE2.write({ data: facetsAndSelectors });
+        _authorizedSender = authorizedSender;
     }
 
     // =========================
@@ -313,6 +319,188 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
     {
         Utils.expectEqual({
             left: _multicall(data, _transferTokensPermit2(msg.sender, tokenTransfersPermit2, bytes32(0))).length,
+            right: 0
+        });
+    }
+
+    function _deployDstCrossChainAddress(
+        address dstAddress,
+        bytes calldata extraData,
+        address token
+    )
+        internal
+        returns (address sender, uint256 amount)
+    {
+        bytes32 dstAddressData = StorageLibrary.getLayerZeroFacetStorage().userAndNonce[dstAddress];
+        bytes memory bytecode = abi.encodePacked(
+            hex"608160113439333d60010152608134f3fe7f00000000000000000000000000000000000000000000000000000000000000003381146029575b005b3680600014607057602014603c575b6027565b60006044601c8280948135906370a0823183523060205260206040602486855afa5063a9059cbb83526020525af150386038565b5060008080809347905af15038603856",
+            extraData
+        );
+
+        uint256 balanceBefore = TransferHelper.safeGetBalance({ token: token, account: address(this) });
+
+        assembly ("memory-safe") {
+            sender := and(dstAddressData, ADDRESS_MASK)
+
+            mstore(0, sender)
+            mstore(32, add(shl(32, and(shr(160, dstAddressData), 0xffffffff)), shr(192, dstAddressData)))
+
+            let salt := keccak256(0, 64)
+
+            let addr := create2(0, add(bytecode, 32), mload(bytecode), salt)
+
+            if sub(addr, dstAddress) {
+                mstore(0, 0)
+                revert(0, 0) // TODO
+            }
+
+            switch token
+            case 0 { pop(call(gas(), dstAddress, 0, 0, 0, 0, 0)) }
+            default {
+                mstore(0, token)
+                pop(call(gas(), dstAddress, 0, 0, 32, 0, 0))
+            }
+
+            mstore(64, bytecode)
+        }
+
+        amount = Utils.compareAmountsWithDifference({
+            greaterValue: TransferHelper.safeGetBalance({ token: token, account: address(this) }),
+            lowerValue: balanceBefore
+        });
+
+        Utils.expectNotZero({ value: amount });
+    }
+
+    function crossChainMulticall(
+        address dstAddress,
+        uint256 feeAmount,
+        address token,
+        bytes calldata extraData,
+        bytes calldata data
+    )
+        external
+    {
+        _checkData(data);
+        (address sender, uint256 amount) = _deployDstCrossChainAddress(dstAddress, extraData, token);
+        
+        if (msg.sender != _authorizedSender) {
+            if (msg.sender != sender) {
+                revert("Unauthorized");
+            }
+        }
+
+        if (amount < feeAmount) {
+            TransferHelper.safeTransferTokenOrNative({ token: token, to: sender, value: amount });
+        } else {
+            if (feeAmount > 0) {
+                TransferHelper.safeTransferTokenOrNative({ token: token, to: sender, value: feeAmount });
+            }
+
+            unchecked {
+                amount -= feeAmount;
+            }
+
+            bool isNativeToken = token == address(0);
+            if (token == address(0)) {
+                token = address(_wrappedNative);
+                _wrappedNative.deposit{ value: amount }();
+            }
+
+            (bool successfulCall, bytes memory payload) = _crossChainCall(token, amount, extraData, data);
+
+            if (!successfulCall) {
+                emit CallFailed({ errorMessage: payload });
+
+                if (isNativeToken) {
+                    token = address(0);
+                    _wrappedNative.withdraw({ wad: amount });
+                }
+
+                TransferHelper.safeTransferTokenOrNative({ token: token, to: sender, value: amount });
+            }
+        }
+    }
+
+    function _checkData(bytes calldata data) internal pure {
+        if (data.length > 0) {
+            bytes4 selector;
+            assembly ("memory-safe") {
+                selector :=
+                    and(calldataload(data.offset), 0xffffffff00000000000000000000000000000000000000000000000000000000)
+            }
+            if (selector != IMultiswapRouterFacet.multiswap2.selector) {
+                if (selector != IMultiswapRouterFacet.multiswap.selector) {
+                    revert("TODO");
+                }
+            }
+        }
+    }
+
+    function _crossChainCall(
+        address token,
+        uint256 amount,
+        bytes calldata extraData,
+        bytes calldata data
+    )
+        internal
+        returns (bool successfulCall, bytes memory payload)
+    {
+        unchecked {
+            bool isMulticall = data.length > 0;
+
+            (bytes[] memory tokenTransferData) = abi.decode(extraData, (bytes[]));
+            bytes[] memory updatedData = new bytes[]((isMulticall ? 1 : 0) + tokenTransferData.length);
+
+            uint256 i;
+            if (isMulticall) {
+                updatedData[i++] = data;
+            }
+
+            for (uint256 j; i < updatedData.length;) {
+                updatedData[i++] = tokenTransferData[j++];
+            }
+
+            payload = abi.encodeWithSelector(
+                // "multicall(bytes[])" selector
+                0xac9650d8,
+                updatedData
+            );
+
+            assembly ("memory-safe") {
+                let length := mload(payload)
+                let offset := add(payload, add(32, length))
+                mstore(offset, add(shl(160, amount), token))
+                mstore(add(offset, 32), 1)
+                length := add(length, 64)
+
+                successfulCall := call(gas(), address(), 0, add(payload, 32), length, 0, 0)
+
+                if iszero(successfulCall) {
+                    returndatacopy(add(payload, 32), 0, returndatasize())
+                    mstore(payload, returndatasize())
+                }
+            }
+        }
+    }
+
+    event CallFailed(bytes errorMessage);
+
+    function _crossChainMulticall(
+        address sender,
+        IEntryPoint.TokenTransfersPermit2 calldata tokenTransfersPermit2,
+        bytes[] calldata data
+    )
+        internal
+        wrap(sender)
+    {
+        Utils.expectEqual({
+            left: _multicall(
+                data,
+                _transferTokensPermit2(
+                    sender, tokenTransfersPermit2, Utils.hashDataAndSenderDetails({ data: data, sender: msg.sender })
+                )
+            ).length,
             right: 0
         });
     }
