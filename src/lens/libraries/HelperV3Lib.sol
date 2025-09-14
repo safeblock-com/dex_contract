@@ -332,4 +332,131 @@ library HelperV3Lib {
             return FullMath.mulDiv(uint256(liquidity), sqrtPriceX96, _2E96);
         }
     }
+
+    function efficientQuoteV3(
+        IUniswapPool pool,
+        bool zeroForOne,
+        int256 amountSpecified,
+        uint160 sqrtPriceLimitX96,
+        Slot0 memory slot0Start,
+        SwapCache memory cache,
+        SwapState memory state,
+        FeeAndTickSpacing memory feeAndTickSpacing
+    )
+        internal
+        view
+        returns (uint256, uint256)
+    {
+        bool exactInput = amountSpecified > 0;
+
+        getDataForSimulate(pool, slot0Start, cache, state, feeAndTickSpacing, amountSpecified);
+
+        if (state.liquidity == 0 || amountSpecified == 0) {
+            return (exactInput ? 0 : type(uint256).max, 0);
+        }
+
+        while (state.amountSpecifiedRemaining != 0 && state.sqrtPriceX96 != sqrtPriceLimitX96) {
+            StepComputations memory step;
+
+            step.sqrtPriceStartX96 = state.sqrtPriceX96;
+            (step.tickNext, step.initialized) = TickBitmap.nextInitializedTickWithinOneWord(
+                pool, state.tick, feeAndTickSpacing.tickSpacing, zeroForOne, cache
+            );
+
+            // ensure that we do not overshoot the min/max tick, as the tick bitmap is not aware of these bounds
+            if (step.tickNext < TickMath.MIN_TICK) {
+                step.tickNext = TickMath.MIN_TICK;
+            } else if (step.tickNext > TickMath.MAX_TICK) {
+                step.tickNext = TickMath.MAX_TICK;
+            }
+
+            // get the price for the next tick
+            step.sqrtPriceNextX96 = TickMath.getSqrtRatioAtTick(step.tickNext);
+
+            // compute values to swap to the target tick, price limit, or point where input/output amount is exhausted
+            (state.sqrtPriceX96, step.amountIn, step.amountOut, step.feeAmount) = SwapMath.computeSwapStep(
+                state.sqrtPriceX96,
+                (zeroForOne ? step.sqrtPriceNextX96 < sqrtPriceLimitX96 : step.sqrtPriceNextX96 > sqrtPriceLimitX96)
+                    ? sqrtPriceLimitX96
+                    : step.sqrtPriceNextX96,
+                state.liquidity,
+                state.amountSpecifiedRemaining,
+                feeAndTickSpacing.fee
+            );
+
+            if (exactInput) {
+                // safe because we test that amountSpecified > amountIn + feeAmount in SwapMath
+                unchecked {
+                    state.amountSpecifiedRemaining -= SafeCast.toInt256(step.amountIn + step.feeAmount);
+                }
+                state.amountCalculated -= SafeCast.toInt256(step.amountOut);
+
+                if (
+                    FullMath.mulDiv(
+                        uint256(-state.amountCalculated), E18, uint256(amountSpecified - state.amountSpecifiedRemaining)
+                    ) < slot0Start.targetPrice
+                ) {
+                    return (exactInput ? 0 : type(uint256).max, 0);
+                }
+            } else {
+                unchecked {
+                    state.amountSpecifiedRemaining += SafeCast.toInt256(step.amountOut);
+                }
+                state.amountCalculated += SafeCast.toInt256(step.amountIn + step.feeAmount);
+            }
+
+            // shift tick if we reached the next price
+            if (state.sqrtPriceX96 == step.sqrtPriceNextX96) {
+                // if the tick is initialized, run the tick transition
+                if (step.initialized) {
+                    int128 liquidityNet;
+                    step.initialized = cache.index < cache.liquidityNets.length;
+                    if (step.initialized) {
+                        liquidityNet = cache.liquidityNets[cache.index];
+                    }
+                    if (liquidityNet == 0) {
+                        liquidityNet = getTickLiquidityNet(pool, step.tickNext);
+
+                        if (step.initialized) {
+                            cache.liquidityNets[cache.index] = liquidityNet;
+                        }
+                    }
+                    // if we're moving leftward, we interpret liquidityNet as the opposite sign
+                    // safe because liquidityNet cannot be type(int128).min
+                    unchecked {
+                        if (zeroForOne) liquidityNet = -liquidityNet;
+                    }
+
+                    state.liquidity = liquidityNet < 0
+                        ? state.liquidity - uint128(-liquidityNet)
+                        : state.liquidity + uint128(liquidityNet);
+                }
+
+                if (state.liquidity == 0 && state.amountSpecifiedRemaining != 0) {
+                    return (exactInput ? 0 : type(uint256).max, 0);
+                }
+
+                unchecked {
+                    state.tick = zeroForOne ? step.tickNext - 1 : step.tickNext;
+                }
+            } else if (state.sqrtPriceX96 != step.sqrtPriceStartX96) {
+                // recompute unless we're on a lower tick boundary (i.e. already transitioned ticks), and haven't moved
+                state.tick = TickMath.getTickAtSqrtRatio(state.sqrtPriceX96);
+            }
+            ++cache.index;
+        }
+
+        unchecked {
+            (int256 amount0, int256 amount1) = zeroForOne == exactInput
+                ? (amountSpecified - state.amountSpecifiedRemaining, state.amountCalculated)
+                : (state.amountCalculated, amountSpecified - state.amountSpecifiedRemaining);
+
+            if (amount0 == 0 || amount1 == 0) {
+                return (exactInput ? 0 : type(uint256).max, 0);
+            }
+
+            return
+                (amount0 > 0 ? uint256(amount0) : uint256(amount1), amount0 < 0 ? uint256(-amount0) : uint256(-amount1));
+        }
+    }
 }

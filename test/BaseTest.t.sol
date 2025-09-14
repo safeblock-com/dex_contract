@@ -33,7 +33,8 @@ import {
     IStargateFacet,
     ILayerZeroComposer,
     OptionsBuilder,
-    OFTComposeMsgCodec
+    OFTComposeMsgCodec,
+    IStargate
 } from "../src/facets/stargateFacet/StargateFacet.sol";
 import { LayerZeroFacet, ILayerZeroFacet } from "../src/facets/stargateFacet/LayerZeroFacet.sol";
 import { SymbiosisFacet, ISymbiosisFacet, ISymbiosis } from "../src/facets/symbiosisFacet/SymbiosisFacet.sol";
@@ -48,6 +49,16 @@ import { CoinFlippersModule, ICoinFlippersModule, ICoinFlippersVault } from "../
 import { CrossCurveFacet, ICrossCurveRouter } from "../src/facets/crossCurveFacet/CrossCurveFacet.sol";
 
 import { console2 } from "forge-std/console2.sol";
+
+import "../src/libraries/Constants.sol";
+
+import {
+    ILayerZeroEndpointV2,
+    UlnConfig,
+    Origin,
+    MessagingFee,
+    MessagingParams
+} from "../src/facets/stargateFacet/interfaces/ILayerZeroEndpointV2.sol";
 
 contract BaseTest is Test {
     address owner;

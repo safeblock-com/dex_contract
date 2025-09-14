@@ -32,4 +32,10 @@ interface IStargate is IOFT {
 
     /// @notice Returns the Stargate implementation type.
     function stargateType() external pure returns (StargateType);
+
+    /// @notice Returns the amount of token that can be sent to the given destination.
+    function paths(uint32 dstEid) external view returns (uint64);
+
+    /// @dev The shared decimals (lowest common decimals between chains).
+    function sharedDecimals() external view returns (uint8);
 }

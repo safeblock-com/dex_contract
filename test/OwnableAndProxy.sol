@@ -29,7 +29,8 @@ contract OwnableAndProxyTest is BaseTest {
         EntryPoint entryPointImplementation = new EntryPoint({
             facetsAndSelectors: bytes(""),
             permit2Address: contracts.permit2,
-            wrappedNativeAddress: contracts.wrappedNative
+            wrappedNativeAddress: contracts.wrappedNative,
+            authorizedSender: contracts.authorizedSender
         });
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
@@ -52,7 +53,8 @@ contract OwnableAndProxyTest is BaseTest {
                 new EntryPoint({
                     facetsAndSelectors: bytes(""),
                     permit2Address: contracts.permit2,
-                    wrappedNativeAddress: contracts.wrappedNative
+                    wrappedNativeAddress: contracts.wrappedNative,
+                    authorizedSender: contracts.authorizedSender
                 })
             ),
             data: abi.encodeCall(EntryPoint.initialize, (newOwner))

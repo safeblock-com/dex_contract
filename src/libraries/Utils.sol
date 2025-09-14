@@ -122,6 +122,14 @@ library Utils {
         }
     }
 
+    /// @notice Returns address as bytes32.
+    /// @return result The address encoded as bytes32
+    function addressToBytes32(address addr) internal pure returns (bytes32 result) {
+        assembly ("memory-safe") {
+            result := addr
+        }
+    }
+
     /// @notice Extracts high 96 bits from a bytes32.
     /// @param encodedValue The bytes32 value to extract bits from
     /// @return result The extracted high 96 bits as uint256

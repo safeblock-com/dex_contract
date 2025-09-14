@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import { Utils } from "../../libraries/Utils.sol";
 import { OptionsBuilder } from "../../libraries/external/OptionsBuilder.sol";
 import { OFTComposeMsgCodec } from "../../libraries/external/OFTComposeMsgCodec.sol";
-import { TransferHelper } from "../../libraries/TransferHelper.sol";
+import { TransferHelper, IERC20 } from "../../libraries/TransferHelper.sol";
 import { TransientStorageLibrary } from "../../libraries/TransientStorageLibrary.sol";
 
 import { LayerZeroLib } from "../../libraries/LayerZeroLib.sol";
@@ -71,10 +71,30 @@ contract StargateFacet is ILayerZeroComposer, IStargateFacet {
         view
         returns (uint256 valueToSend, uint256 dstAmount)
     {
+        IStargate pool = IStargate(poolAddress);
+
+        address token = pool.token();
+
+        unchecked {
+            uint256 paths = pool.paths({ dstEid: dstEid });
+
+            uint256 tokenDecimals;
+            if (token > address(0)) {
+                tokenDecimals = IERC20(token).decimals();
+            } else {
+                tokenDecimals = 18;
+            }
+
+            uint256 tokenRate = 10 ** (tokenDecimals - pool.sharedDecimals());
+
+            if (paths < amountLD / tokenRate) {
+                amountLD = paths * tokenRate;
+            }
+        }
+
         SendParam memory sendParam;
-        (valueToSend, sendParam,) = _quoteV2(
-            poolAddress, IStargate(poolAddress).token(), dstEid, amountLD, receiver, composeMsg, composeGasLimit
-        );
+        (valueToSend, sendParam,) =
+            _quoteV2(poolAddress, token, dstEid, amountLD, receiver, composeMsg, composeGasLimit);
 
         dstAmount = sendParam.minAmountLD;
     }
@@ -95,15 +115,9 @@ contract StargateFacet is ILayerZeroComposer, IStargateFacet {
         returns (bytes32[] memory tokensAndAmounts)
     {
         address token = IStargate(poolAddress).token();
-        uint256 amountLD;
 
         tokensAndAmounts = Utils.decodeTokensAndAmountsArray();
-        if (token > address(0)) {
-            amountLD = Utils.getAmountFromArrayAndDelete({ tokensAndAmounts: tokensAndAmounts, token: token });
-            Utils.expectNotZero({ value: amountLD });
-        } else {
-            revert IStargateFacet.StargateFacet_UnsupportedAsset();
-        }
+        uint256 amountLD = _getAmountIn(token, tokensAndAmounts);
 
         uint256 balanceBefore = TransferHelper.safeGetBalance({ token: token, account: address(this) });
 
@@ -120,75 +134,40 @@ contract StargateFacet is ILayerZeroComposer, IStargateFacet {
             refundAddress: TransientStorageLibrary.getSenderAddress()
         });
 
-        unchecked {
-            uint256 balanceAfter =
-                amountLD - (balanceBefore - TransferHelper.safeGetBalance({ token: token, account: address(this) }));
-
-            if (balanceAfter > 0) {
-                Utils.addElementToArrayOrAddAmount({
-                    tokensAndAmounts: tokensAndAmounts,
-                    element: Utils.encodeTokenAndAmount({ token: token, amount: balanceAfter })
-                });
-            }
-        }
+        _checkBalanceAfter(tokensAndAmounts, amountLD, token, balanceBefore);
     }
 
-    function _validateReceiver(
-        address receiver,
-        address sender,
-        uint32 dstEid,
-        address tokenIn,
-        address tokenOut,
-        uint256 minAmountLD,
-        bytes calldata extraData
-    )
-        internal
-        returns (address)
-    {
-        if (receiver == address(0)) {
-            // send cross-chain message through LayerZero
-            receiver = LayerZeroLib.sendCrossChainMessage({
-                sender: sender,
-                endpoint: ILayerZeroEndpointV2(_lzEndpointV2),
-                remoteEid: dstEid,
-                trustedPeer: LayerZeroLib.getPeer({ remoteEid: dstEid }),
-                tokenIn: tokenIn,
-                tokenOut: tokenOut,
-                minimalAmountOut: minAmountLD,
-                extraData: extraData
-            });
-        }
-
-        return receiver;
-    }
-
+    /// @inheritdoc IStargateFacet
     function sendStargate(
         address poolAddress,
         uint32 dstEid,
         address receiver,
         address tokenOut,
-        bytes calldata extraData // data for tokensOut, tokensReceiver and so on
+        bytes calldata extraData
     )
         external
         returns (bytes32[] memory tokensAndAmounts)
     {
         address token = IStargate(poolAddress).token();
-        uint256 amountLD;
 
         tokensAndAmounts = Utils.decodeTokensAndAmountsArray();
-        if (token > address(0)) {
-            amountLD = Utils.getAmountFromArrayAndDelete({ tokensAndAmounts: tokensAndAmounts, token: token });
-            Utils.expectNotZero({ value: amountLD });
-        } else {
-            revert IStargateFacet.StargateFacet_UnsupportedAsset();
-        }
+        uint256 amountLD = _getAmountIn(token, tokensAndAmounts);
 
         address sender = TransientStorageLibrary.getSenderAddress();
 
         (uint256 valueToSend, SendParam memory sendParam, MessagingFee memory messagingFee) =
             _quoteV2(poolAddress, token, dstEid, amountLD, receiver, bytes(""), 0);
 
-        receiver = _validateReceiver(receiver, sender, dstEid, token, tokenOut, sendParam.minAmountLD, extraData);
+        receiver = LayerZeroLib.validateReceiver({
+            receiver: receiver,
+            sender: sender,
+            dstEid: dstEid,
+            tokenIn: token,
+            tokenOut: tokenOut,
+            minAmountLD: sendParam.minAmountLD,
+            extraData: extraData,
+            endpoint: ILayerZeroEndpointV2(_lzEndpointV2)
+        });
 
         sendParam.to = OFTComposeMsgCodec.addressToBytes32({ _addr: receiver });
 
@@ -204,17 +183,7 @@ contract StargateFacet is ILayerZeroComposer, IStargateFacet {
             refundAddress: sender
         });
 
-        unchecked {
-            uint256 balanceAfter =
-                amountLD - (balanceBefore - TransferHelper.safeGetBalance({ token: token, account: address(this) }));
-
-            if (balanceAfter > 0) {
-                Utils.addElementToArrayOrAddAmount({
-                    tokensAndAmounts: tokensAndAmounts,
-                    element: Utils.encodeTokenAndAmount({ token: token, amount: balanceAfter })
-                });
-            }
-        }
+        _checkBalanceAfter(tokensAndAmounts, amountLD, token, balanceBefore);
     }
 
     // =========================
@@ -335,6 +304,46 @@ contract StargateFacet is ILayerZeroComposer, IStargateFacet {
         if (token == address(0)) {
             unchecked {
                 valueToSend += sendParam.amountLD;
+            }
+        }
+    }
+
+    /// @dev Retrieves the amount of tokens to send from the array of tokens and amounts.
+    /// @param token The address of the token to send.
+    /// @param tokensAndAmounts The array of tokens and amounts.
+    /// @return amountLD The amount of tokens to send (in local decimals).
+    function _getAmountIn(address token, bytes32[] memory tokensAndAmounts) internal pure returns (uint256 amountLD) {
+        if (token > address(0)) {
+            amountLD = Utils.getAmountFromArrayAndDelete({ tokensAndAmounts: tokensAndAmounts, token: token });
+            Utils.expectNotZero({ value: amountLD });
+        } else {
+            revert IStargateFacet.StargateFacet_UnsupportedAsset();
+        }
+    }
+
+    /// @dev Checks the balance after the transfer and adds the remaining amount to the array of tokens and amounts.
+    /// @param tokensAndAmounts The array of tokens and amounts.
+    /// @param amountLD The amount of tokens to send (in local decimals).
+    /// @param token The address of the token to send.
+    /// @param balanceBefore The balance of the sender before the transfer.
+    function _checkBalanceAfter(
+        bytes32[] memory tokensAndAmounts,
+        uint256 amountLD,
+        address token,
+        uint256 balanceBefore
+    )
+        internal
+        view
+    {
+        unchecked {
+            uint256 balanceAfter =
+                amountLD - (balanceBefore - TransferHelper.safeGetBalance({ token: token, account: address(this) }));
+
+            if (balanceAfter > 0) {
+                Utils.addElementToArrayOrAddAmount({
+                    tokensAndAmounts: tokensAndAmounts,
+                    element: Utils.encodeTokenAndAmount({ token: token, amount: balanceAfter })
+                });
             }
         }
     }

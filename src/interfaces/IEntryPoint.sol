@@ -16,6 +16,13 @@ interface IEntryPoint {
     }
 
     // =========================
+    // events
+    // =========================
+
+    /// @dev Emitted when a function call fails.
+    event CallFailed(bytes errorMessage);
+
+    // =========================
     // errors
     // =========================
 
@@ -33,6 +40,15 @@ interface IEntryPoint {
 
     /// @dev Thrown when a function is called externally but is restricted to internal delegation.
     error EntryPoint_OnlySelfCall();
+
+    /// @dev Thrown when the sender is not the owner of deposit or authorized sender.
+    error EntryPoint_UnauthorizedSender();
+
+    /// @dev Thrown when the deployed deposit address is invalid.
+    error EntryPoint_InvalidDepositAddress();
+
+    /// @dev Thrown when the function selector is not allowed for the call through the crossChainMulticall.
+    error EntryPoint_SelectorNotAllowed(bytes4 selector);
 
     // =========================
     // initializer
@@ -105,6 +121,22 @@ interface IEntryPoint {
     /// @param tokenTransfersPermit2 Permit2 structure with tokens and signature.
     /// @param data Encoded function calls.
     function multicall(TokenTransfersPermit2 calldata tokenTransfersPermit2, bytes[] calldata data) external;
+
+    /// @notice Executes a batch of calls for cross-chain transactions.
+    /// @dev Used for swap and transfer tokens after cross-chain transfer.
+    /// @param depositAddress The address of the deposit contract.
+    /// @param feeAmount The fee amount.
+    /// @param token The token address.
+    /// @param extraData Extra data to pass to the deposit address bytecode.
+    /// @param data Encoded function call. Must be only multiswap or multiswap2
+    function crossChainMulticall(
+        address depositAddress,
+        uint256 feeAmount,
+        address token,
+        bytes calldata extraData,
+        bytes calldata data
+    )
+        external;
 
     // =========================
     // admin methods

@@ -6,6 +6,35 @@ import { UlnConfig, Origin } from "./ILayerZeroEndpointV2.sol";
 /// @title ILayerZeroFacet - LayerZeroFacet Interface
 interface ILayerZeroFacet {
     // =========================
+    // events
+    // =========================
+
+    /// @dev Emitted when a LayerZero message is received.
+    /// @param depositAddress The receiver of the tokens.
+    /// @param user The sender of the message.
+    /// @param srcChainId The source chain ID.
+    /// @param tokenIn The token being sent.
+    /// @param tokenOut The token being received.
+    /// @param minimalAmountOut The minimum amount of tokens to receive.
+    /// @param extraData Extra data passed to the deposit address bytecode.
+    event MessageReceived(
+        address depositAddress,
+        address user,
+        uint256 srcChainId,
+        address tokenIn,
+        address tokenOut,
+        uint256 minimalAmountOut,
+        bytes extraData
+    );
+
+    // =========================
+    // errors
+    // =========================
+
+    /// @dev Thrown when `lzReceive` is called by an address other than the configured LayerZero endpoint.
+    error LayerZeroFacet_NotLZEndpoint();
+
+    // =========================
     // getters
     // =========================
 
@@ -69,6 +98,12 @@ interface ILayerZeroFacet {
         external
         view
         returns (uint256 nativeFee);
+
+    /// @notice Estimates the native fee for sending a cross-chain message.
+    /// @param remoteEid The remote chain’s endpoint ID.
+    /// @param extraData The extraData for the message.
+    /// @return nativeFee The estimated native currency fee for the message.
+    function quoteMessage(uint32 remoteEid, bytes calldata extraData) external view returns (uint256 nativeFee);
 
     // =========================
     // main

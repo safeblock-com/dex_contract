@@ -112,7 +112,8 @@ contract EntryPointTest is BaseTest {
                     facetAddresses: Solarray.addresses(facet1, facet2)
                 }),
                 permit2Address: contracts.permit2,
-                wrappedNativeAddress: contracts.wrappedNative
+                wrappedNativeAddress: contracts.wrappedNative,
+                authorizedSender: contracts.authorizedSender
             })
         );
 
@@ -138,7 +139,8 @@ contract EntryPointTest is BaseTest {
         EntryPoint _entryPoint = new EntryPoint({
             facetsAndSelectors: bytes(""),
             permit2Address: contracts.permit2,
-            wrappedNativeAddress: contracts.wrappedNative
+            wrappedNativeAddress: contracts.wrappedNative,
+            authorizedSender: contracts.authorizedSender
         });
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
@@ -154,7 +156,8 @@ contract EntryPointTest is BaseTest {
             new EntryPoint({
                 facetsAndSelectors: bytes(""),
                 permit2Address: contracts.permit2,
-                wrappedNativeAddress: contracts.wrappedNative
+                wrappedNativeAddress: contracts.wrappedNative,
+                authorizedSender: contracts.authorizedSender
             })
         );
 

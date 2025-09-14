@@ -14,7 +14,7 @@ import { FeeLibrary } from "./libraries/FeeLibrary.sol";
 import { ADDRESS_MASK } from "./libraries/Constants.sol";
 import { TransferHelper } from "./libraries/TransferHelper.sol";
 
-import { StorageLibrary, LayerZeroFacetStorage } from "./libraries/StorageLibrary.sol";
+import { StorageLibrary } from "./libraries/StorageLibrary.sol";
 
 import { ISignatureTransfer } from "./interfaces/ISignatureTransfer.sol";
 import { IWrappedNative } from "./interfaces/IWrappedNative.sol";
@@ -56,7 +56,12 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
     /// @param facetsAndSelectors Encoded data containing facet function selectors and addresses.
     /// @param permit2Address Address of the deployed Permit2 contract used for signature-based transfers.
     /// @param wrappedNativeAddress Address of the deployed Wrapped Native token contract (e.g., WETH).
-    constructor(bytes memory facetsAndSelectors, address permit2Address, address wrappedNativeAddress, address authorizedSender) {
+    constructor(
+        bytes memory facetsAndSelectors,
+        address permit2Address,
+        address wrappedNativeAddress,
+        address authorizedSender
+    ) {
         _disableInitializers();
         _permit2 = ISignatureTransfer(permit2Address);
         _wrappedNative = IWrappedNative(wrappedNativeAddress);
@@ -323,57 +328,9 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
         });
     }
 
-    function _deployDstCrossChainAddress(
-        address dstAddress,
-        bytes calldata extraData,
-        address token
-    )
-        internal
-        returns (address sender, uint256 amount)
-    {
-        bytes32 dstAddressData = StorageLibrary.getLayerZeroFacetStorage().userAndNonce[dstAddress];
-        bytes memory bytecode = abi.encodePacked(
-            hex"608160113439333d60010152608134f3fe7f00000000000000000000000000000000000000000000000000000000000000003381146029575b005b3680600014607057602014603c575b6027565b60006044601c8280948135906370a0823183523060205260206040602486855afa5063a9059cbb83526020525af150386038565b5060008080809347905af15038603856",
-            extraData
-        );
-
-        uint256 balanceBefore = TransferHelper.safeGetBalance({ token: token, account: address(this) });
-
-        assembly ("memory-safe") {
-            sender := and(dstAddressData, ADDRESS_MASK)
-
-            mstore(0, sender)
-            mstore(32, add(shl(32, and(shr(160, dstAddressData), 0xffffffff)), shr(192, dstAddressData)))
-
-            let salt := keccak256(0, 64)
-
-            let addr := create2(0, add(bytecode, 32), mload(bytecode), salt)
-
-            if sub(addr, dstAddress) {
-                mstore(0, 0)
-                revert(0, 0) // TODO
-            }
-
-            switch token
-            case 0 { pop(call(gas(), dstAddress, 0, 0, 0, 0, 0)) }
-            default {
-                mstore(0, token)
-                pop(call(gas(), dstAddress, 0, 0, 32, 0, 0))
-            }
-
-            mstore(64, bytecode)
-        }
-
-        amount = Utils.compareAmountsWithDifference({
-            greaterValue: TransferHelper.safeGetBalance({ token: token, account: address(this) }),
-            lowerValue: balanceBefore
-        });
-
-        Utils.expectNotZero({ value: amount });
-    }
-
+    /// @inheritdoc IEntryPoint
     function crossChainMulticall(
-        address dstAddress,
+        address depositAddress,
         uint256 feeAmount,
         address token,
         bytes calldata extraData,
@@ -381,20 +338,28 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
     )
         external
     {
-        _checkData(data);
-        (address sender, uint256 amount) = _deployDstCrossChainAddress(dstAddress, extraData, token);
-        
-        if (msg.sender != _authorizedSender) {
-            if (msg.sender != sender) {
-                revert("Unauthorized");
+        if (data.length > 0) {
+            bytes4 selector;
+            assembly ("memory-safe") {
+                selector :=
+                    and(calldataload(data.offset), 0xffffffff00000000000000000000000000000000000000000000000000000000)
+            }
+
+            // only multiswap and multiswap2 are allowed for call
+            if (selector != IMultiswapRouterFacet.multiswap2.selector) {
+                if (selector != IMultiswapRouterFacet.multiswap.selector) {
+                    revert IEntryPoint.EntryPoint_SelectorNotAllowed({ selector: selector });
+                }
             }
         }
 
-        if (amount < feeAmount) {
+        (address sender, uint256 amount) = _deployDepositAddress(extraData, depositAddress, token);
+
+        if (amount <= feeAmount) {
             TransferHelper.safeTransferTokenOrNative({ token: token, to: sender, value: amount });
         } else {
             if (feeAmount > 0) {
-                TransferHelper.safeTransferTokenOrNative({ token: token, to: sender, value: feeAmount });
+                TransferHelper.safeTransferTokenOrNative({ token: token, to: msg.sender, value: feeAmount });
             }
 
             unchecked {
@@ -407,10 +372,10 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
                 _wrappedNative.deposit{ value: amount }();
             }
 
-            (bool successfulCall, bytes memory payload) = _crossChainCall(token, amount, extraData, data);
+            (bool successfulCall, bytes memory payload) = _selfMulticall(token, amount, extraData, data);
 
             if (!successfulCall) {
-                emit CallFailed({ errorMessage: payload });
+                emit IEntryPoint.CallFailed({ errorMessage: payload });
 
                 if (isNativeToken) {
                     token = address(0);
@@ -420,89 +385,6 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
                 TransferHelper.safeTransferTokenOrNative({ token: token, to: sender, value: amount });
             }
         }
-    }
-
-    function _checkData(bytes calldata data) internal pure {
-        if (data.length > 0) {
-            bytes4 selector;
-            assembly ("memory-safe") {
-                selector :=
-                    and(calldataload(data.offset), 0xffffffff00000000000000000000000000000000000000000000000000000000)
-            }
-            if (selector != IMultiswapRouterFacet.multiswap2.selector) {
-                if (selector != IMultiswapRouterFacet.multiswap.selector) {
-                    revert("TODO");
-                }
-            }
-        }
-    }
-
-    function _crossChainCall(
-        address token,
-        uint256 amount,
-        bytes calldata extraData,
-        bytes calldata data
-    )
-        internal
-        returns (bool successfulCall, bytes memory payload)
-    {
-        unchecked {
-            bool isMulticall = data.length > 0;
-
-            (bytes[] memory tokenTransferData) = abi.decode(extraData, (bytes[]));
-            bytes[] memory updatedData = new bytes[]((isMulticall ? 1 : 0) + tokenTransferData.length);
-
-            uint256 i;
-            if (isMulticall) {
-                updatedData[i++] = data;
-            }
-
-            for (uint256 j; i < updatedData.length;) {
-                updatedData[i++] = tokenTransferData[j++];
-            }
-
-            payload = abi.encodeWithSelector(
-                // "multicall(bytes[])" selector
-                0xac9650d8,
-                updatedData
-            );
-
-            assembly ("memory-safe") {
-                let length := mload(payload)
-                let offset := add(payload, add(32, length))
-                mstore(offset, add(shl(160, amount), token))
-                mstore(add(offset, 32), 1)
-                length := add(length, 64)
-
-                successfulCall := call(gas(), address(), 0, add(payload, 32), length, 0, 0)
-
-                if iszero(successfulCall) {
-                    returndatacopy(add(payload, 32), 0, returndatasize())
-                    mstore(payload, returndatasize())
-                }
-            }
-        }
-    }
-
-    event CallFailed(bytes errorMessage);
-
-    function _crossChainMulticall(
-        address sender,
-        IEntryPoint.TokenTransfersPermit2 calldata tokenTransfersPermit2,
-        bytes[] calldata data
-    )
-        internal
-        wrap(sender)
-    {
-        Utils.expectEqual({
-            left: _multicall(
-                data,
-                _transferTokensPermit2(
-                    sender, tokenTransfersPermit2, Utils.hashDataAndSenderDetails({ data: data, sender: msg.sender })
-                )
-            ).length,
-            right: 0
-        });
     }
 
     /// @notice Handles incoming calls by delegating to the appropriate facet or callback address.
@@ -910,6 +792,132 @@ contract EntryPoint is Ownable2Step, UUPSUpgradeable, Initializable, IEntryPoint
 
         assembly ("memory-safe") {
             mstore(64, permitted)
+        }
+    }
+
+    /// @dev Deploys the deposit address and gets tokens from it.
+    /// @param depositAddress The address which must be deployed.
+    /// @param extraData Extra data to pass to the deposit address bytecode.
+    /// @param token The token to get from the deposit address.
+    function _deployDepositAddress(
+        bytes calldata extraData,
+        address depositAddress,
+        address token
+    )
+        internal
+        returns (address sender, uint256 amount)
+    {
+        bytes32 depositAddressData = StorageLibrary.getLayerZeroFacetStorage().userAndNonce[depositAddress];
+        assembly ("memory-safe") {
+            sender := xor(and(depositAddressData, ADDRESS_MASK), token)
+        }
+
+        if (msg.sender != _authorizedSender) {
+            if (msg.sender != sender) {
+                revert IEntryPoint.EntryPoint_UnauthorizedSender();
+            }
+        }
+
+        bytes memory bytecode = abi.encodePacked(
+            hex"608160113439333d60010152608134f3fe7f00000000000000000000000000000000000000000000000000000000000000003381146029575b005b3680600014607057602014603c575b6027565b60006044601c8280948135906370a0823183523060205260206040602486855afa5063a9059cbb83526020525af150386038565b5060008080809347905af15038603856",
+            extraData
+        );
+
+        uint256 balanceBefore = TransferHelper.safeGetBalance({ token: token, account: address(this) });
+
+        assembly ("memory-safe") {
+            mstore(0, sender)
+            mstore(32, add(shl(32, and(shr(160, depositAddressData), 0xffffffff)), shr(192, depositAddressData)))
+
+            let salt := keccak256(0, 64)
+
+            let addr := create2(0, add(bytecode, 32), mload(bytecode), salt)
+
+            // if address are not equal -> revert
+            if sub(addr, depositAddress) {
+                // EntryPoint_InvalidDepositAddress() selector
+                mstore(0, 0x8fa1d3f9)
+                revert(28, 4)
+            }
+
+            switch token
+            // if token is Native -> call with empty data
+            case 0 { pop(call(gas(), depositAddress, 0, 0, 0, 0, 0)) }
+            default {
+                // else call with token address
+                mstore(0, token)
+                pop(call(gas(), depositAddress, 0, 0, 32, 0, 0))
+            }
+
+            mstore(64, bytecode)
+        }
+
+        amount = Utils.compareAmountsWithDifference({
+            greaterValue: TransferHelper.safeGetBalance({ token: token, account: address(this) }),
+            lowerValue: balanceBefore
+        });
+
+        Utils.expectNotZero({ value: amount });
+    }
+
+    /// @dev assemble data for a multicall and call it in self call
+    /// @param token token address
+    /// @param amount amount to use for the call
+    /// @param extraData extra data to use for transfer to end user
+    /// @param data data for multiswap
+    function _selfMulticall(
+        address token,
+        uint256 amount,
+        bytes calldata extraData,
+        bytes calldata data
+    )
+        internal
+        returns (bool successfulCall, bytes memory payload)
+    {
+        bytes[] memory updatedData;
+
+        unchecked {
+            bool isMulticall = data.length > 0;
+
+            (bytes[] memory tokenTransferData) = abi.decode(extraData, (bytes[]));
+
+            if (isMulticall) {
+                updatedData = new bytes[](1 + tokenTransferData.length);
+
+                uint256 i;
+                if (isMulticall) {
+                    updatedData[i++] = data;
+                }
+
+                for (uint256 j; i < updatedData.length;) {
+                    updatedData[i++] = tokenTransferData[j++];
+                }
+            } else {
+                assembly ("memory-safe") {
+                    updatedData := tokenTransferData
+                }
+            }
+
+            payload = abi.encodeWithSelector(
+                // "multicall(bytes[])" selector
+                0xac9650d8,
+                updatedData
+            );
+
+            assembly ("memory-safe") {
+                let length := mload(payload)
+                let offset := add(payload, add(32, length))
+                mstore(offset, add(shl(160, amount), token))
+                mstore(add(offset, 32), 1)
+                length := add(length, 64)
+
+                successfulCall := call(gas(), address(), 0, add(payload, 32), length, 0, 0)
+
+                if iszero(successfulCall) {
+                    returndatacopy(add(payload, 32), 0, returndatasize())
+                    mstore(payload, returndatasize())
+                }
+            }
         }
     }
 

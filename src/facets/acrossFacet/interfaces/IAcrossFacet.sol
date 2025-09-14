@@ -35,6 +35,38 @@ interface IAcrossFacet {
         bytes message;
     }
 
+    /// @notice Parameters for an Across V3 cross-chain deposit.
+    /// @dev Specifies the tokens, amounts, and metadata for bridging tokens to a destination chain.
+    struct AcrossDepositParams {
+        /// @notice The address to receive the tokens on the destination chain.
+        address recipient;
+        /// @notice The address of the input token to deposit.
+        /// @dev Use address(0) for native currency, which is converted to `_wrappedNative`.
+        address inputToken;
+        /// @notice The address of the output token on the destination chain.
+        address outputToken;
+        /// @notice The amount of input tokens to deposit.
+        uint256 inputAmount;
+        /// @notice The percentage of the input amount expected as output, scaled by 1e18.
+        /// @dev Used to calculate the minimum output amount as `inputAmount * outputAmountPercent / E18`.
+        uint256 outputAmountPercent;
+        /// @notice The chain ID of the destination chain.
+        uint256 destinationChainId;
+        /// @notice The address of the exclusive relayer (if any).
+        /// @dev Set to address(0) for no exclusive relayer.
+        address exclusiveRelayer;
+        /// @notice The timestamp of the quote for the deposit.
+        uint32 quoteTimestamp;
+        /// @notice The deadline for filling the deposit on the destination chain.
+        uint32 fillDeadline;
+        /// @notice The deadline for the exclusive relayer's exclusivity period.
+        uint32 exclusivityDeadline;
+        /// @notice The destination layerZero endpoint ID for message transfer.
+        uint32 dstEid;
+        /// @notice The extraData for the message which will be used for deposit address calculation.
+        bytes extraData;
+    }
+
     // =========================
     // events
     // =========================

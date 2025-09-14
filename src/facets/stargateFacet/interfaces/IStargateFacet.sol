@@ -86,4 +86,22 @@ interface IStargateFacet {
     )
         external
         returns (bytes32[] memory tokensAndAmounts);
+
+    /// @notice Sends tokens across chains via the Stargate protocol
+    /// @dev Transfers tokens from the sender (or uses pre-transferred tokens), applies protocol fees,
+    ///      approves the Stargate pool, and initiates the cross-chain transfer.
+    /// @param poolAddress The address of the Stargate pool contract.
+    /// @param dstEid The destination chain's LayerZero endpoint ID.
+    /// @param receiver The recipient address on the destination chain.
+    /// @param extraData The optional extraData for the message.
+    /// @return tokensAndAmounts Array of token and amount pairs
+    function sendStargate(
+        address poolAddress,
+        uint32 dstEid,
+        address receiver,
+        address tokenOut,
+        bytes calldata extraData
+    )
+        external
+        returns (bytes32[] memory tokensAndAmounts);
 }

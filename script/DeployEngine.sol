@@ -8,6 +8,7 @@ import { LayerZeroFacet } from "../src/facets/stargateFacet/LayerZeroFacet.sol";
 import { SymbiosisFacet } from "../src/facets/symbiosisFacet/SymbiosisFacet.sol";
 import { AcrossFacet } from "../src/facets/acrossFacet/AcrossFacet.sol";
 import { CrossCurveFacet } from "../src/facets/crossCurveFacet/CrossCurveFacet.sol";
+import { CelerCCTPFacet } from "../src/facets/CCTPFacet/CelerCCTPFacet.sol";
 
 import { EntryPoint } from "../src/EntryPoint.sol";
 
@@ -19,6 +20,7 @@ struct Contracts {
     address symbiosisFacet;
     address acrossFacet;
     address crossCurveFacet;
+    address celerCCTPFacet;
     //
     address quoter;
     address quoterProxy;
@@ -38,6 +40,8 @@ struct Contracts {
     address permit2;
     address acrossSpokePool;
     address crossCurveUnifiedRouter;
+    address celerCCTPProxy;
+    address usdc;
     //
     address multisig;
     //
@@ -52,11 +56,12 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
         return Contracts({
             multiswapRouterFacet: 0xbF9e94b89D6f4f8DA8e56Bc2F92C058d5e12e1Ae,
             transferFacet: 0x22c9F7E674d52C71b9f00F6e637bd66A6c83D41A,
-            stargateFacet: 0xD9Aa9C211ca25d46e04d40dA04A6965bBDe4246A,
-            layerZeroFacet: 0x8318AEB7Dfc6990A2Ec80e0a97F43906a502547a,
+            stargateFacet: address(0),
+            layerZeroFacet: address(0),
             symbiosisFacet: address(1),
             acrossFacet: 0x17bC5E1A8DC29C702F4af5DC939a06c339ccc23e,
             crossCurveFacet: address(1),
+            celerCCTPFacet: address(0),
             //
             quoter: 0x7F17EA00590d1A1b6384717058f3C29a06391967,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
@@ -76,6 +81,8 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
             acrossSpokePool: 0x5c7BCd6E7De5423a257D81B442095A1a6ced35C5,
             crossCurveUnifiedRouter: 0xA2A786ff9148f7C88EE93372Db8CBe9e94585c74,
+            celerCCTPProxy: 0x6065A982F04F759b7d2D042D2864e569fad84214,
+            usdc: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,
             //
             multisig: multisig,
             //
@@ -88,11 +95,12 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
         return Contracts({
             multiswapRouterFacet: 0xe514120888329e44414E40f0b1F5Ae4eB3C89F96,
             transferFacet: 0xC69A50AEd37f7c08fe6C602f92922Cffd7E7045A,
-            stargateFacet: 0xb0A3eF30A00670D0AA907909160E7b1a16c51a85,
-            layerZeroFacet: 0x2c5C3775Be2E4Aa408Acc836a39d853Ca1CE68Ef,
+            stargateFacet: 0xea2f8aC5e74B9a12A21333e03Ca4b0b51e4CfB2D,
+            layerZeroFacet: 0x63b9F6b24Cd07793795D3f0488e34039E9519210,
             symbiosisFacet: address(1),
-            acrossFacet: address(1),
+            acrossFacet: 0x066a0640E451f8FA727DD219b5a93Cb01F3ECF6e,
             crossCurveFacet: address(1),
+            celerCCTPFacet: address(1),
             //
             quoter: 0xD27CDB55E82b1FbF69E64C57e1D1D43FdA3854d9,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
@@ -100,7 +108,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContract: 0xd36f8CC82EA004B4d0c15BdCf584D19aaD775209,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0xB2699c5433382d7475d502a1e98850cC7C621D1D,
+            prodEntryPoint: 0xD084263a34781e17cB6cd8d39CB1c5F392CCE442,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -110,8 +118,10 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             layerZeroEndpointV2: 0x1a44076050125825900e736c501f859c50fE728c,
             symbiosisPortal: 0x5Aa5f7f84eD0E5db0a4a85C3947eA16B53352FD4,
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
-            acrossSpokePool: address(0),
+            acrossSpokePool: 0x4e8E101924eDE233C13e2D8622DC8aED2872d505,
             crossCurveUnifiedRouter: 0xA2A786ff9148f7C88EE93372Db8CBe9e94585c74,
+            celerCCTPProxy: address(0),
+            usdc: address(0),
             //
             multisig: multisig,
             //
@@ -124,11 +134,12 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
         return Contracts({
             multiswapRouterFacet: 0x4E8B3593b50942133d0484F90FD38a655e5fFA7D,
             transferFacet: 0x5bd810757d09FD3CD139379c7A8d4321F50C4505,
-            stargateFacet: 0x0B14925b19327563BAa76cBeC04A3d4c0F8619b6,
-            layerZeroFacet: 0x41FaCCFaa42e62988e3D3346B3987bb1D56a6481,
+            stargateFacet: 0x56109b40E7BB0f4C987f9dddA5C5cfCf142Cad2E,
+            layerZeroFacet: 0x33E01c15D792c4Aa0927845778863b9617Ed4698,
             symbiosisFacet: address(1),
-            acrossFacet: 0xd4D07c5cd66390833b0bA9E5f6d2c93b83E511c4,
+            acrossFacet: 0x87d84EC6026757593428C5cB73290aFBc6B4472D,
             crossCurveFacet: address(1),
+            celerCCTPFacet: 0x0E77029aB1522F38A284A9d3EA59980211822D35,
             //
             quoter: 0x311621eAAea04955ab96F6F2F17DB705c108e8b0,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
@@ -136,7 +147,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContract: 0x85Db0f7aBEA9A1232e7617bE69d7988a3221EF15,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0x2c4F3e3d9cc614e40B70BC24a67a525d22bF5270,
+            prodEntryPoint: 0xCcAfc69a7F75C672501B0f0B819bA03Dab127B46,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -148,6 +159,8 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
             acrossSpokePool: 0x9295ee1d8C5b022Be115A2AD3c30C72E34e7F096,
             crossCurveUnifiedRouter: address(0),
+            celerCCTPProxy: 0xB876cc05c3C3C8ECBA65dAc4CF69CaF871F2e0DD,
+            usdc: 0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359,
             //
             multisig: multisig,
             //
@@ -160,11 +173,12 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
         return Contracts({
             multiswapRouterFacet: 0x5c12c5160697a129AF51fBc94C2BE50eBFD2bF53,
             transferFacet: 0x4bEdfe5B9f35C258376fDDb46D1b2Db2b85ebC00,
-            stargateFacet: 0xe9ccF0993b6593bFF94d68c10cE469BF52d00677,
-            layerZeroFacet: 0x9FC94bed2FF68cC279070C4bBE86Bb3F3C42E14B,
+            stargateFacet: 0x517c6413bEe56bcCEb62CFA7f411Ef25f80a6195,
+            layerZeroFacet: 0xFd58921ec28d7c407ba684DD8dED4F5B22bd4a44,
             symbiosisFacet: address(1),
             acrossFacet: address(1),
             crossCurveFacet: address(1),
+            celerCCTPFacet: address(0),
             //
             quoter: 0xcEECc58e3d1A2dBc39ad3EDa5F62775966971952,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
@@ -172,7 +186,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContract: 0x595EeaA4E8A8643bE5E2462f109C94012A472774,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0x30A46f018C7D7d8eb42098Ec658B123B34E93F68,
+            prodEntryPoint: 0x102c3817Eea7B968bb637590eEEBBb369262f7a5,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -184,6 +198,8 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
             acrossSpokePool: address(0),
             crossCurveUnifiedRouter: 0xA2A786ff9148f7C88EE93372Db8CBe9e94585c74,
+            celerCCTPProxy: 0x9744ae566c64B6B6f7F9A4dD50f7496Df6Fef990,
+            usdc: 0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E,
             //
             multisig: multisig,
             //
@@ -196,11 +212,12 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
         return Contracts({
             multiswapRouterFacet: 0x3bC7a01b433F232de34132179DdAEE12F7FEE0c2,
             transferFacet: 0x50E4D4a7385992a415A6F27294658B1017cF8701,
-            stargateFacet: 0xdb7Dbf34EBFAE345e69e848FD58b8cBA0252Fca9,
-            layerZeroFacet: 0x9876C5c806E1A97634E0A5df7817e0E2f5fBE109,
+            stargateFacet: 0x311621eAAea04955ab96F6F2F17DB705c108e8b0,
+            layerZeroFacet: 0x8eb46949e8D707FF8Fd4eB6ad7Bda011B62f8196,
             symbiosisFacet: address(1),
-            acrossFacet: 0xF6B31e6DD18C81d10fD292691E0014Be03420A1c,
+            acrossFacet: address(0),
             crossCurveFacet: address(1),
+            celerCCTPFacet: address(0),
             //
             quoter: 0x5c12c5160697a129AF51fBc94C2BE50eBFD2bF53,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
@@ -208,7 +225,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContract: 0xE846Bc68EC2cE2BC813eBDEB315f24cC46cdf4de,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0xb6adBf8c60857DeAa4D756D29a63f21D0732CaB3,
+            prodEntryPoint: 0x565358F34ecaE13b8E9D97C12b0baE84b87bE476,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -220,6 +237,8 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
             acrossSpokePool: 0x6f26Bf09B1C792e3228e5467807a900A503c0281,
             crossCurveUnifiedRouter: 0xA2A786ff9148f7C88EE93372Db8CBe9e94585c74,
+            celerCCTPProxy: 0x697aC93c9263346c5Ad0412F9356D5789a3AA687,
+            usdc: 0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85,
             //
             multisig: multisig,
             //
@@ -232,11 +251,12 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
         return Contracts({
             multiswapRouterFacet: 0x30A46f018C7D7d8eb42098Ec658B123B34E93F68,
             transferFacet: 0x633AbbcE954Fc3fcB3D2e2D27E86B75dE6650d66,
-            stargateFacet: 0xa1cF9Aa16071F97BcF9AAB75A5A6D79CB53DFb9C,
-            layerZeroFacet: 0x64D225f5a87E01CF015770815de34f03fe59fE13,
+            stargateFacet: 0x6829a3c7bAeCB3eEE4072C9BB6f5d4ccac9dbf03,
+            layerZeroFacet: 0x81CD5B260462a06b705Da1C35d16ACF7f37798F5,
             symbiosisFacet: address(1),
-            acrossFacet: 0x5c12c5160697a129AF51fBc94C2BE50eBFD2bF53,
+            acrossFacet: 0xDF34E00fE0EB9f8a5255E843a83fBa8f43eD62d6,
             crossCurveFacet: address(1),
+            celerCCTPFacet: 0xEd14a2D721c1987Ae96842b1bc0E4852a73307c0,
             //
             quoter: 0x4bEdfe5B9f35C258376fDDb46D1b2Db2b85ebC00,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
@@ -244,7 +264,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContract: 0x7E9bF77656C1FB73813e725153c70300C502e56f,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0xFd58921ec28d7c407ba684DD8dED4F5B22bd4a44,
+            prodEntryPoint: 0x046684C98C88E940B7321F175972C37A5E1862f5,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -256,6 +276,8 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
             acrossSpokePool: 0xe35e9842fceaCA96570B734083f4a58e8F7C5f2A,
             crossCurveUnifiedRouter: 0xA2A786ff9148f7C88EE93372Db8CBe9e94585c74,
+            celerCCTPProxy: 0x054B95b60BFFACe948Fa4548DA8eE2e212fb7C0a,
+            usdc: 0xaf88d065e77c8cC2239327C5EDb3A432268e5831,
             //
             multisig: multisig,
             //
@@ -268,11 +290,12 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
         return Contracts({
             multiswapRouterFacet: 0x443e430a87d68e285E56FBD76cB4ef60DA0bCe9f,
             transferFacet: 0x0000600c2cAE34743ffA4605fce80bcda2fC1b33,
-            stargateFacet: 0xE06a5011B83c5D2b0e6aCfe54ecf1f46Dc6D7544,
-            layerZeroFacet: 0xA1458B50bb651c2B5231186D7CFef8cC469eC51b,
+            stargateFacet: 0x633AbbcE954Fc3fcB3D2e2D27E86B75dE6650d66,
+            layerZeroFacet: 0xa1cF9Aa16071F97BcF9AAB75A5A6D79CB53DFb9C,
             symbiosisFacet: address(1),
-            acrossFacet: 0x62B1F797d0b00e79D9bA2a419D20fDC547c0B49F,
+            acrossFacet: address(0),
             crossCurveFacet: address(1),
+            celerCCTPFacet: address(0),
             //
             quoter: 0x90DF6f51165AFEccb379c047d1bc34f70225Fc71,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
@@ -280,7 +303,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContract: 0xfdF5F450CF0dE94F6C0Bf0B2355de1EEb753B39D,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0x422b28F886AC3D0a4AF792DC75077CE44305ABda,
+            prodEntryPoint: 0x64D225f5a87E01CF015770815de34f03fe59fE13,
             prodProxy: 0x9AE4De30ad3943e3b65E5DF41e8FB8CC0F0213d7,
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -292,6 +315,8 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
             acrossSpokePool: 0x09aea4b2242abC8bb4BB78D537A67a245A7bEC64,
             crossCurveUnifiedRouter: 0xA2A786ff9148f7C88EE93372Db8CBe9e94585c74,
+            celerCCTPProxy: 0x243b40e96c6bF21511E53d85c86F6Ec982f9a879,
+            usdc: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913,
             //
             multisig: multisig,
             //
@@ -304,11 +329,12 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
         return Contracts({
             multiswapRouterFacet: 0xfDf7b550BD971dF0846872080cE93c67dE00853f,
             transferFacet: 0xACCa97a6F48342d069f19fb4502AC5C5c37541d4,
-            stargateFacet: 0x917213eDBEF61B83bc8c80f23Ba16b60Ebe68204,
-            layerZeroFacet: 0xD2A7A4cF1B25B92f47B4A702276DefbB42F45e77,
+            stargateFacet: 0x7E9bF77656C1FB73813e725153c70300C502e56f,
+            layerZeroFacet: 0x595EeaA4E8A8643bE5E2462f109C94012A472774,
             symbiosisFacet: address(1),
-            acrossFacet: 0xf9Fe66d241BF32610a557c204a0A660348965481,
+            acrossFacet: address(0),
             crossCurveFacet: address(1),
+            celerCCTPFacet: address(1),
             //
             quoter: 0x71e1e613f57102A7c921a829848C3823030ed500,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
@@ -316,7 +342,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContract: 0x65DfbA5338137e0De3c7e9C11D9BFEd0B02c33b8,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0xCc5bdcB370BDff54F92bEBF2EF7EE4cD049E45b0,
+            prodEntryPoint: 0xD7D812de23Dfd953F1431322cE62A0Ca818C9570,
             prodProxy: address(1),
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -328,6 +354,8 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
             acrossSpokePool: 0x3baD7AD0728f9917d1Bf08af5782dCbD516cDd96,
             crossCurveUnifiedRouter: address(0),
+            celerCCTPProxy: address(0),
+            usdc: address(0),
             //
             multisig: multisig,
             //
@@ -340,11 +368,12 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
         return Contracts({
             multiswapRouterFacet: 0xfdF5F450CF0dE94F6C0Bf0B2355de1EEb753B39D,
             transferFacet: 0xDa7fbeb9D9Ee83194f10E9D84Ad6DCb47A7311Dc,
-            stargateFacet: 0xaA2b8D9B4328076Ff656476111F5c654D1d70Eb0,
-            layerZeroFacet: 0xc25bED344C4c3885f16d127F23FaDaa82784c2A6,
+            stargateFacet: 0x71e1e613f57102A7c921a829848C3823030ed500,
+            layerZeroFacet: 0xDE9C11Fc5688f768c92734282d884aC5fB79d4a6,
             symbiosisFacet: address(1),
             acrossFacet: address(1),
             crossCurveFacet: address(1),
+            celerCCTPFacet: address(1),
             //
             quoter: 0xF9B37dFa8479C657FddD9fB50dDb75404622EBCe,
             quoterProxy: 0x13e6aC30fC8E37792F18b1e3D75B8266B0A93734,
@@ -352,7 +381,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             feeContract: 0xF307b0a60330512D51e4C8e4ddAA3E26D8f08569,
             feeContractProxy: 0x37D8fb3336CB25322741c9A75733CFF3903989e6,
             //
-            prodEntryPoint: 0xFd431Bcc7D1aAc3166e7D6c328b21567c55AAfD0,
+            prodEntryPoint: 0x490555CBa64d606FFf6f82a3A373cEA5d59B3973,
             prodProxy: address(1),
             prodProxyV2: 0x07eA307c40599915177b8d0c2EF0F67871Ba4652,
             prodProxyV3: 0xA5487594bD2303AF225f8c15E80CED0Da883A0E8,
@@ -364,6 +393,8 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
             acrossSpokePool: address(0),
             crossCurveUnifiedRouter: 0xA2A786ff9148f7C88EE93372Db8CBe9e94585c74,
+            celerCCTPProxy: address(0),
+            usdc: address(0),
             //
             multisig: multisig,
             //
@@ -381,6 +412,7 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             symbiosisFacet: address(0),
             acrossFacet: address(0),
             crossCurveFacet: address(0),
+            celerCCTPFacet: address(0),
             //
             quoter: address(0),
             quoterProxy: address(0),
@@ -400,6 +432,8 @@ function getContracts(uint256 chainId) pure returns (Contracts memory) {
             permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3,
             acrossSpokePool: 0x5c7BCd6E7De5423a257D81B442095A1a6ced35C5,
             crossCurveUnifiedRouter: address(0),
+            celerCCTPProxy: address(0),
+            usdc: address(0),
             //
             multisig: multisig,
             //
@@ -502,6 +536,7 @@ library DeployEngine {
         if (contracts.acrossFacet > address(1)) {
             selectors[i++] = AcrossFacet.spokePool.selector;
             selectors[i++] = AcrossFacet.sendAcrossDepositV3.selector;
+            selectors[i++] = AcrossFacet.sendAcrossDeposit.selector;
             selectors[i++] = AcrossFacet.handleV3AcrossMessage.selector;
             for (uint256 k; k < i - iCache; ++k) {
                 addressIndexes[j++] = addressIndex;
@@ -518,6 +553,17 @@ library DeployEngine {
             }
             iCache = i;
             facetAddresses[addressIndex] = contracts.crossCurveFacet;
+            ++addressIndex;
+        }
+
+        if (contracts.celerCCTPFacet > address(1)) {
+            selectors[i++] = CelerCCTPFacet.quoteTransfer.selector;
+            selectors[i++] = CelerCCTPFacet.sendCircleBridge.selector;
+            for (uint256 k; k < i - iCache; ++k) {
+                addressIndexes[j++] = addressIndex;
+            }
+            iCache = i;
+            facetAddresses[addressIndex] = contracts.celerCCTPFacet;
             ++addressIndex;
         }
 
@@ -583,7 +629,11 @@ library DeployEngine {
             upgrade = true;
 
             contracts.acrossFacet = address(
-                new AcrossFacet({ spokePool_: contracts.acrossSpokePool, wrappedNative_: contracts.wrappedNative })
+                new AcrossFacet({
+                    spokePool_: contracts.acrossSpokePool,
+                    wrappedNative_: contracts.wrappedNative,
+                    endpointV2: contracts.layerZeroEndpointV2
+                })
             );
         }
 
@@ -592,6 +642,18 @@ library DeployEngine {
 
             contracts.crossCurveFacet =
                 address(new CrossCurveFacet({ crossCurveRouter: contracts.crossCurveUnifiedRouter }));
+        }
+
+        if (contracts.celerCCTPFacet == address(0) || isTest) {
+            upgrade = true;
+
+            contracts.celerCCTPFacet = address(
+                new CelerCCTPFacet({
+                    circleBridge: contracts.celerCCTPProxy,
+                    endpointV2: contracts.layerZeroEndpointV2,
+                    USDC_: contracts.usdc
+                })
+            );
         }
 
         return (contracts, upgrade);

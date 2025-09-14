@@ -5,8 +5,11 @@ import { Utils } from "../../libraries/Utils.sol";
 import { TransferHelper } from "../../libraries/TransferHelper.sol";
 import { TransientStorageLibrary } from "../../libraries/TransientStorageLibrary.sol";
 
+import { LayerZeroLib } from "../../libraries/LayerZeroLib.sol";
+
 import { IV3SpokePool } from "./interfaces/IV3SpokePool.sol";
 import { IAcrossFacet } from "./interfaces/IAcrossFacet.sol";
+import { ILayerZeroEndpointV2 } from "../stargateFacet/interfaces/ILayerZeroEndpointV2.sol";
 
 import { E18 } from "../../libraries/Constants.sol";
 
@@ -28,6 +31,10 @@ contract AcrossFacet is IAcrossFacet {
     ///      Immutable, set during construction. Used for native currency deposits.
     address private immutable _wrappedNative;
 
+    /// @dev The address of the LayerZero V2 endpoint contract.
+    ///      Immutable, set during construction. Used for validating incoming compose messages in `lzCompose`.
+    address private immutable _lzEndpointV2;
+
     // =========================
     // constructor
     // =========================
@@ -36,9 +43,10 @@ contract AcrossFacet is IAcrossFacet {
     /// @dev Sets the immutable `_spokePool` and `_wrappedNative` addresses.
     /// @param spokePool_ The address of the Across V3 SpokePool contract.
     /// @param wrappedNative_ The address of the wrapped native token (e.g., WETH).
-    constructor(address spokePool_, address wrappedNative_) {
+    constructor(address spokePool_, address wrappedNative_, address endpointV2) {
         _spokePool = spokePool_;
         _wrappedNative = wrappedNative_;
+        _lzEndpointV2 = endpointV2;
     }
 
     // =========================
@@ -80,6 +88,43 @@ contract AcrossFacet is IAcrossFacet {
         );
         address spokePool_ = _spokePool;
 
+        assembly ("memory-safe") {
+            if iszero(call(gas(), spokePool_, nativeValue, add(depositCalldata, 32), mload(depositCalldata), 0, 0)) {
+                returndatacopy(0, 0, returndatasize())
+                revert(0, returndatasize())
+            }
+        }
+    }
+
+    function sendAcrossDeposit(IAcrossFacet.AcrossDepositParams calldata acrossDepositParams)
+        external
+        returns (bytes32[] memory tokensAndAmounts)
+    {
+        address inputToken = acrossDepositParams.inputToken;
+        uint256 inputAmount;
+
+        tokensAndAmounts = Utils.decodeTokensAndAmountsArray();
+
+        uint256 nativeValue;
+        if (inputToken > address(0)) {
+            inputAmount = Utils.getAmountFromArrayAndDelete({ tokensAndAmounts: tokensAndAmounts, token: inputToken });
+            Utils.expectNotZero({ value: inputAmount });
+
+            TransferHelper.safeApprove({ token: inputToken, spender: _spokePool, value: inputAmount });
+        } else {
+            inputToken = _wrappedNative;
+            nativeValue = inputAmount;
+        }
+
+        bytes memory depositCalldata = _getDepositV3Calldata(
+            TransientStorageLibrary.getSenderAddress(),
+            acrossDepositParams.recipient,
+            acrossDepositParams,
+            inputToken,
+            inputAmount
+        );
+
+        address spokePool_ = _spokePool;
         assembly ("memory-safe") {
             if iszero(call(gas(), spokePool_, nativeValue, add(depositCalldata, 32), mload(depositCalldata), 0, 0)) {
                 returndatacopy(0, 0, returndatasize())
@@ -172,6 +217,68 @@ contract AcrossFacet is IAcrossFacet {
                     acrossDepositParams.fillDeadline,
                     acrossDepositParams.exclusivityDeadline,
                     abi.encode(sender, acrossDepositParams.message) // fallbackAddress and message
+                )
+            );
+        }
+    }
+
+    /// @notice Constructs the calldata for the `depositV3` call to the SpokePool and optionally send cross-chain message via LayerZero
+    /// @dev Encodes the deposit parameters, adjusting the output amount based on `outputAmountPercent` scaled by `E18`.
+    /// @param sender The depositor address.
+    /// @param acrossDepositParams The deposit parameters including:
+    ///        - recipient: The recipient address on the destination chain
+    ///        - inputToken: The input token address (address(0) for native currency)
+    ///        - outputToken: The output token address on the destination chain
+    ///        - outputAmountPercent: The percentage of input amount to receive on the destination chain
+    ///        - destinationChainId: The destination chain ID
+    ///        - exclusiveRelayer: The exclusive relayer address
+    ///        - quoteTimestamp: The timestamp of the quote
+    ///        - fillDeadline: The deadline for filling the deposit
+    ///        - exclusivityDeadline: The deadline for exclusive relayer
+    ///        - message: Additional message data
+    /// @param inputToken The input token address (adjusted to `_wrappedNative` for native deposits).
+    /// @param inputAmount The input token amount.
+    /// @return The encoded calldata for `IV3SpokePool.depositV3`.
+    function _getDepositV3Calldata(
+        address sender,
+        address recipient,
+        IAcrossFacet.AcrossDepositParams calldata acrossDepositParams,
+        address inputToken,
+        uint256 inputAmount
+    )
+        internal
+        returns (bytes memory)
+    {
+        unchecked {
+            address outputToken = acrossDepositParams.outputToken;
+            uint256 outputAmount = inputAmount * acrossDepositParams.outputAmountPercent / E18;
+
+            recipient = LayerZeroLib.validateReceiver({
+                receiver: acrossDepositParams.recipient,
+                sender: sender,
+                dstEid: acrossDepositParams.dstEid,
+                tokenIn: inputToken,
+                tokenOut: outputToken,
+                minAmountLD: outputAmount,
+                extraData: acrossDepositParams.extraData,
+                endpoint: ILayerZeroEndpointV2(_lzEndpointV2)
+            });
+
+            return abi.encodeCall(
+                IV3SpokePool.depositV3,
+                (
+                    sender, // depositor
+                    recipient,
+                    inputToken,
+                    outputToken,
+                    inputAmount,
+                    outputAmount,
+                    acrossDepositParams.destinationChainId,
+                    acrossDepositParams.exclusiveRelayer,
+                    acrossDepositParams.quoteTimestamp,
+                    acrossDepositParams.fillDeadline,
+                    acrossDepositParams.exclusivityDeadline,
+                    new bytes(0)
                 )
             );
         }

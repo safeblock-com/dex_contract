@@ -8,17 +8,9 @@ import { StorageLibrary, LayerZeroFacetStorage } from "../../libraries/StorageLi
 import { TransientStorageLibrary } from "../../libraries/TransientStorageLibrary.sol";
 import { LayerZeroLib } from "../../libraries/LayerZeroLib.sol";
 
-import {
-    ILayerZeroEndpointV2,
-    UlnConfig,
-    Origin,
-    MessagingFee,
-    MessagingParams
-} from "./interfaces/ILayerZeroEndpointV2.sol";
+import { ILayerZeroEndpointV2, UlnConfig, Origin, MessagingParams } from "./interfaces/ILayerZeroEndpointV2.sol";
 import { IMessageLibManager } from "./interfaces/IMessageLibManager.sol";
 import { ISendLib } from "./interfaces/ISendLib.sol";
-
-import { IStargateFacet } from "./interfaces/IStargateFacet.sol";
 
 import { ILayerZeroFacet } from "./interfaces/ILayerZeroFacet.sol";
 
@@ -116,6 +108,7 @@ contract LayerZeroFacet is BaseOwnableFacet, ILayerZeroFacet {
         });
     }
 
+    /// @inheritdoc ILayerZeroFacet
     function quoteMessage(uint32 remoteEid, bytes calldata extraData) external view returns (uint256 nativeFee) {
         uint256 nonce = StorageLibrary.getLayerZeroFacetStorage().nonce[remoteEid];
 
@@ -282,7 +275,7 @@ contract LayerZeroFacet is BaseOwnableFacet, ILayerZeroFacet {
     /// @notice Invoked by OAppReceiver when EndpointV2.lzReceive is called
     /// @dev   origin    Metadata (source chain, sender address, nonce)
     /// @dev   guid      Global unique ID for tracking this message
-    /// @param message   ABI-encoded bytes (the string we sent earlier)
+    /// @param message   ABI-encoded bytes
     /// @dev   executor  Executor address that delivered the message
     /// @dev   extraData Additional data from the Executor (unused here)
     function _lzReceive(
@@ -295,11 +288,11 @@ contract LayerZeroFacet is BaseOwnableFacet, ILayerZeroFacet {
         internal
     {
         if (msg.sender != address(_endpointV2)) {
-            revert IStargateFacet.StargateFacet_NotLZEndpoint();
+            revert ILayerZeroFacet.LayerZeroFacet_NotLZEndpoint();
         }
 
         (
-            address dstAddress,
+            address depositAddress,
             address user,
             uint256 nonce,
             uint256 srcChainId,
@@ -312,13 +305,13 @@ contract LayerZeroFacet is BaseOwnableFacet, ILayerZeroFacet {
         LayerZeroFacetStorage storage s = StorageLibrary.getLayerZeroFacetStorage();
 
         assembly ("memory-safe") {
-            mstore(0, dstAddress)
+            mstore(0, depositAddress)
             mstore(32, add(s.slot, 4))
-            sstore(keccak256(0, 64), add(user, add(shl(192, srcChainId), shl(160, nonce))))
+            sstore(keccak256(0, 64), add(xor(user, tokenOut), add(shl(192, srcChainId), shl(160, nonce))))
         }
 
-        emit MessageReceived({
-            dstAddress: dstAddress,
+        emit ILayerZeroFacet.MessageReceived({
+            depositAddress: depositAddress,
             user: user,
             srcChainId: srcChainId,
             tokenIn: tokenIn,
@@ -327,16 +320,6 @@ contract LayerZeroFacet is BaseOwnableFacet, ILayerZeroFacet {
             extraData: extraData
         });
     }
-
-    event MessageReceived(
-        address dstAddress,
-        address user,
-        uint256 srcChainId,
-        address tokenIn,
-        address tokenOut,
-        uint256 minimalAmountOut,
-        bytes extraData
-    );
 
     // =========================
     // internal

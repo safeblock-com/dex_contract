@@ -24,8 +24,11 @@ contract AcrossFacetTest is BaseTest {
     // =========================
 
     function test_acrossFacet_constructor_shouldInitializeInConstructor() external {
-        AcrossFacet _acrossFacet =
-            new AcrossFacet({ spokePool_: contracts.acrossSpokePool, wrappedNative_: contracts.wrappedNative });
+        AcrossFacet _acrossFacet = new AcrossFacet({
+            spokePool_: contracts.acrossSpokePool,
+            wrappedNative_: contracts.wrappedNative,
+            endpointV2: contracts.layerZeroEndpointV2
+        });
 
         assertEq(_acrossFacet.spokePool(), contracts.acrossSpokePool);
     }
